@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+*.venv/
+services/**/.venv/
+services/**/venv/
+services/**/env/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Build Outputs
+apps/web/dist/
+apps/web/dist-ssr/
+apps/chrome-extension/dist/
+packages/*/dist/
+*.tsbuildinfo
+.eslintcache
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.pfx
+secrets/
+credentials.json
+token.json
+service_account.json
+
+# Local Generated & Runtime Data
+*.log
+logs/
+*.sqlite
+*.sqlite3
+*.db
+local_data/
+storage/
+temp/
+tmp/
+.cache/
+.parcel-cache/
+
+# Operating System & IDE Artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
