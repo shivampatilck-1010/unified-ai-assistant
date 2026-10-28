@@ -129,3 +129,18 @@ flowchart LR
 | **Resource Exhaustion / Malicious Payloads** *(Denial of Service)* | Discovered links point to multi-gigabyte ISOs, archives, or streaming endpoints designed to freeze the browser worker. | `WebCollector` verifies HTTP `Content-Type` (`text/html` or `text/plain` only), sets strict navigation timeouts (15s), and limits extracted text length to 15,000 characters. |
 | **Session & State Contamination** *(Information Disclosure)* | Third-party cookies, tracking tokens, or session state persist across research jobs or identities. | Playwright worker executes within fresh ephemeral `BrowserContext` instances. No session storage, cookies, or browser profiles persist between collection runs. |
 
+---
+
+## 8. Phase 7 Wi-Fi Sensing Service Threat Analysis
+
+| Threat & STRIDE Category | Attack Scenario | Implemented Mitigation & Security Control |
+| :--- | :--- | :--- |
+| **Authenticity Spoofing** *(Spoofing / Tampering)* | Service or malicious actor claims synthetic observations are real physical humans, or fakes a physical CSI hardware connection. | Every simulated observation is immutably tagged with `is_simulated = True` and `sensor_type = "synthetic_csi"`. Hardware adapter explicitly verifies physical NIC and driver capabilities, honestly returning `is_available: False` when unsupported. UI presents persistent `SIMULATION MODE ACTIVE` badge. |
+| **Unconsented Surveillance** *(Information Disclosure)* | Sensing is activated in an unauthorized zone without explicit operator consent. | Every sensing zone mandates explicit authorization (`is_authorized: True`) prior to session start. Starting an unauthorized room returns HTTP 400 (`Consent required`). De-authorizing a room immediately halts active sessions. |
+| **Passive Biometric Identification** *(Information Disclosure)* | Estimator or assistant attempts to de-anonymize or identify specific individuals from RF perturbation patterns. | Sensing model is restricted strictly to non-identifying disturbance metrics (subcarrier variance, Doppler proxy, RSSI). The assistant tool prompt and presence estimator explicitly prohibit personal identification, facial/gait recognition, or demographic inference. |
+| **Cross-Tenant Telemetry Leakage** *(Information Disclosure)* | Tenant B queries, modifies, starts, or deletes Tenant A's room configs or time-series events. | Database queries enforce strict `owner_id == authenticated_user_id` filtering on `wifi_sensor_configs`, `wifi_sensing_events`, and `wifi_sensing_audits`. Cross-tenant resource lookups return HTTP 404. |
+| **Silent Background Execution** *(Denial of Service / Privacy)* | Sensing runs indefinitely in the background without user awareness. | Dashboard visibly indicates active simulations. Session status endpoints detail active room counts. In-memory simulators require explicit start commands and support immediate reset. |
+| **Retention Violation** *(Information Disclosure)* | Sensitive historical occupancy trends remain stored indefinitely on disk. | Configurable per-zone retention windows (`retention_days`, default 7 days) with automated cutoff purging. Users can trigger immediate manual history purges via `DELETE /api/sensing/events`. |
+| **External AI Telemetry Exfiltration** *(Information Disclosure)* | Raw high-frequency CSI packets or subcarrier metrics are transmitted to third-party AI models. | Raw CSI arrays are kept strictly local. Only high-level aggregated occupancy status is shared with the assistant when explicitly requested via `use_sensing=True`, bound by privacy rules. |
+
+

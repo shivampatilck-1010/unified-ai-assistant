@@ -19,6 +19,8 @@ class ChatStreamRequest(BaseModel):
     selected_file_ids: Optional[List[str]] = Field(default=None, description="Optional target file IDs for document grounding")
     use_research: Optional[bool] = Field(default=False, description="Whether to invoke autonomous web research and synthesis")
     research_depth: Optional[str] = Field(default="standard", description="Research depth: quick, standard, deep")
+    use_sensing: Optional[bool] = Field(default=False, description="Whether to ground answer in Wi-Fi sensing status/occupancy")
+    sensing_room_id: Optional[str] = Field(default=None, description="Optional target room ID for sensing queries")
 
 
 class SSEEventPayload(BaseModel):

@@ -8,6 +8,7 @@ from routers.providers import router as providers_router
 from routers.reminders import router as reminders_router
 from routers.research import router as research_router
 from routers.tasks import router as tasks_router
+from routers.wifi_sensing import router as wifi_sensing_router
 
 __all__ = [
     "browser_tasks_router",
@@ -20,4 +21,5 @@ __all__ = [
     "files_router",
     "knowledge_router",
     "research_router",
+    "wifi_sensing_router",
 ]

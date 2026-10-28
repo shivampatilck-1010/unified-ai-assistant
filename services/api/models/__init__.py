@@ -8,6 +8,7 @@ from models.message import Message
 from models.reminder import Reminder
 from models.research import ResearchEvent, ResearchJob, ResearchSource
 from models.task import Task
+from models.wifi_sensing import WifiSensingAudit, WifiSensingEvent, WifiSensorConfig
 
 __all__ = [
     "Base",
@@ -23,4 +24,7 @@ __all__ = [
     "ResearchJob",
     "ResearchSource",
     "ResearchEvent",
+    "WifiSensorConfig",
+    "WifiSensingEvent",
+    "WifiSensingAudit",
 ]

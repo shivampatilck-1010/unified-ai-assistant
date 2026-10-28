@@ -636,3 +636,121 @@ export interface ResearchJobDetailResponse {
   sources: ResearchSource[];
   events: ResearchEvent[];
 }
+
+// --- Phase 7: Wi-Fi Sensing Types ---
+
+export interface SensorCapabilityItem {
+  provider_id: string;
+  name: string;
+  is_hardware: bool_or_boolean;
+  is_simulated: boolean;
+  is_available: boolean;
+  unavailability_reason?: string | null;
+  supported_measurements: string[];
+  sampling_rate_hz: number;
+  requires_authorization: boolean;
+}
+
+type bool_or_boolean = boolean;
+
+export interface SensingCapabilitiesResponse {
+  providers: SensorCapabilityItem[];
+  active_provider_id: string;
+  simulation_mode: boolean;
+  hardware_available: boolean;
+}
+
+export interface WifiSensingStatusResponse {
+  status: string;
+  service: string;
+  simulation_mode: boolean;
+  active_simulations_count: number;
+  active_rooms: string[];
+  hardware_detected: boolean;
+  timestamp: string;
+}
+
+export interface SensorConfig {
+  id: string;
+  owner_id: string;
+  room_id: string;
+  room_name: string;
+  is_authorized: boolean;
+  is_active: boolean;
+  simulation_speed: number;
+  retention_days: number;
+  authorized_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SensorConfigCreate {
+  room_id: string;
+  room_name: string;
+  is_authorized: boolean;
+  simulation_speed?: number;
+  retention_days?: number;
+}
+
+export interface SensorConfigUpdate {
+  room_name?: string;
+  is_authorized?: boolean;
+  simulation_speed?: number;
+  retention_days?: number;
+}
+
+export interface SimulationControlResponse {
+  room_id: string;
+  is_active: boolean;
+  simulation_mode: boolean;
+  action: 'started' | 'stopped' | 'reset' | string;
+  speed: number;
+  message: string;
+}
+
+export interface SensingEvent {
+  id: string;
+  room_id: string;
+  timestamp: string;
+  is_simulated: boolean;
+  sensor_type: string;
+  presence_state: 'vacant' | 'presence' | 'motion' | 'unknown' | string;
+  presence_probability?: number | null;
+  motion_level: 'none' | 'low' | 'medium' | 'high' | string;
+  signal_strength_dbm: number;
+  sample_count: number;
+  quality_score: number;
+  raw_metrics: Record<string, unknown>;
+}
+
+export interface SensingEventListResponse {
+  events: SensingEvent[];
+  total: number;
+  room_id?: string | null;
+  simulation_mode: boolean;
+}
+
+export interface SensingOccupancySummary {
+  room_id: string;
+  is_simulated: boolean;
+  total_events: number;
+  current_state: string;
+  current_probability?: number | null;
+  average_signal_dbm: number;
+  state_breakdown: Record<string, number>;
+  last_event_time?: string | null;
+}
+
+export interface SensingPurgeResponse {
+  purged_count: number;
+  message: string;
+}
+
+export interface WifiSensingAudit {
+  id: string;
+  owner_id: string;
+  room_id?: string | null;
+  action: string;
+  details: Record<string, unknown>;
+  created_at: string;
+}

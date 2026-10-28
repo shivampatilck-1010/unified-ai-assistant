@@ -266,6 +266,40 @@ DOCUMENT CONTEXT:
             except Exception as exc:
                 logger.warning("Knowledge search failed during chat streaming: %s", exc)
 
+        # 6b. Apply Wi-Fi sensing context if requested
+        if request.use_sensing:
+            try:
+                from services.wifi_sensing_tool import WifiSensingTool
+
+                if request.sensing_room_id:
+                    sensing_res = await WifiSensingTool.execute(
+                        db=db,
+                        owner_id=owner_id,
+                        action="summarize_room",
+                        room_id=request.sensing_room_id,
+                    )
+                else:
+                    sensing_res = await WifiSensingTool.execute(
+                        db=db,
+                        owner_id=owner_id,
+                        action="get_status",
+                    )
+
+                sensing_prompt = f"""You are an AI assistant with access to the Wi-Fi Sensing Subsystem.
+TELEMETRY DATA (SYNTHETIC SIMULATION ONLY):
+{json.dumps(sensing_res, indent=2)}
+
+STRICT SENSING SAFETY & PRIVACY RULES:
+1. All observations in this deployment are SYNTHETIC CSI SIMULATIONS. Clearly state that no physical sensing hardware is active.
+2. NEVER claim that a real human being is present based on simulated data.
+3. NEVER infer or state a person's identity, biometric information, or personal characteristics.
+4. Do NOT interpret missing data or zero samples as definitive proof of room vacancy.
+5. Accurately report the state ('vacant', 'presence', 'motion', or 'unknown') and probability without fabricating measurements.
+"""
+                conversation_history.insert(0, {"role": "system", "content": sensing_prompt})
+            except Exception as exc:
+                logger.warning("Sensing context retrieval failed during chat streaming: %s", exc)
+
         conversation_history.append({"role": "user", "content": request.message})
 
         accumulated_chunks = []

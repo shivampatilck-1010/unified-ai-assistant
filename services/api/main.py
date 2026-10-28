@@ -13,6 +13,10 @@ _worker_dir = str(Path(__file__).resolve().parent.parent / "agent-worker")
 if _worker_dir not in sys.path:
     sys.path.insert(0, _worker_dir)
 
+_wifi_sensing_dir = str(Path(__file__).resolve().parent.parent / "wifi-sensing")
+if _wifi_sensing_dir not in sys.path:
+    sys.path.insert(0, _wifi_sensing_dir)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -30,6 +34,7 @@ from routers import (
     reminders_router,
     research_router,
     tasks_router,
+    wifi_sensing_router,
 )
 from services.reminder_scheduler import scheduler_instance
 from services.research.job_service import ResearchJobService
@@ -79,6 +84,7 @@ app.include_router(reminders_router)
 app.include_router(files_router)
 app.include_router(knowledge_router)
 app.include_router(research_router)
+app.include_router(wifi_sensing_router)
 
 
 class HealthResponse(BaseModel):

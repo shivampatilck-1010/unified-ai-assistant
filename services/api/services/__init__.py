@@ -10,6 +10,7 @@ from services.reminder_scheduler import ReminderScheduler, scheduler_instance
 from services.reminder_service import ReminderService
 from services.streaming_service import StreamingService
 from services.task_service import TaskService
+from services.wifi_sensing_service import WifiSensingService
 
 __all__ = [
     "ConversationService",
@@ -27,4 +28,5 @@ __all__ = [
     "KnowledgeService",
     "get_storage_backend",
     "get_embedding_provider",
+    "WifiSensingService",
 ]

@@ -156,9 +156,10 @@ unified-ai-assistant/
   * **Mandatory Confirmation**: Extraction returns structured proposals with `requires_confirmation: true`. Records are never written directly to the database without explicit human approval.
 
 ### 4.6. Wi-Fi Sensing Service (`services/wifi-sensing`)
-* **Role**: Provides ambient environmental awareness through Wi-Fi Channel State Information (CSI) perturbation analysis.
-* **Isolation**: Operates as a distinct service communicating through internal events.
-* **Initial Simulation**: Uses simulated CSI streams generating synthetic subcarrier variance to model room entry, exit, sitting, and breathing patterns.
+* **Role**: Provides ambient environmental presence awareness and activity estimation based on Channel State Information (CSI) disturbance dynamics.
+* **Isolation**: Operates as a distinct modular domain boundary with strict separation across acquisition, normalization, inference, persistence, and presentation.
+* **Simulation Mode**: Uses deterministic mathematical modeling of subcarrier amplitude variance and Doppler proxies to model room entry, exit, sitting, and breathing patterns. Unmistakably labels all telemetry as synthetic.
+* **Hardware Boundary**: Features an honest physical CSI adapter that verifies hardware presence and driver availability, declaring real hardware unavailable when compatible capture NICs are absent.
 
 ---
 
@@ -334,3 +335,64 @@ All uploaded files are saved into private directory trees segmented by owner ID 
 - **Pluggable Embeddings**: Implements `BaseEmbeddingProvider` supporting OpenAI (`text-embedding-3-small`), Gemini (`text-embedding-004`), and `MockEmbeddingProvider`. Embeddings are stored as JSON float arrays in the database to support both PostgreSQL and local SQLite.
 - **Retrieval Strategy**: When embeddings are configured, cosine similarity ranks relevant chunks. When no embedding API key is present, an honest lexical keyword matching strategy is used.
 - **Grounded Synthesis**: Grounded answers quote verified excerpts in `[Doc: filename, Page X]` format. Extracted document text is strictly isolated in the prompt as untrusted reference material, preventing prompt injection attacks from overriding system instructions. If document evidence is insufficient, the system honestly reports insufficient context.
+
+---
+
+## 9. Wi-Fi Sensing Subsystem Architecture (Phase 7)
+
+```mermaid
+flowchart TD
+    subgraph SensingAcquisition["Acquisition & Providers (services/wifi-sensing)"]
+        Simulator["Synthetic CSI Simulator<br/>Deterministic time-stepped<br/>is_simulated = True"]
+        HwAdapter["Physical CSI Hardware Adapter<br/>Device & Driver Discovery<br/>Reports is_available = False"]
+    end
+
+    subgraph PipelineInference["Normalization & Inference"]
+        Pipeline["Sensing Pipeline<br/>Bounded FIFO Queue"]
+        Estimator["Baseline Presence Estimator<br/>Variance & Doppler Modulation<br/>unknown state fallback"]
+    end
+
+    subgraph PersistenceAPIs["Persistence & Consent Layer (services/api)"]
+        Configs[("wifi_sensor_configs<br/>Explicit Operator Consent<br/>Retention Days")]
+        Events[("wifi_sensing_events<br/>Normalized RF Observations<br/>is_simulated = True")]
+        Audits[("wifi_sensing_audits<br/>Session & Purge Trail")]
+        Service["WifiSensingService<br/>Retention Cleanup & Lifecycle"]
+    end
+
+    subgraph PresentationOrchestration["Presentation & Orchestration"]
+        UI["React Sensing Monitor<br/>SIMULATION MODE ACTIVE<br/>No Emojis / Clean Telemetry"]
+        ToolBridge["WifiSensingTool<br/>Assistant Tool Orchestration<br/>Anti-Identification Guardrails"]
+    end
+
+    Simulator --> Pipeline
+    HwAdapter -.->|"If driver installed"| Pipeline
+    Pipeline --> Estimator
+    Estimator --> Events
+    Service --> Configs
+    Service --> Events
+    Service --> Audits
+    UI --> Service
+    ToolBridge --> Service
+```
+
+### 9.1. Acquisition & Hardware Boundary
+- **Synthetic Simulation**: Employs deterministic mathematical modeling of RF perturbation regimes:
+  - *Vacant*: Ambient thermal floor (variance ~0.015, Doppler ~0.008, RSSI -64 dBm).
+  - *Stationary*: Periodic sinusoidal breathing modulation (~0.25 Hz, variance ~0.15, Doppler ~0.12).
+  - *Motion*: Active multi-path Doppler shifts (variance ~0.50-0.85, Doppler ~0.70, RSSI -52 dBm).
+- **Physical CSI Boundary**: Standard consumer Wi-Fi cards and OS stacks do not expose 802.11 CSI without specialized firmware (e.g. Intel 5300, Atheros 9k, ESP32-CSI). The `HardwareSensorAdapter` honestly tests for genuine CSI drivers and reports `is_available: False` when unsupported, never fabricating hardware detection or simulating under a hardware label.
+
+### 9.2. Presence Estimation & The Unknown State
+- The `BaselinePresenceEstimator` evaluates normalized RF perturbation scores against bounded baselines.
+- **Handling Invalid/Degraded Data**: If signal quality drops below 40%, packet counts are zero, or RSSI falls outside [-120 dBm, -10 dBm], the estimator immediately emits an explicit `presence_state = "unknown"` with `presence_probability = None` and `quality_score = 0.0`. Missing data is never treated as proof of absence.
+- **Zero Identification**: The estimator operates on anonymous RF energy and subcarrier variance; it does not collect MAC addresses, packet payloads, or biometric profiles.
+
+### 9.3. Consent, Tenancy & Retention
+- **Mandatory Consent**: Rooms require explicit operator authorization (`is_authorized: True`) before simulation or monitoring can start. De-authorizing a room immediately halts active sessions.
+- **Strict Tenancy**: Every query and mutation enforces `owner_id == authenticated_user_id`. Cross-tenant queries return HTTP 404.
+- **Configurable Retention & Purging**: Time-series events have configurable retention windows (default 7 days) and support one-click manual deletion (`DELETE /api/sensing/events`).
+- **Immutable Audit Logging**: Every session start, stop, reset, consent toggle, and purge action is persisted to `wifi_sensing_audits`.
+
+### 9.4. Assistant Tool Orchestration
+- `WifiSensingTool` exposes typed actions (`check_availability`, `get_status`, `summarize_room`, `explain_simulation`) for model grounding.
+- **Safety Invariant**: When answering questions regarding occupancy, the assistant is provided with strict prompt constraints requiring it to emphasize that all data is synthetic, refuse to infer human identities, and avoid asserting physical occupancy based on simulation.

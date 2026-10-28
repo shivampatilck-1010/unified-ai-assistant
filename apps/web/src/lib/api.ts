@@ -31,11 +31,22 @@ import type {
   ResearchReport,
   ResearchSource,
   SearchResponse,
+  SensingCapabilitiesResponse,
+  SensingEvent,
+  SensingEventListResponse,
+  SensingOccupancySummary,
+  SensingPurgeResponse,
+  SensorConfig,
+  SensorConfigCreate,
+  SensorConfigUpdate,
+  SimulationControlResponse,
   Task,
   TaskCreatePayload,
   TaskListResponse,
   TaskUpdatePayload,
   UnifiedProviderStatusResponse,
+  WifiSensingAudit,
+  WifiSensingStatusResponse,
   WorkerStatus,
 } from '../types';
 
@@ -837,6 +848,195 @@ export async function exportResearchReportMarkdown(
 
   if (!res.ok) throw new Error(`Failed to export research report: ${res.status}`);
   return await res.text();
+}
+
+// --- Phase 7: Wi-Fi Sensing API ---
+
+export async function fetchSensingStatus(signal?: AbortSignal): Promise<WifiSensingStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/sensing/status`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch sensing status: ${res.status}`);
+  return (await res.json()) as WifiSensingStatusResponse;
+}
+
+export async function fetchSensingCapabilities(signal?: AbortSignal): Promise<SensingCapabilitiesResponse> {
+  const res = await fetch(`${API_BASE}/api/sensing/capabilities`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch sensing capabilities: ${res.status}`);
+  return (await res.json()) as SensingCapabilitiesResponse;
+}
+
+export async function fetchSensorConfigs(signal?: AbortSignal): Promise<SensorConfig[]> {
+  const res = await fetch(`${API_BASE}/api/sensing/configs`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch sensor configs: ${res.status}`);
+  return (await res.json()) as SensorConfig[];
+}
+
+export async function createSensorConfig(
+  payload: SensorConfigCreate,
+  signal?: AbortSignal
+): Promise<SensorConfig> {
+  const res = await fetch(`${API_BASE}/api/sensing/configs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to create sensor config: ${res.status}`);
+  }
+  return (await res.json()) as SensorConfig;
+}
+
+export async function updateSensorConfig(
+  configId: string,
+  payload: SensorConfigUpdate,
+  signal?: AbortSignal
+): Promise<SensorConfig> {
+  const res = await fetch(`${API_BASE}/api/sensing/configs/${encodeURIComponent(configId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to update sensor config: ${res.status}`);
+  }
+  return (await res.json()) as SensorConfig;
+}
+
+export async function startSensingSimulation(
+  roomId: string,
+  speed = 1.0,
+  signal?: AbortSignal
+): Promise<SimulationControlResponse> {
+  const res = await fetch(`${API_BASE}/api/sensing/simulation/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ room_id: roomId, speed }),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to start simulation: ${res.status}`);
+  }
+  return (await res.json()) as SimulationControlResponse;
+}
+
+export async function stopSensingSimulation(
+  roomId: string,
+  signal?: AbortSignal
+): Promise<SimulationControlResponse> {
+  const res = await fetch(`${API_BASE}/api/sensing/simulation/stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ room_id: roomId }),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to stop simulation: ${res.status}`);
+  }
+  return (await res.json()) as SimulationControlResponse;
+}
+
+export async function resetSensingSimulation(
+  roomId: string,
+  signal?: AbortSignal
+): Promise<SimulationControlResponse> {
+  const res = await fetch(`${API_BASE}/api/sensing/simulation/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ room_id: roomId }),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to reset simulation: ${res.status}`);
+  }
+  return (await res.json()) as SimulationControlResponse;
+}
+
+export async function stepSensingSimulation(
+  roomId: string,
+  signal?: AbortSignal
+): Promise<SensingEvent | null> {
+  const res = await fetch(`${API_BASE}/api/sensing/simulation/step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ room_id: roomId }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to step simulation: ${res.status}`);
+  return (await res.json()) as SensingEvent | null;
+}
+
+export async function fetchSensingEvents(
+  roomId?: string,
+  limit = 50,
+  offset = 0,
+  signal?: AbortSignal
+): Promise<SensingEventListResponse> {
+  const params = new URLSearchParams();
+  if (roomId) params.set('room_id', roomId);
+  params.set('limit', limit.toString());
+  params.set('offset', offset.toString());
+
+  const res = await fetch(`${API_BASE}/api/sensing/events?${params.toString()}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch sensing events: ${res.status}`);
+  return (await res.json()) as SensingEventListResponse;
+}
+
+export async function fetchSensingSummary(
+  roomId: string,
+  signal?: AbortSignal
+): Promise<SensingOccupancySummary> {
+  const res = await fetch(`${API_BASE}/api/sensing/summary?room_id=${encodeURIComponent(roomId)}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch sensing summary: ${res.status}`);
+  return (await res.json()) as SensingOccupancySummary;
+}
+
+export async function purgeSensingEvents(
+  roomId?: string,
+  beforeDate?: string,
+  signal?: AbortSignal
+): Promise<SensingPurgeResponse> {
+  const res = await fetch(`${API_BASE}/api/sensing/events`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ room_id: roomId, before_date: beforeDate, confirm_purge: true }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to purge events: ${res.status}`);
+  return (await res.json()) as SensingPurgeResponse;
+}
+
+export async function fetchSensingAudits(
+  limit = 50,
+  offset = 0,
+  signal?: AbortSignal
+): Promise<WifiSensingAudit[]> {
+  const res = await fetch(`${API_BASE}/api/sensing/audit?limit=${limit}&offset=${offset}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch sensing audits: ${res.status}`);
+  return (await res.json()) as WifiSensingAudit[];
 }
 
 export { API_BASE };

@@ -8,6 +8,7 @@ import { ChatView } from './components/chat/ChatView';
 import { BrowserAgentView } from './components/browser/BrowserAgentView';
 import { CalendarTasksView } from './components/calendar/CalendarTasksView';
 import { FilesKnowledgeView } from './components/files/FilesKnowledgeView';
+import { WifiSensingView } from './components/sensing/WifiSensingView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -172,6 +173,8 @@ export default function App() {
             <CalendarTasksView />
           ) : activeSection === 'files' ? (
             <FilesKnowledgeView />
+          ) : activeSection === 'wifi-sensing' ? (
+            <WifiSensingView />
           ) : (
             <SectionPlaceholder
               section={activeSection}

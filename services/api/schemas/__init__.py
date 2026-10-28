@@ -86,6 +86,22 @@ from schemas.task import (
     TaskStatus,
     TaskUpdate,
 )
+from schemas.wifi_sensing import (
+    SensingCapabilitiesResponse,
+    SensingEventListResponse,
+    SensingEventResponse,
+    SensingOccupancySummary,
+    SensingPurgeRequest,
+    SensingPurgeResponse,
+    SensorCapabilityItem,
+    SensorConfigCreate,
+    SensorConfigResponse,
+    SensorConfigUpdate,
+    SimulationControlRequest,
+    SimulationControlResponse,
+    WifiSensingAuditResponse,
+    WifiSensingStatusResponse,
+)
 
 __all__ = [
     "ConversationCreate",
@@ -164,4 +180,18 @@ __all__ = [
     "ResearchEventResponse",
     "ResearchJobListResponse",
     "ResearchJobDetailResponse",
+    "SensorCapabilityItem",
+    "SensingCapabilitiesResponse",
+    "WifiSensingStatusResponse",
+    "SensorConfigCreate",
+    "SensorConfigUpdate",
+    "SensorConfigResponse",
+    "SimulationControlRequest",
+    "SimulationControlResponse",
+    "SensingEventResponse",
+    "SensingEventListResponse",
+    "SensingOccupancySummary",
+    "SensingPurgeRequest",
+    "SensingPurgeResponse",
+    "WifiSensingAuditResponse",
 ]
