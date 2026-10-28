@@ -1,12 +1,28 @@
 // API client for the Unified AI Assistant backend
 
 import type {
+  BrowserTask,
+  BrowserTaskEvent,
+  CalendarEvent,
+  CalendarEventCreatePayload,
+  CalendarEventsQueryResponse,
+  CalendarEventUpdatePayload,
   ConversationDetail,
   ConversationListResponse,
   ConversationSummary,
+  ExtractRequest,
+  ExtractResponse,
   HealthResponse,
+  Reminder,
+  ReminderCreatePayload,
+  ReminderListResponse,
   SearchResponse,
+  Task,
+  TaskCreatePayload,
+  TaskListResponse,
+  TaskUpdatePayload,
   UnifiedProviderStatusResponse,
+  WorkerStatus,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000';
@@ -166,12 +182,6 @@ export function getStreamUrl(): string {
 
 // Browser Agent Endpoints (Phase 3)
 
-import type {
-  BrowserTask,
-  BrowserTaskEvent,
-  WorkerStatus,
-} from '../types';
-
 export async function fetchWorkerStatus(signal?: AbortSignal): Promise<WorkerStatus> {
   const response = await fetch(`${API_BASE}/api/browser/worker/status`, {
     signal,
@@ -300,6 +310,218 @@ export async function fetchBrowserTaskEvents(
 
 export function getBrowserStreamUrl(taskId: string): string {
   return `${API_BASE}/api/browser/tasks/${encodeURIComponent(taskId)}/stream`;
+}
+
+// ==========================================
+// Phase 4: Tasks, Calendar & Reminders Endpoints
+// ==========================================
+
+export async function fetchTasks(
+  params?: {
+    status?: string;
+    priority?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  },
+  signal?: AbortSignal
+): Promise<TaskListResponse> {
+  const url = new URL(`${API_BASE}/api/tasks`);
+  if (params?.status) url.searchParams.set('status', params.status);
+  if (params?.priority) url.searchParams.set('priority', params.priority);
+  if (params?.search) url.searchParams.set('search', params.search);
+  if (params?.page) url.searchParams.set('page', String(params.page));
+  if (params?.pageSize) url.searchParams.set('page_size', String(params.pageSize));
+
+  const res = await fetch(url.toString(), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to load tasks: ${res.status}`);
+  return (await res.json()) as TaskListResponse;
+}
+
+export async function createTask(payload: TaskCreatePayload, signal?: AbortSignal): Promise<Task> {
+  const res = await fetch(`${API_BASE}/api/tasks`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to create task: ${res.status} ${err}`);
+  }
+  return (await res.json()) as Task;
+}
+
+export async function updateTask(
+  taskId: string,
+  payload: TaskUpdatePayload,
+  signal?: AbortSignal
+): Promise<Task> {
+  const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to update task: ${res.status}`);
+  return (await res.json()) as Task;
+}
+
+export async function toggleTask(
+  taskId: string,
+  completed?: boolean,
+  signal?: AbortSignal
+): Promise<Task> {
+  const url = new URL(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}/toggle`);
+  if (completed !== undefined) {
+    url.searchParams.set('completed', String(completed));
+  }
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to toggle task: ${res.status}`);
+  return (await res.json()) as Task;
+}
+
+export async function deleteTask(taskId: string, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`);
+}
+
+export async function extractTasksAndEvents(
+  payload: ExtractRequest,
+  signal?: AbortSignal
+): Promise<ExtractResponse> {
+  const res = await fetch(`${API_BASE}/api/tasks/extract`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `Extraction failed with status ${res.status}`);
+  }
+  return (await res.json()) as ExtractResponse;
+}
+
+export async function fetchCalendarEvents(
+  start?: string,
+  end?: string,
+  signal?: AbortSignal
+): Promise<CalendarEventsQueryResponse> {
+  const url = new URL(`${API_BASE}/api/calendar/events`);
+  if (start) url.searchParams.set('start', start);
+  if (end) url.searchParams.set('end', end);
+
+  const res = await fetch(url.toString(), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to load calendar events: ${res.status}`);
+  return (await res.json()) as CalendarEventsQueryResponse;
+}
+
+export async function createCalendarEvent(
+  payload: CalendarEventCreatePayload,
+  signal?: AbortSignal
+): Promise<CalendarEvent> {
+  const res = await fetch(`${API_BASE}/api/calendar/events`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to create event: ${res.status} ${err}`);
+  }
+  return (await res.json()) as CalendarEvent;
+}
+
+export async function updateCalendarEvent(
+  eventId: string,
+  payload: CalendarEventUpdatePayload,
+  signal?: AbortSignal
+): Promise<CalendarEvent> {
+  const res = await fetch(`${API_BASE}/api/calendar/events/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to update event: ${res.status}`);
+  return (await res.json()) as CalendarEvent;
+}
+
+export async function deleteCalendarEvent(eventId: string, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/calendar/events/${encodeURIComponent(eventId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to delete event: ${res.status}`);
+}
+
+export async function fetchReminders(
+  activeOnly: boolean = false,
+  status?: string,
+  limit: number = 100,
+  signal?: AbortSignal
+): Promise<ReminderListResponse> {
+  const url = new URL(`${API_BASE}/api/reminders`);
+  if (activeOnly) url.searchParams.set('active_only', 'true');
+  if (status) url.searchParams.set('status', status);
+  url.searchParams.set('limit', String(limit));
+
+  const res = await fetch(url.toString(), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to load reminders: ${res.status}`);
+  return (await res.json()) as ReminderListResponse;
+}
+
+export async function createReminder(
+  payload: ReminderCreatePayload,
+  signal?: AbortSignal
+): Promise<Reminder> {
+  const res = await fetch(`${API_BASE}/api/reminders`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to create reminder: ${res.status}`);
+  return (await res.json()) as Reminder;
+}
+
+export async function dismissReminder(
+  reminderId: string,
+  signal?: AbortSignal
+): Promise<Reminder> {
+  const res = await fetch(`${API_BASE}/api/reminders/${encodeURIComponent(reminderId)}/dismiss`, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to dismiss reminder: ${res.status}`);
+  return (await res.json()) as Reminder;
+}
+
+export async function deleteReminder(reminderId: string, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/reminders/${encodeURIComponent(reminderId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to delete reminder: ${res.status}`);
 }
 
 export { API_BASE };

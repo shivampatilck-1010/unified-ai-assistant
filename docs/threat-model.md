@@ -56,7 +56,7 @@ flowchart LR
 | :--- | :--- | :--- | :--- |
 | Client requests impersonate user sessions or bypass auth | API Gateway (`services/api`) | High | Session tokens / JWT, HTTPS enforcement, strict CORS configuration limiting access to authorized frontend origins. |
 | Malicious script impersonates Chrome extension messages | Chrome Extension bridge | High | Manifest V3 message validation, strict origin checking, one-time shared secret handshake between API and extension. |
-| Cross-tenant conversation hijacking or spoofed user IDs | Database API (`/api/conversations/*`) | High | **Identity Boundary**: Request dependency extracts identity from verified bearer token or dev boundary; client-supplied `owner_id` parameters in request bodies are ignored. Cross-user access returns HTTP 404 (preventing user enumeration). |
+| Cross-tenant conversation hijacking or spoofed user IDs | Database API (`/api/conversations/*`, `/api/tasks/*`, `/api/calendar/*`, `/api/reminders/*`) | High | **Identity Boundary**: Request dependency extracts identity from verified bearer token or dev boundary; client-supplied `owner_id` parameters in request bodies are ignored. Cross-user access returns HTTP 404 (preventing user enumeration and resource tampering). |
 
 ### 3.2. Tampering
 | Threat | Target | Risk | Mitigation |
@@ -64,6 +64,7 @@ flowchart LR
 | SQL Injection in conversation CRUD or search | Database Engine | Critical | **Parameterized Queries**: All queries execute exclusively via SQLAlchemy 2.x parameterized statements and ORM mappings. Zero string interpolation in SQL clauses. |
 | Untrusted web page injects malicious commands into browser agent | Agent Worker (`services/agent-worker`) | Critical | **Indirect Prompt Injection Defense**: Extracted DOM text is treated as untrusted and scrubbed (`prompt_defense.py`); injection heuristics detect override patterns ("ignore previous instructions"); system prompt and goal cannot be modified by page content; action allowlist strictly blocks unapproved actions; post-navigation redirect revalidation blocks malicious escapes. |
 | Malicious website tricks agent into unauthorized consequential actions | Agent Worker / Browser | Critical | **Consequential Action Confirmation Gates**: Deterministic policy heuristic detects financial transactions, account deletions, message submissions, and credential entry, pausing execution for explicit operator confirmation with target and reason display. |
+| Untrusted natural language prompt attempts automated unauthorized event creation | Task & Calendar Engine (`/api/tasks/extract`) | High | **Mandatory Human-in-the-Loop Confirmation**: Extraction endpoints generate structured proposals only (`requires_confirmation: true`). Zero automated database persistence from raw model output. The user must explicitly inspect and confirm extracted tasks/events in the UI before they are stored. |
 | In-flight tampering of simulated CSI data streams | Wi-Fi Sensing Service | Low | Internal loopback or authenticated Unix socket/named pipe communication only. |
 
 ### 3.3. Repudiation
@@ -84,7 +85,8 @@ flowchart LR
 ### 3.5. Denial of Service
 | Threat | Target | Risk | Mitigation |
 | :--- | :--- | :--- | :--- |
-| Excessive database query loads or expensive full-text scans | Database Engine | Medium | Enforced pagination limits (`limit=50` max), indexed foreign keys (`conversation_id`), and indexed search columns (`title`, `content`). |
+| Excessive database query loads or expensive full-text scans | Database Engine | Medium | Enforced pagination limits (`limit=50` max), indexed foreign keys (`conversation_id`, `task_id`, `event_id`), and indexed search/filter columns (`title`, `content`, `status`, `due_date`, `start_time`). |
+| Unbounded recurrence expansion DOS in calendar queries | Calendar Service | High | **Bounded RRULE Evaluation**: Enforced maximum occurrences limit (`max_occurrences <= 50`), maximum time horizon (1 year max from window start), and rejection of infinite recurrence rules without bounded counts or endpoints. |
 | Infinite loops or resource exhaustion in browser automation | Agent Worker | High | Per-task execution timeout (e.g., 5 minutes max), maximum step count (e.g., 25 steps), and concurrent execution limits. |
 | Uncontrolled LLM streaming consuming excessive API credits | API Gateway | High | Server-enforced rate limiting, token usage quotas, and prompt length caps. |
 

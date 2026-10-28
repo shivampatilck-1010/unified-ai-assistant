@@ -19,7 +19,16 @@ from pydantic import BaseModel, Field
 
 from config import get_settings
 from database import check_db_readiness, create_tables
-from routers import browser_tasks_router, chat_router, conversations_router, providers_router
+from routers import (
+    browser_tasks_router,
+    calendar_router,
+    chat_router,
+    conversations_router,
+    providers_router,
+    reminders_router,
+    tasks_router,
+)
+from services.reminder_scheduler import scheduler_instance
 
 settings = get_settings()
 
@@ -28,7 +37,13 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup (ensuring dev SQLite / fallback is ready)
     await create_tables()
-    yield
+    # Start background reminder scheduler
+    scheduler_instance.start()
+    try:
+        yield
+    finally:
+        # Graceful shutdown of scheduler
+        await scheduler_instance.stop()
 
 
 app = FastAPI(
@@ -52,6 +67,9 @@ app.include_router(conversations_router)
 app.include_router(chat_router)
 app.include_router(providers_router)
 app.include_router(browser_tasks_router)
+app.include_router(tasks_router)
+app.include_router(calendar_router)
+app.include_router(reminders_router)
 
 
 class HealthResponse(BaseModel):
@@ -86,4 +104,7 @@ def get_root():
         "conversations_url": "/api/conversations",
         "provider_status_url": "/api/provider/status",
         "chat_stream_url": "/api/chat/stream",
+        "tasks_url": "/api/tasks",
+        "calendar_events_url": "/api/calendar/events",
+        "reminders_url": "/api/reminders",
     }

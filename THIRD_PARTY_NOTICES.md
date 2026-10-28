@@ -95,6 +95,7 @@ Audited via Python `importlib.metadata` and `requirements.lock` on 2026-10-28.
 | `starlette` | 1.10.0 | BSD-3-Clause | Verified |
 | `typing-inspection` | 0.4.4 | MIT | Verified |
 | `typing_extensions` | 4.16.0 | PSF-2.0 | Verified |
+| `tzdata` | 2026.6 | Apache-2.0 | Verified (Phase 4 IANA timezone provider for Windows) |
 | `uvicorn` | 0.54.0 | BSD-3-Clause | Verified |
 | `watchfiles` | 1.3.0 | MIT | Verified |
 | `websockets` | 17.3 | BSD-3-Clause | Verified |

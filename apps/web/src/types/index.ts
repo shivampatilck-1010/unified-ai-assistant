@@ -236,3 +236,195 @@ export type NavigationSection =
   | 'settings';
 
 export type BackendStatus = 'checking' | 'connected' | 'disconnected' | 'error';
+
+// Phase 4: Task & Calendar Engine Types
+
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface Task {
+  id: string;
+  owner_id: string;
+  title: string;
+  description?: string | null;
+  priority: TaskPriority;
+  status: TaskStatus;
+  due_date?: string | null;
+  start_date?: string | null;
+  timezone?: string | null;
+  conversation_id?: string | null;
+  message_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+}
+
+export interface TaskCreatePayload {
+  title: string;
+  description?: string | null;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  due_date?: string | null;
+  start_date?: string | null;
+  timezone?: string;
+  conversation_id?: string | null;
+  message_id?: string | null;
+}
+
+export interface TaskUpdatePayload {
+  title?: string;
+  description?: string | null;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  due_date?: string | null;
+  start_date?: string | null;
+  timezone?: string;
+  conversation_id?: string | null;
+  message_id?: string | null;
+}
+
+export interface TaskListResponse {
+  items: Task[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CalendarEvent {
+  id: string;
+  owner_id: string;
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  all_day: boolean;
+  location?: string | null;
+  recurrence_rule?: string | null;
+  color?: string | null;
+  conversation_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEventOccurrence {
+  event_id: string;
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  all_day: boolean;
+  location?: string | null;
+  color?: string | null;
+  is_recurring: boolean;
+  recurrence_rule?: string | null;
+}
+
+export interface CalendarEventCreatePayload {
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  timezone?: string;
+  all_day?: boolean;
+  location?: string | null;
+  recurrence_rule?: string | null;
+  color?: string | null;
+  conversation_id?: string | null;
+}
+
+export interface CalendarEventUpdatePayload {
+  title?: string;
+  description?: string | null;
+  start_time?: string;
+  end_time?: string;
+  timezone?: string;
+  all_day?: boolean;
+  location?: string | null;
+  recurrence_rule?: string | null;
+  color?: string | null;
+  conversation_id?: string | null;
+}
+
+export interface CalendarEventsQueryResponse {
+  events: CalendarEvent[];
+  occurrences: CalendarEventOccurrence[];
+}
+
+export type ReminderStatus = 'scheduled' | 'processing' | 'delivered' | 'dismissed' | 'failed';
+
+export interface Reminder {
+  id: string;
+  owner_id: string;
+  title: string;
+  task_id?: string | null;
+  event_id?: string | null;
+  scheduled_time: string;
+  timezone: string;
+  status: ReminderStatus;
+  delivery_attempts: number;
+  last_error?: string | null;
+  delivered_at?: string | null;
+  dismissed_at?: string | null;
+  idempotency_key?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReminderCreatePayload {
+  title: string;
+  scheduled_time: string;
+  timezone?: string;
+  task_id?: string | null;
+  event_id?: string | null;
+  idempotency_key?: string | null;
+}
+
+export interface ReminderListResponse {
+  items: Reminder[];
+  total: number;
+}
+
+export interface ExtractedTaskProposal {
+  title: string;
+  description?: string | null;
+  priority: TaskPriority;
+  due_date?: string | null;
+  timezone: string;
+}
+
+export interface ExtractedEventProposal {
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  all_day: boolean;
+  location?: string | null;
+  recurrence_rule?: string | null;
+}
+
+export interface ExtractedReminderProposal {
+  title: string;
+  scheduled_time: string;
+  timezone: string;
+}
+
+export interface ExtractRequest {
+  text: string;
+  reference_time?: string;
+  timezone?: string;
+  conversation_id?: string;
+  message_id?: string;
+}
+
+export interface ExtractResponse {
+  tasks: ExtractedTaskProposal[];
+  events: ExtractedEventProposal[];
+  reminders: ExtractedReminderProposal[];
+  reference_time: string;
+  timezone: string;
+  explanation?: string | null;
+  requires_confirmation: boolean;
+}

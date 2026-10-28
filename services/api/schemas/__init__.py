@@ -15,6 +15,13 @@ from schemas.browser_task import (
     PendingConfirmation,
     WorkerStatusResponse,
 )
+from schemas.calendar_event import (
+    CalendarEventCreate,
+    CalendarEventOccurrence,
+    CalendarEventResponse,
+    CalendarEventsQueryResponse,
+    CalendarEventUpdate,
+)
 from schemas.conversation import (
     ConversationCreate,
     ConversationDetail,
@@ -24,9 +31,31 @@ from schemas.conversation import (
     SearchMatch,
     SearchResponse,
 )
+from schemas.extraction import (
+    ExtractRequest,
+    ExtractResponse,
+    ExtractedEventProposal,
+    ExtractedReminderProposal,
+    ExtractedTaskProposal,
+)
 from schemas.message import MessageBase, MessageCreate, MessageResponse
 from schemas.provider import ModelInfo, ProviderStatus, UnifiedProviderStatusResponse
+from schemas.reminder import (
+    ReminderCreate,
+    ReminderListResponse,
+    ReminderResponse,
+    ReminderStatus,
+    ReminderUpdate,
+)
 from schemas.streaming import ChatStreamRequest, SSEEventPayload, SSEEventType
+from schemas.task import (
+    TaskCreate,
+    TaskListResponse,
+    TaskPriority,
+    TaskResponse,
+    TaskStatus,
+    TaskUpdate,
+)
 
 __all__ = [
     "ConversationCreate",
@@ -45,4 +74,40 @@ __all__ = [
     "ChatStreamRequest",
     "SSEEventPayload",
     "SSEEventType",
+    "BrowserAction",
+    "BrowserActionType",
+    "BrowserPlan",
+    "BrowserPlanStep",
+    "BrowserTaskApproveRequest",
+    "BrowserTaskCancelRequest",
+    "BrowserTaskConfirmationRequest",
+    "BrowserTaskCreateRequest",
+    "BrowserTaskEventResponse",
+    "BrowserTaskEventType",
+    "BrowserTaskListResponse",
+    "BrowserTaskResponse",
+    "BrowserTaskStatus",
+    "PendingConfirmation",
+    "WorkerStatusResponse",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskResponse",
+    "TaskListResponse",
+    "TaskPriority",
+    "TaskStatus",
+    "CalendarEventCreate",
+    "CalendarEventUpdate",
+    "CalendarEventResponse",
+    "CalendarEventOccurrence",
+    "CalendarEventsQueryResponse",
+    "ReminderCreate",
+    "ReminderUpdate",
+    "ReminderResponse",
+    "ReminderListResponse",
+    "ReminderStatus",
+    "ExtractRequest",
+    "ExtractResponse",
+    "ExtractedTaskProposal",
+    "ExtractedEventProposal",
+    "ExtractedReminderProposal",
 ]

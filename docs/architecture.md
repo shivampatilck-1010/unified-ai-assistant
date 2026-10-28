@@ -135,7 +135,27 @@ unified-ai-assistant/
   * Prompt-Injection Defense: Extracted DOM text is treated as untrusted data and strictly isolated from system execution directives.
 * **Progress Streaming & Event Replay**: Live task events stream via SSE (`GET /api/browser/tasks/{id}/stream`) and persist to the `browser_task_events` table for full timeline replay upon reconnect.
 
-### 4.5. Wi-Fi Sensing Service (`services/wifi-sensing`)
+### 4.5. Task & Calendar Engine (`services/api/services/task_service.py`, `calendar_service.py`, `reminder_service.py`, `reminder_scheduler.py`)
+* **Role**: Provides internal, self-hosted task management, calendar event scheduling, and reliable reminder notifications with AI extraction.
+* **Key Constraints**: Internal only. No third-party sync (e.g. Google Calendar), SMS, or email services in Phase 4.
+* **Data Models & Persistence**:
+  * `Task`: Tracks `id`, `owner_id`, `title`, `description`, `priority` (`low`, `medium`, `high`, `urgent`), `status` (`pending`, `in_progress`, `completed`, `cancelled`), `due_date`, `start_date`, `timezone`, `completed_at`, and foreign keys to conversations/messages. Includes idempotent completion toggling.
+  * `CalendarEvent`: Tracks `id`, `owner_id`, `title`, `description`, `start_time`, `end_time`, `timezone` (IANA validated), `all_day`, `location`, `recurrence_rule`, and `color`.
+  * `Reminder`: Tracks `id`, `owner_id`, `title`, `task_id`, `event_id`, `scheduled_time`, `status` (`scheduled`, `processing`, `delivered`, `dismissed`, `failed`), `delivery_attempts`, and optional client `idempotency_key`.
+* **Bounded Recurrence**:
+  * Evaluates a clean, bounded subset of iCalendar RRULE (`FREQ=DAILY|WEEKLY|MONTHLY`, `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`).
+  * Enforces security bounds: maximum 50 occurrences per expansion and a 366-day (1-year) horizon to prevent Denial-of-Service loops.
+* **Background Reminder Scheduler**:
+  * Runs as an asynchronous polling worker inside the FastAPI lifespan (`scheduler_instance.start()` / `stop()`).
+  * Performs atomic status claiming (`UPDATE reminders SET status = 'processing', delivery_attempts = delivery_attempts + 1 WHERE id = :id AND status = 'scheduled'`) to prevent race conditions.
+  * Recovers past-due and restart-interrupted reminders seamlessly on startup.
+  * Bounded retry logic (max 3 delivery attempts) recording errors and marking terminal failures.
+* **Natural Language Extraction**:
+  * Uses the unified `ModelGateway` to parse unstructured user input into structured task, event, and reminder proposals.
+  * Resolves relative date references ("tomorrow at 2pm", "Friday 5pm") using server-provided reference timestamp and the user's local timezone.
+  * **Mandatory Confirmation**: Extraction returns structured proposals with `requires_confirmation: true`. Records are never written directly to the database without explicit human approval.
+
+### 4.6. Wi-Fi Sensing Service (`services/wifi-sensing`)
 * **Role**: Provides ambient environmental awareness through Wi-Fi Channel State Information (CSI) perturbation analysis.
 * **Isolation**: Operates as a distinct service communicating through internal events.
 * **Initial Simulation**: Uses simulated CSI streams generating synthetic subcarrier variance to model room entry, exit, sitting, and breathing patterns.
@@ -233,6 +253,6 @@ Supported event types:
 * **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation, Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
 * **Phase 2 — Persistence & Model Gateway** *(Completed)*: Dual-dialect database persistence (PostgreSQL/SQLite), Alembic migrations, ownership boundaries, Unified Model Gateway with OpenAI/Anthropic/Gemini adapters, conversation CRUD, database text search, and client UI integration.
 * **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright-powered local browser execution engine in dedicated background worker, isolated ephemeral contexts, database task persistence and Alembic migrations, action allowlist, SSRF/private IP blocking, post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, real-time SSE progress streaming, and interactive frontend Browser Agent workspace.
-* **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
+* **Phase 4 — Task & Calendar Engine** *(Completed)*: Internal task tracking with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving restarts, natural language task/event extraction with mandatory operator confirmation, strict ownership isolation, and Claude-inspired dark Calendar & Tasks workspace.
 * **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
 * **Phase 6 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.

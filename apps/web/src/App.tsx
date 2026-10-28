@@ -6,6 +6,7 @@ import { fetchProviderStatus } from './lib/api';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
 import { BrowserAgentView } from './components/browser/BrowserAgentView';
+import { CalendarTasksView } from './components/calendar/CalendarTasksView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -166,6 +167,8 @@ export default function App() {
             />
           ) : activeSection === 'browser-agent' ? (
             <BrowserAgentView />
+          ) : activeSection === 'calendar' ? (
+            <CalendarTasksView />
           ) : (
             <SectionPlaceholder
               section={activeSection}
