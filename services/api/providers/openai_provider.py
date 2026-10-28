@@ -42,11 +42,15 @@ class OpenAIProvider(BaseProviderAdapter):
     ]
 
     def __init__(self, api_key: Optional[str] = None):
-        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self._explicit_api_key = api_key
 
     @property
     def provider_id(self) -> str:
         return "openai"
+
+    @property
+    def _api_key(self) -> Optional[str]:
+        return self._explicit_api_key or os.getenv("OPENAI_API_KEY")
 
     def is_configured(self) -> bool:
         return bool(self._api_key)

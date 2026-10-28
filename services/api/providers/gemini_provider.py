@@ -19,22 +19,64 @@ class GeminiProvider(BaseProviderAdapter):
 
     MODELS = [
         ModelInfo(
-            id="gemini-2.0-flash",
-            name="Gemini 2.0 Flash",
+            id="gemini-3.5-flash",
+            name="Gemini 3.5 Flash",
             provider="gemini",
             context_window=1048576,
             is_default=True,
         ),
         ModelInfo(
+            id="gemini-3.5-flash-lite",
+            name="Gemini 3.5 Flash Lite",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-3.8-flash",
+            name="Gemini 3.8 Flash",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-flash-latest",
+            name="Gemini Flash Latest",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-2.5-flash",
+            name="Gemini 2.5 Flash",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-2.5-pro",
+            name="Gemini 2.5 Pro",
+            provider="gemini",
+            context_window=2097152,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-2.0-flash",
+            name="Gemini 2.0 Flash (Legacy)",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
             id="gemini-1.5-flash",
-            name="Gemini 1.5 Flash",
+            name="Gemini 1.5 Flash (Legacy)",
             provider="gemini",
             context_window=1048576,
             is_default=False,
         ),
         ModelInfo(
             id="gemini-1.5-pro",
-            name="Gemini 1.5 Pro",
+            name="Gemini 1.5 Pro (Legacy)",
             provider="gemini",
             context_window=2097152,
             is_default=False,
@@ -42,11 +84,15 @@ class GeminiProvider(BaseProviderAdapter):
     ]
 
     def __init__(self, api_key: Optional[str] = None):
-        self._api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self._explicit_api_key = api_key
 
     @property
     def provider_id(self) -> str:
         return "gemini"
+
+    @property
+    def _api_key(self) -> Optional[str]:
+        return self._explicit_api_key or os.getenv("GEMINI_API_KEY")
 
     def is_configured(self) -> bool:
         return bool(self._api_key)
@@ -64,7 +110,7 @@ class GeminiProvider(BaseProviderAdapter):
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
-        selected_model = model or "gemini-2.0-flash"
+        selected_model = model or "gemini-3.5-flash"
         valid_models = {m.id for m in self.MODELS}
         if selected_model not in valid_models:
             raise InvalidModelError(selected_model, self.provider_id)
@@ -96,6 +142,20 @@ class GeminiProvider(BaseProviderAdapter):
                 raise RateLimitError(message) from err
             elif status_code == 408 or "DEADLINE_EXCEEDED" in message:
                 raise TimeoutError(message) from err
+            elif status_code == 503 and selected_model != "gemini-3.5-flash-lite":
+                # Upstream demand spike on selected model: gracefully fall back to gemini-3.5-flash-lite
+                try:
+                    fallback_stream = await client.aio.models.generate_content_stream(
+                        model="gemini-3.5-flash-lite",
+                        contents=contents,  # type: ignore
+                    )
+                    async for chunk in fallback_stream:
+                        if chunk.text:
+                            yield chunk.text
+                    return
+                except Exception:
+                    pass
+                raise ProviderError("GEMINI_ERROR", message) from err
             else:
                 raise ProviderError("GEMINI_ERROR", message) from err
         except Exception as err:

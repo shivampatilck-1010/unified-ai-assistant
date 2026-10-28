@@ -19,3 +19,14 @@ def setup_test_database():
     """Initializes tables for the test database session."""
     asyncio.run(create_tables())
     yield
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_environment(monkeypatch):
+    """Isolates unit tests from live external provider credentials and default overrides."""
+    from config import get_settings
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "DEFAULT_PROVIDER", "DEFAULT_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()

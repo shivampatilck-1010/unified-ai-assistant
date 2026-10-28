@@ -82,11 +82,16 @@ class MockProviderAdapter(BaseProviderAdapter):
 
 
 @pytest.fixture(autouse=True)
-def clean_gateway():
-    """Ensure gateway is reset before and after each test."""
+def clean_gateway(monkeypatch):
+    """Ensure gateway is reset before and after each test with clean environment."""
+    from config import get_settings
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "DEFAULT_PROVIDER", "DEFAULT_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+    get_settings.cache_clear()
     get_model_gateway().reset()
     yield
     get_model_gateway().reset()
+    get_settings.cache_clear()
 
 
 def test_model_gateway_provider_selection_and_models():

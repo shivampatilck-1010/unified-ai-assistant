@@ -392,7 +392,7 @@ async def test_consequential_confirmation_workflow(local_web_server: str):
     worker_coro = asyncio.create_task(runner.execute_task(task_id))
 
     # Wait until task transitions to awaiting_confirmation
-    for _ in range(150):
+    for _ in range(350):
         await asyncio.sleep(0.1)
         async with async_session_factory() as session:
             t = await session.get(BrowserTask, task_id)

@@ -4,6 +4,17 @@ from typing import List, Optional
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+try:
+    from dotenv import load_dotenv
+
+    _env_path = os.path.join(_BASE_DIR, ".env")
+    if os.path.isfile(_env_path):
+        load_dotenv(_env_path)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
+
 
 class Settings:
     """Application configuration loaded from environment variables."""
