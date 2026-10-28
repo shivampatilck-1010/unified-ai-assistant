@@ -120,11 +120,20 @@ unified-ai-assistant/
 * **Streaming Persistence**: Saves the user message prior to stream emission, updates the assistant record status to `streaming`, writes incremental chunks or finalized content, and marks status as `completed`, `interrupted`, or `error`.
 
 ### 4.4. Autonomous Browser Agent (`services/agent-worker`)
-* **Role**: Executes multi-step web browsing tasks.
-* **Phased Execution**:
-  * *Local Execution*: Connects to the user's running Chrome via Chrome DevTools Protocol (CDP) or via the dedicated extension in `apps/chrome-extension`.
-  * *Isolated Cloud Execution (Later Phase)*: Ephemeral containerized headless browsers for untrusted web navigation.
-* **Safety & Guardrails**: Human-in-the-loop confirmation before sensitive actions (e.g., submitting forms with credentials, financial transactions, data downloads).
+* **Role**: Executes multi-step, plan-governed browser automation workflows using Microsoft Playwright in isolated ephemeral sessions.
+* **Separation of Concerns**: Long-running browser automation executes in background worker tasks without blocking the main FastAPI HTTP request loop.
+* **Lifecycle & State Machine**:
+  * `pending` / `awaiting_approval`: User defines a goal. A structured plan with typed actions is generated and displayed. Execution requires explicit operator approval (`POST /api/browser/tasks/{id}/approve`).
+  * `running`: Worker launches a dedicated ephemeral Chromium instance (no cookies, passwords, or persistent local storage from everyday profiles).
+  * `awaiting_confirmation`: When an action targets consequential operations (payments, account deletions, message transmissions), execution pauses and prompts for explicit operator confirmation (`POST /api/browser/tasks/{id}/confirm`).
+  * `completed`: Execution terminates only after a final state verification step confirms observed DOM/URL state against the task goal.
+  * `failed` / `cancelled`: Failures produce sanitized, path-redacted error messages; cancellation cleanly closes browser sessions immediately.
+* **Security & Action Allowlist**:
+  * Permitted action types: `navigate`, `inspect`, `read_text`, `click`, `type_text`, `scroll`, `wait_for`, `screenshot`.
+  * Arbitrary shell, raw javascript execution, extension loading, and filesystem navigation (`file:///`) are prohibited.
+  * SSRF Protection: Blocks private RFC 1918 subnets, loopback, and cloud metadata (`169.254.169.254`) on both initial navigation and post-navigation redirects.
+  * Prompt-Injection Defense: Extracted DOM text is treated as untrusted data and strictly isolated from system execution directives.
+* **Progress Streaming & Event Replay**: Live task events stream via SSE (`GET /api/browser/tasks/{id}/stream`) and persist to the `browser_task_events` table for full timeline replay upon reconnect.
 
 ### 4.5. Wi-Fi Sensing Service (`services/wifi-sensing`)
 * **Role**: Provides ambient environmental awareness through Wi-Fi Channel State Information (CSI) perturbation analysis.
@@ -223,7 +232,7 @@ Supported event types:
 * **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
 * **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation, Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
 * **Phase 2 — Persistence & Model Gateway** *(Completed)*: Dual-dialect database persistence (PostgreSQL/SQLite), Alembic migrations, ownership boundaries, Unified Model Gateway with OpenAI/Anthropic/Gemini adapters, conversation CRUD, database text search, and client UI integration.
-* **Phase 3 — Autonomous Browser Agent**: Local Chrome CDP integration and safety guardrails.
+* **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright-powered local browser execution engine in dedicated background worker, isolated ephemeral contexts, database task persistence and Alembic migrations, action allowlist, SSRF/private IP blocking, post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, real-time SSE progress streaming, and interactive frontend Browser Agent workspace.
 * **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
 * **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
 * **Phase 6 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.

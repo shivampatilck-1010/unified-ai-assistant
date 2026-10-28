@@ -26,6 +26,9 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+# Alias for worker and background services
+async_session_factory = AsyncSessionLocal
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency yielding an isolated async database session with automatic cleanup."""

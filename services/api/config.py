@@ -43,6 +43,13 @@ class Settings:
         # Development identity boundary (for local single-user or auth mock)
         self.dev_user_id: str = os.getenv("DEV_USER_ID", "dev-user-default")
 
+        # Browser Agent Worker settings
+        self.browser_headless: bool = os.getenv("BROWSER_HEADLESS", "true").lower() in ("true", "1", "yes")
+        self.browser_action_timeout_ms: int = int(os.getenv("BROWSER_ACTION_TIMEOUT_MS", "15000"))
+        self.browser_task_deadline_seconds: int = int(os.getenv("BROWSER_TASK_DEADLINE_SECONDS", "180"))
+        self.browser_max_steps: int = int(os.getenv("BROWSER_MAX_STEPS", "15"))
+        self.allow_local_browser_targets: bool = os.getenv("ALLOW_LOCAL_BROWSER_TARGETS", "false").lower() in ("true", "1", "yes")
+
 
 @lru_cache()
 def get_settings() -> Settings:

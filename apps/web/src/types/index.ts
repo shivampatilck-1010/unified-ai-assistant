@@ -129,6 +129,102 @@ export interface SearchResponse {
   total: number;
 }
 
+// Browser Agent Task & Worker Types (Phase 3)
+
+export type BrowserActionType =
+  | 'navigate'
+  | 'inspect'
+  | 'read_text'
+  | 'click'
+  | 'type_text'
+  | 'scroll'
+  | 'wait_for'
+  | 'screenshot';
+
+export type BrowserTaskStatus =
+  | 'pending'
+  | 'awaiting_approval'
+  | 'running'
+  | 'awaiting_confirmation'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface BrowserAction {
+  action_type: BrowserActionType;
+  url?: string | null;
+  selector?: string | null;
+  text?: string | null;
+  direction?: string | null;
+  amount?: number | null;
+  condition?: string | null;
+  timeout_ms?: number | null;
+  is_consequential?: boolean;
+  consequential_reason?: string | null;
+}
+
+export interface BrowserPlanStep {
+  step_index: number;
+  description: string;
+  action: BrowserAction;
+}
+
+export interface BrowserPlan {
+  goal: string;
+  steps: BrowserPlanStep[];
+  estimated_steps: number;
+  allowed_domains: string[];
+}
+
+export interface PendingConfirmation {
+  confirmation_id: string;
+  step_index: number;
+  action_type: string;
+  target?: string | null;
+  data?: string | null;
+  reason: string;
+}
+
+export interface BrowserTaskEvent {
+  id: string;
+  task_id: string;
+  step_index?: number | null;
+  event_type: string;
+  message: string;
+  payload?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface BrowserTask {
+  id: string;
+  owner_id: string;
+  task_description: string;
+  status: BrowserTaskStatus;
+  current_step: number;
+  plan?: BrowserPlan | null;
+  approved_scope?: {
+    allowed_domains: string[];
+    max_steps: number;
+    allowed_actions: string[];
+  } | null;
+  pending_confirmation?: PendingConfirmation | null;
+  result_summary?: string | null;
+  error_message?: string | null;
+  cancellation_reason?: string | null;
+  evidence?: Array<Record<string, unknown>> | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface WorkerStatus {
+  available: boolean;
+  runtime: string;
+  active_tasks: number;
+  browser_session_strategy: string;
+  message: string;
+}
+
 export type NavigationSection =
   | 'chat'
   | 'search'

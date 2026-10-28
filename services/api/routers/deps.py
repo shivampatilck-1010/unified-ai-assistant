@@ -25,3 +25,7 @@ def get_current_user_id(
 
     # Fallback to server-side development identity
     return settings.dev_user_id
+
+
+# Alias for backward/forward compatibility
+get_current_user = get_current_user_id

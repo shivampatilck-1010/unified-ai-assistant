@@ -5,6 +5,7 @@ import { useHealthCheck } from './hooks/useHealthCheck';
 import { fetchProviderStatus } from './lib/api';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
+import { BrowserAgentView } from './components/browser/BrowserAgentView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -163,6 +164,8 @@ export default function App() {
               selectedModelId={selectedModelId ?? effectiveProviderStatus?.active_model ?? null}
               onSelectModel={setSelectedModelId}
             />
+          ) : activeSection === 'browser-agent' ? (
+            <BrowserAgentView />
           ) : (
             <SectionPlaceholder
               section={activeSection}

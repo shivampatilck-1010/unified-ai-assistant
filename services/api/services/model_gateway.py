@@ -37,6 +37,10 @@ class ModelGateway:
     def get_provider(self, provider_id: str) -> Optional[BaseProviderAdapter]:
         return self._providers.get(provider_id)
 
+    def is_any_provider_configured(self) -> bool:
+        """Returns True if at least one model provider adapter has valid credentials."""
+        return any(adapter.is_configured() for adapter in self._providers.values())
+
     def get_status(self) -> UnifiedProviderStatusResponse:
         settings = get_settings()
         provider_statuses: Dict[str, bool] = {}

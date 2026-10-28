@@ -18,6 +18,7 @@ A unified personal AI workspace combining conversational intelligence, server pe
   * ⚙️ **Settings**: Server-side model key management and preferences.
 * **Server Persistence & Dual Dialect**: SQLAlchemy 2.x and Alembic migrations supporting production PostgreSQL and local SQLite fallback.
 * **Unified Model Gateway**: Server-side client adapters for OpenAI, Anthropic, and Google Gemini with normalized error handling (`RATE_LIMIT_EXCEEDED`, `TIMEOUT`, `PROVIDER_UNAVAILABLE`, `AUTHENTICATION_FAILED`).
+* **Autonomous Browser Agent (Phase 3)**: Microsoft Playwright-powered background execution worker running in isolated ephemeral sessions without touching user everyday profiles. Features structured plan generation, strict action allowlists, SSRF/private IP blocking with post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, and real-time SSE progress streaming.
 * **Security First**: Hosted AI provider keys and database connection strings remain strictly server-side. Zero client-side API key exposure. Strict identity ownership boundaries enforce that users cannot read, mutate, or search conversations belonging to other identities.
 * **Modern Full-Stack Architecture**: React 19 + TypeScript + Vite frontend with a high-performance FastAPI backend.
 
@@ -97,6 +98,9 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
+# Install Playwright browser binary (Chromium)
+playwright install chromium
+
 # Run database migrations
 alembic upgrade head
 
@@ -111,6 +115,9 @@ The FastAPI backend will be available at:
 * **Conversations API**: `http://127.0.0.1:8000/api/conversations`
 * **Search API**: `http://127.0.0.1:8000/api/conversations/search?q={query}`
 * **Chat SSE Stream**: `http://127.0.0.1:8000/api/chat/stream`
+* **Browser Worker Status**: `http://127.0.0.1:8000/api/browser/worker/status`
+* **Browser Tasks API**: `http://127.0.0.1:8000/api/browser/tasks`
+* **Browser Task Events SSE**: `http://127.0.0.1:8000/api/browser/tasks/{id}/stream`
 * **Interactive Docs**: `http://127.0.0.1:8000/docs`
 
 ### 2. Frontend Setup & Run
@@ -161,7 +168,7 @@ npm run build
 * **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
 * **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation (8 items), Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
 * **Phase 2 — Server Persistence & Unified AI Model Gateway** *(Completed)*: Dual-dialect PostgreSQL/SQLite database persistence, Alembic migrations, strict identity ownership boundaries, Unified Model Gateway with OpenAI, Anthropic, and Gemini adapters, conversation CRUD, database text search, and client UI integration.
-* **Phase 3 — Autonomous Browser Agent**: Local Chrome CDP integration and safety guardrails.
+* **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright background execution worker in isolated sessions, structured plan approval workflow, strict action allowlist, SSRF private IP blocking, redirect revalidation, prompt-injection defense, consequential action confirmation gates, SSE progress streaming, and interactive frontend Browser Agent workspace.
 * **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
 * **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
 * **Phase 6 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.

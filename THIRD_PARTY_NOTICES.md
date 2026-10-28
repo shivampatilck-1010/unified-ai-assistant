@@ -80,10 +80,12 @@ Audited via Python `importlib.metadata` and `requirements.lock` on 2026-10-28.
 | `openai` | 1.109.1 | Apache-2.0 | Verified (Phase 2 OpenAI client) |
 | `opentelemetry-api` | 1.45.1 | Apache-2.0 | Verified |
 | `packaging` | 26.3 | Apache-2.0 OR BSD-2-Clause | Verified |
+| `playwright` | 1.64.1 | Apache-2.0 | Verified (Phase 3 browser automation runtime) |
 | `pluggy` | 1.7.0 | MIT | Verified |
 | `psycopg2-binary` | 2.9.13 | LGPL with exceptions | Verified (Alembic sync PostgreSQL inspection driver; includes explicit psycopg2 license exception permitting proprietary and non-GPL dynamic linking) |
 | `pydantic` | 2.14.1 | MIT | Verified |
 | `pydantic_core` | 2.50.1 | MIT | Verified |
+| `pyee` | 14.0.0 | MIT | Verified (Playwright event emitter) |
 | `Pygments` | 2.21.0 | BSD-2-Clause | Verified |
 | `pytest` | 8.4.2 | MIT | Verified |
 | `pytest-asyncio` | 1.4.1 | Apache-2.0 | Verified (Phase 2 async pytest extension) |

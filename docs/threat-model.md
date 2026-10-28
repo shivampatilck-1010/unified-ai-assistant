@@ -62,7 +62,8 @@ flowchart LR
 | Threat | Target | Risk | Mitigation |
 | :--- | :--- | :--- | :--- |
 | SQL Injection in conversation CRUD or search | Database Engine | Critical | **Parameterized Queries**: All queries execute exclusively via SQLAlchemy 2.x parameterized statements and ORM mappings. Zero string interpolation in SQL clauses. |
-| Untrusted web page injects malicious commands into browser agent | Agent Worker (`services/agent-worker`) | Critical | **Indirect Prompt Injection defense**: Segregate system instructions from untrusted DOM text; require explicit user approval for destructive/financial actions. |
+| Untrusted web page injects malicious commands into browser agent | Agent Worker (`services/agent-worker`) | Critical | **Indirect Prompt Injection Defense**: Extracted DOM text is treated as untrusted and scrubbed (`prompt_defense.py`); injection heuristics detect override patterns ("ignore previous instructions"); system prompt and goal cannot be modified by page content; action allowlist strictly blocks unapproved actions; post-navigation redirect revalidation blocks malicious escapes. |
+| Malicious website tricks agent into unauthorized consequential actions | Agent Worker / Browser | Critical | **Consequential Action Confirmation Gates**: Deterministic policy heuristic detects financial transactions, account deletions, message submissions, and credential entry, pausing execution for explicit operator confirmation with target and reason display. |
 | In-flight tampering of simulated CSI data streams | Wi-Fi Sensing Service | Low | Internal loopback or authenticated Unix socket/named pipe communication only. |
 
 ### 3.3. Repudiation

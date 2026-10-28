@@ -1,3 +1,20 @@
+from schemas.browser_task import (
+    BrowserAction,
+    BrowserActionType,
+    BrowserPlan,
+    BrowserPlanStep,
+    BrowserTaskApproveRequest,
+    BrowserTaskCancelRequest,
+    BrowserTaskConfirmationRequest,
+    BrowserTaskCreateRequest,
+    BrowserTaskEventResponse,
+    BrowserTaskEventType,
+    BrowserTaskListResponse,
+    BrowserTaskResponse,
+    BrowserTaskStatus,
+    PendingConfirmation,
+    WorkerStatusResponse,
+)
 from schemas.conversation import (
     ConversationCreate,
     ConversationDetail,
