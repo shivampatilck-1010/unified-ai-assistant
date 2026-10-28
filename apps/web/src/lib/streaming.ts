@@ -1,0 +1,164 @@
+// SSE streaming client for the chat endpoint
+
+import type { SSEEvent, SSEEventType, ChatRequest } from '../types';
+import { getStreamUrl } from './api';
+
+export interface StreamCallbacks {
+  onMessageStart: (conversationId: string, messageId: string) => void;
+  onTextDelta: (text: string) => void;
+  onMessageComplete: (finishReason: string) => void;
+  onError: (code: string, message: string) => void;
+  onStreamError: (error: Error) => void;
+}
+
+function parseSSELines(text: string): SSEEvent[] {
+  const events: SSEEvent[] = [];
+  const blocks = text.split('\n\n');
+
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+
+    let eventType: SSEEventType | null = null;
+    let dataStr = '';
+
+    const lines = block.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        eventType = line.slice(7).trim() as SSEEventType;
+      } else if (line.startsWith('data: ')) {
+        dataStr += line.slice(6);
+      } else if (line.startsWith('data:')) {
+        dataStr += line.slice(5);
+      }
+    }
+
+    if (eventType && dataStr) {
+      try {
+        const parsed = JSON.parse(dataStr) as SSEEvent;
+        if (parsed.event && parsed.conversation_id && parsed.message_id) {
+          events.push(parsed);
+        }
+      } catch {
+        // Skip malformed JSON
+      }
+    }
+  }
+
+  return events;
+}
+
+export async function streamChat(
+  request: ChatRequest,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal
+): Promise<void> {
+  let response: Response;
+
+  try {
+    response = await fetch(getStreamUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify(request),
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) return;
+    callbacks.onStreamError(
+      err instanceof Error ? err : new Error('Failed to connect to the server')
+    );
+    return;
+  }
+
+  if (!response.ok) {
+    callbacks.onStreamError(
+      new Error(`Server returned ${response.status}: ${response.statusText}`)
+    );
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    callbacks.onStreamError(new Error('Response body is not readable'));
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE blocks (separated by double newlines)
+      const parts = buffer.split('\n\n');
+      // Keep the last incomplete part in the buffer
+      buffer = parts.pop() ?? '';
+
+      for (const part of parts) {
+        if (!part.trim()) continue;
+
+        const events = parseSSELines(part + '\n\n');
+        for (const event of events) {
+          switch (event.event) {
+            case 'message_start':
+              callbacks.onMessageStart(event.conversation_id, event.message_id);
+              break;
+            case 'text_delta':
+              callbacks.onTextDelta((event.data as { text?: string }).text ?? '');
+              break;
+            case 'message_complete':
+              callbacks.onMessageComplete(
+                (event.data as { finish_reason?: string }).finish_reason ?? 'stop'
+              );
+              break;
+            case 'error':
+              callbacks.onError(
+                (event.data as { code?: string }).code ?? 'UNKNOWN',
+                (event.data as { message?: string }).message ?? 'An unknown error occurred'
+              );
+              break;
+          }
+        }
+      }
+    }
+
+    // Process any remaining buffer
+    if (buffer.trim()) {
+      const events = parseSSELines(buffer + '\n\n');
+      for (const event of events) {
+        switch (event.event) {
+          case 'message_start':
+            callbacks.onMessageStart(event.conversation_id, event.message_id);
+            break;
+          case 'text_delta':
+            callbacks.onTextDelta((event.data as { text?: string }).text ?? '');
+            break;
+          case 'message_complete':
+            callbacks.onMessageComplete(
+              (event.data as { finish_reason?: string }).finish_reason ?? 'stop'
+            );
+            break;
+          case 'error':
+            callbacks.onError(
+              (event.data as { code?: string }).code ?? 'UNKNOWN',
+              (event.data as { message?: string }).message ?? 'An unknown error occurred'
+            );
+            break;
+        }
+      }
+    }
+  } catch (err) {
+    if (signal?.aborted) return;
+    callbacks.onStreamError(
+      err instanceof Error ? err : new Error('Stream reading failed')
+    );
+  } finally {
+    reader.releaseLock();
+  }
+}

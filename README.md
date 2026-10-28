@@ -89,6 +89,8 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 The FastAPI backend will be available at:
 * **Root API info**: `http://127.0.0.1:8000/`
 * **Health Check**: `http://127.0.0.1:8000/health`
+* **Provider Status**: `http://127.0.0.1:8000/api/provider/status`
+* **Chat SSE Stream**: `http://127.0.0.1:8000/api/chat/stream`
 * **Interactive Docs**: `http://127.0.0.1:8000/docs`
 
 ### 2. Frontend Setup & Run
@@ -99,7 +101,10 @@ Open a separate terminal window:
 # Navigate to web application
 cd apps/web
 
-# Install dependencies
+# Optional: configure backend URL in .env (defaults to http://127.0.0.1:8000)
+cp .env.example .env
+
+# Install dependencies (already satisfied in Phase 0)
 npm install
 
 # Start development server
@@ -111,15 +116,20 @@ The web application will be accessible at `http://localhost:5173/`.
 ### 3. Running Verification Tests
 
 ```bash
-# From repository root using the backend virtual environment:
-services/api/.venv/Scripts/python -m pytest tests/test_health.py -v
+# Run all backend unit & streaming tests:
+services/api/.venv/Scripts/python -m pytest tests -v
+
+# Run frontend type-checking, linting & production build:
+cd apps/web
+npm run lint
+npm run build
 ```
 
 ---
 
 ## Documentation
 
-* [System Architecture](file:///docs/architecture.md) — Subsystem designs, data flows, and phased roadmap.
+* [System Architecture](file:///docs/architecture.md) — Subsystem designs, SSE streaming contract, data flows, and phased roadmap.
 * [Repository Audit Report](file:///docs/repository-audit.md) — Pre-modification audit, lockfiles, and license findings.
 * [Security Threat Model](file:///docs/threat-model.md) — STRIDE analysis, trust boundaries, and mitigations.
 * [Third-Party Notices](file:///THIRD_PARTY_NOTICES.md) — License inventory for all dependencies.
@@ -129,8 +139,8 @@ services/api/.venv/Scripts/python -m pytest tests/test_health.py -v
 ## Development Phases
 
 * **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
-* **Phase 1 — Claude-Inspired Chat UI & Layout**: Dark workspace theme, sidebar navigation, serif typography, and real streaming contracts.
-* **Phase 2 — Persistence & Model Gateway**: Database models (PostgreSQL), server-side hosted model integration (OpenAI, Anthropic, Gemini).
+* **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation (8 items), Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
+* **Phase 2 — Persistence & Model Gateway**: Database models (PostgreSQL), server-side hosted model integration (OpenAI, Anthropic, Gemini), chat persistence, and search.
 * **Phase 3 — Autonomous Browser Agent**: Local Chrome CDP integration and safety guardrails.
 * **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
 * **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.

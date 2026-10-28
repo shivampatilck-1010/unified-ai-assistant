@@ -1,0 +1,113 @@
+.composer {
+  padding: 0 24px 20px;
+  max-width: 780px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.composer__inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 12px;
+  transition: border-color 0.15s;
+}
+
+.composer__inner:focus-within {
+  border-color: var(--accent-muted);
+}
+
+.composer__input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  resize: none;
+  padding: 4px 0;
+  min-height: 24px;
+  max-height: 200px;
+  outline: none;
+}
+
+.composer__input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.composer__input:disabled {
+  opacity: 0.5;
+}
+
+.composer__attach-btn,
+.composer__send-btn,
+.composer__stop-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.composer__attach-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.composer__send-btn:not(:disabled):hover,
+.composer__stop-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.composer__send-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.composer__send-btn:focus-visible,
+.composer__stop-btn:focus-visible,
+.composer__attach-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.composer__stop-btn {
+  color: var(--accent);
+}
+
+.composer__hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  user-select: none;
+}
+
+.composer__hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  background: var(--surface-sidebar);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .composer {
+    padding: 0 12px 12px;
+  }
+}

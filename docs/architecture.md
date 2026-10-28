@@ -104,7 +104,62 @@ unified-ai-assistant/
 
 ---
 
-## 5. Technology Stack Decisions
+## 5. Streaming API Contract & Protocol (Phase 1)
+
+The assistant uses Server-Sent Events (SSE) over standard HTTP streaming (`text/event-stream`) to stream AI responses incrementally to the client.
+
+### 5.1. Endpoints
+
+* **`POST /api/chat/stream`**: Initiates a streaming response for a user message.
+  * **Request Header**: `Content-Type: application/json`, `Accept: text/event-stream`
+  * **Request Body**:
+    ```json
+    {
+      "conversation_id": "optional-uuid-string-or-null",
+      "message": "User text input string"
+    }
+    ```
+  * **Response Format**: `text/event-stream` with blocks separated by double newlines (`\n\n`).
+* **`GET /api/provider/status`**: Returns the server-side configuration status of hosted AI model providers without exposing secrets.
+  * **Response**:
+    ```json
+    {
+      "configured": false,
+      "provider": null,
+      "message": "No AI provider configured"
+    }
+    ```
+
+### 5.2. Event Protocol Types
+
+Each event block adheres to standard SSE framing:
+```
+event: <event_type>
+data: {"event": "<event_type>", "conversation_id": "<uuid>", "message_id": "<uuid>", "data": { ... }}
+```
+
+Supported event types:
+1. `message_start`: Emitted when the request has been received and streaming begins.
+   * `data`: `{"role": "assistant"}`
+2. `text_delta`: Emitted incrementally for every new token or text chunk.
+   * `data`: `{"text": "chunk string"}`
+3. `message_complete`: Emitted when the assistant response stream finishes cleanly or after an error.
+   * `data`: `{"finish_reason": "stop" | "error" | "cancelled"}`
+4. `error`: Emitted when an operational or configuration failure occurs.
+   * `data`: `{"code": "<ERROR_CODE>", "message": "<Human-readable explanation>"}`
+
+### 5.3. Error Invariants & Current Limitations
+
+* **No Fake AI Output**: If no model provider API key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) is configured on the server, the stream emits:
+  1. `message_start`
+  2. `error` (`code: "PROVIDER_NOT_CONFIGURED"`)
+  3. `message_complete` (`finish_reason: "error"`)
+* **Client Handling**: The client detects the `error` event, displays the honest message in an accessible error state, and stops the stream without attempting to invent or demonstrate dummy AI responses.
+* **Storage**: In Phase 1, conversations are stored in browser `localStorage` under `unified-ai-conversations`. Multi-device synchronization and server persistence are deferred to Phase 2 (PostgreSQL).
+
+---
+
+## 6. Technology Stack Decisions
 
 | Component | Selected Technology | Rationale |
 | :--- | :--- | :--- |
@@ -113,16 +168,16 @@ unified-ai-assistant/
 | **Backend Framework** | FastAPI 0.162, Pydantic 2.14 | High-throughput asynchronous endpoints, automatic OpenAPI documentation, strict schema validation |
 | **Server Runtime** | Python 3.12 (Uvicorn 0.54) | Broad ecosystem compatibility for signal processing and backend services |
 | **Persistence (Phase 2+)** | PostgreSQL | Robust relational integrity for chat histories, project scopes, and tasks |
-| **Styling** | Modern CSS / Tailwind (Phase 1) | Custom design system adhering to serif typography and dark workspace specifications |
+| **Styling** | Modern CSS Custom Properties | Custom design system adhering to Georgia serif typography and Claude-style dark palette |
 
 ---
 
-## 6. Phased Roadmap
+## 7. Phased Roadmap
 
-* **Phase 0 (Current)**: Repository Foundation, Monorepo Topology, Environment Audit, Verified Health Endpoints.
-* **Phase 1**: Claude-Inspired Dark UI with Sidebar Navigation, Large Serif AI Response Typography, Mock-free Chat Stream Contracts.
-* **Phase 2**: Backend Persistence (PostgreSQL), Hosted Model Providers Integration (Server-Side), Chat History.
-* **Phase 3**: Browser Agent Scaffolding & Local Chrome CDP Bridge.
-* **Phase 4**: Natural-Language Task Management & Calendar Integration.
-* **Phase 5**: Wi-Fi Sensing Simulation Service & Presence Events.
-* **Phase 6**: Cloud Browser Isolation & Hardening.
+* **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
+* **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation, Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
+* **Phase 2 — Persistence & Model Gateway**: Database models (PostgreSQL), server-side hosted model provider integration (OpenAI, Anthropic, Gemini), chat persistence, and search.
+* **Phase 3 — Autonomous Browser Agent**: Local Chrome CDP integration and safety guardrails.
+* **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
+* **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
+* **Phase 6 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.

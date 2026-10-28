@@ -1,0 +1,70 @@
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--text-tertiary);
+  padding: 6px 12px;
+}
+
+.status-indicator__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-indicator--checking .status-indicator__dot {
+  background: #f59e0b;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-indicator--connected .status-indicator__dot {
+  background: #22c55e;
+}
+
+.status-indicator--disconnected .status-indicator__dot,
+.status-indicator--error .status-indicator__dot {
+  background: #ef4444;
+}
+
+.status-indicator__label {
+  white-space: nowrap;
+}
+
+.status-indicator__error {
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.status-indicator__retry {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-sans);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.status-indicator__retry:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.status-indicator__retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

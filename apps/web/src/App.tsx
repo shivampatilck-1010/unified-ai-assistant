@@ -1,122 +1,165 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import type { NavigationSection, ProviderConfigStatus } from './types';
+import { useConversations } from './hooks/useConversations';
+import { useHealthCheck } from './hooks/useHealthCheck';
+import { fetchProviderStatus } from './lib/api';
+import { Sidebar } from './components/sidebar/Sidebar';
+import { ChatView } from './components/chat/ChatView';
+import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
+import { StatusIndicator } from './components/status/StatusIndicator';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [activeSection, setActiveSection] = useState<NavigationSection>('chat');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [providerStatus, setProviderStatus] = useState<ProviderConfigStatus | null>(null);
+
+  const {
+    conversations,
+    activeConversation,
+    activeId,
+    isStreaming,
+    startNewChat,
+    selectConversation,
+    deleteConversation,
+    sendMessage,
+    cancelStream,
+  } = useConversations();
+
+  const { status: healthStatus, health, error: healthError, recheck } = useHealthCheck();
+
+  // Check server-side provider status when health connects
+  useEffect(() => {
+    let active = true;
+    if (healthStatus === 'connected') {
+      void fetchProviderStatus()
+        .then((res) => {
+          if (active) setProviderStatus(res);
+        })
+        .catch(() => {
+          if (active) setProviderStatus(null);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [healthStatus]);
+
+  const effectiveProviderStatus = healthStatus === 'connected' ? providerStatus : null;
+
+  const handleNewChat = () => {
+    startNewChat();
+    setActiveSection('chat');
+  };
+
+  const handleSelectConversation = (id: string) => {
+    selectConversation(id);
+    setActiveSection('chat');
+    setMobileSidebarOpen(false);
+  };
+
+  const getSectionTitle = (section: NavigationSection): string => {
+    switch (section) {
+      case 'chat':
+        return activeConversation?.title || 'Chat Workspace';
+      case 'search':
+        return 'Search';
+      case 'projects':
+        return 'Projects';
+      case 'browser-agent':
+        return 'Browser Agent';
+      case 'calendar':
+        return 'Calendar & Tasks';
+      case 'files':
+        return 'Files & Knowledge';
+      case 'wifi-sensing':
+        return 'Wi-Fi Sensing';
+      case 'settings':
+        return 'Settings';
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="app-layout">
+      <Sidebar
+        activeSection={activeSection}
+        onNavigate={(sec) => setActiveSection(sec)}
+        onNewChat={handleNewChat}
+        conversations={conversations}
+        activeConversationId={activeId}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={deleteConversation}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
 
-      <div className="ticks"></div>
+      <main className="app-main">
+        {/* Top Header */}
+        <header className="app-header">
+          <div className="app-header__left">
+            <button
+              className="app-header__menu-btn"
+              onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Open navigation sidebar"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M3 4.5h12M3 9h12M3 13.5h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+            <div className="app-header__title">
+              <span>Unified AI</span>
+              <span>/</span>
+              <span className="app-header__title-active">{getSectionTitle(activeSection)}</span>
+            </div>
+          </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+          <div className="app-header__right">
+            {effectiveProviderStatus && (
+              <div
+                className={`app-header__provider-badge ${
+                  effectiveProviderStatus.configured ? '' : 'app-header__provider-badge--unconfigured'
+                }`}
+                title={effectiveProviderStatus.message}
+              >
+                <span className="app-header__provider-dot" aria-hidden="true" />
+                <span>
+                  {effectiveProviderStatus.configured
+                    ? `AI: ${effectiveProviderStatus.provider}`
+                    : 'AI Provider Not Configured'}
+                </span>
+              </div>
+            )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            <StatusIndicator
+              status={healthStatus}
+              version={health?.version}
+              error={healthError}
+              onRetry={recheck}
+            />
+          </div>
+        </header>
+
+        {/* Dynamic Content */}
+        <div className="app-content">
+          {activeSection === 'chat' ? (
+            <ChatView
+              messages={activeConversation?.messages ?? []}
+              onSend={sendMessage}
+              isStreaming={isStreaming}
+              onCancel={cancelStream}
+              onNewChat={handleNewChat}
+            />
+          ) : (
+            <SectionPlaceholder
+              section={activeSection}
+              onBackToChat={() => setActiveSection('chat')}
+            />
+          )}
+        </div>
+      </main>
+    </div>
+  );
 }
-
-export default App
