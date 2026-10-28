@@ -9,6 +9,7 @@ import { BrowserAgentView } from './components/browser/BrowserAgentView';
 import { CalendarTasksView } from './components/calendar/CalendarTasksView';
 import { FilesKnowledgeView } from './components/files/FilesKnowledgeView';
 import { WifiSensingView } from './components/sensing/WifiSensingView';
+import { OrchestrationView } from './components/orchestration/OrchestrationView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -86,6 +87,8 @@ export default function App() {
         return 'Files & Knowledge';
       case 'wifi-sensing':
         return 'Wi-Fi Sensing';
+      case 'orchestration':
+        return 'AI Orchestration Engine';
       case 'settings':
         return 'Settings';
     }
@@ -175,6 +178,8 @@ export default function App() {
             <FilesKnowledgeView />
           ) : activeSection === 'wifi-sensing' ? (
             <WifiSensingView />
+          ) : activeSection === 'orchestration' ? (
+            <OrchestrationView />
           ) : (
             <SectionPlaceholder
               section={activeSection}

@@ -21,6 +21,7 @@ class ChatStreamRequest(BaseModel):
     research_depth: Optional[str] = Field(default="standard", description="Research depth: quick, standard, deep")
     use_sensing: Optional[bool] = Field(default=False, description="Whether to ground answer in Wi-Fi sensing status/occupancy")
     sensing_room_id: Optional[str] = Field(default=None, description="Optional target room ID for sensing queries")
+    use_orchestration: Optional[bool] = Field(default=False, description="Whether to invoke unified multi-capability orchestration engine")
 
 
 class SSEEventPayload(BaseModel):

@@ -158,3 +158,16 @@ flowchart LR
 
 
 
+
+---
+
+## 10. Phase 9 Unified AI Orchestration Engine Threat Analysis
+
+| Threat & STRIDE Category | Attack Scenario | Implemented Mitigation & Security Control |
+| :--- | :--- | :--- |
+| **Hallucinated / Invented Capability Invocation** *(Elevation of Privilege / Tampering)* | An LLM planner invents non-existent or dangerous internal tools (e.g., `execute_system_command`, `delete_database`, `cloud_iam_grant`). | Strict capability allowlisting: `OrchestrationPlanner` enforces that every step's capability must be a valid member of `CapabilityType`. Plans containing unknown tools are rejected during validation before persistence. `CapabilityDispatcher` dispatches only to registered, typed internal handlers. |
+| **Unintended Consequential State Mutation** *(Tampering / Repudiation)* | The engine automatically creates tasks, adds calendar events, schedules reminders, or executes external browser mutations without explicit human approval. | Consequential Action Gates: Capabilities that modify external state (`task_create`, `calendar_event_create`, `reminder_create`, `browser_action`) are tagged `is_consequential = True`. The execution engine pauses before execution at `waiting_for_confirmation`. Execution halts until the user explicitly confirms via `/confirm`. Rejection cancels the step without mutating the DB. |
+| **Stale Plan Approval Race Condition** *(Tampering)* | A user approves a plan while a concurrent process or clarification update has modified the underlying steps and scope. | Optimistic concurrency versioning: `Workflow.plan_version` is incremented on every replan or clarification. `approve_workflow_plan` validates that `payload.plan_version == workflow.plan_version`. Mismatched versions are rejected with HTTP 409 Conflict. |
+| **Indirect Prompt Injection in Cross-Tool Blackboard** *(Tampering / Information Disclosure)* | External web pages or documents gathered in early steps contain adversarial prompts attempting to manipulate subsequent synthesis steps or hijack task creation. | Strict isolation & structured system prompts: Preceding step outputs are treated as untrusted reference data. System prompts explicitly instruct synthesis models to treat previous step outputs as inert evidence rather than executable instructions. |
+| **Cross-Tenant Workflow Hijacking** *(Information Disclosure / Elevation of Privilege)* | User B attempts to view, approve, confirm, or cancel User A's workflow by guessing workflow IDs. | Tenant isolation boundary: Every workflow query, approval, clarification, confirmation, and cancellation strictly checks `workflow.owner_id == authenticated_user_id`. Cross-tenant requests return HTTP 404 Not Found. |
+| **Dangling Workflow Leases & Server Crash Invalidation** *(Denial of Service)* | Server or worker crashes mid-execution, leaving workflows trapped in `running` or `planning` forever. | `OrchestrationEngine.recover_dangling_workflows()` runs during application startup (`lifespan`), reconciling active workflows, setting status to `failed`, and logging audit events. |

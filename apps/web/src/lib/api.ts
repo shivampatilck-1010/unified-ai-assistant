@@ -48,6 +48,15 @@ import type {
   WifiSensingAudit,
   WifiSensingStatusResponse,
   WorkerStatus,
+  Workflow,
+  WorkflowApproveRequest,
+  WorkflowCancelRequest,
+  WorkflowClarifyRequest,
+  WorkflowConfirmStepRequest,
+  WorkflowCreateRequest,
+  WorkflowEvent,
+  WorkflowListResponse,
+  WorkflowPlan,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000';
@@ -1100,6 +1109,154 @@ export async function fetchSensingAudits(
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing audits: ${res.status}`);
   return (await res.json()) as WifiSensingAudit[];
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9: Unified AI Orchestration Engine API Client
+// ---------------------------------------------------------------------------
+
+export async function createWorkflow(
+  payload: WorkflowCreateRequest,
+  signal?: AbortSignal
+): Promise<Workflow> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to create workflow: ${res.status} ${err}`);
+  }
+  return (await res.json()) as Workflow;
+}
+
+export async function listWorkflows(
+  status?: string,
+  limit: number = 20,
+  offset: number = 0,
+  signal?: AbortSignal
+): Promise<WorkflowListResponse> {
+  const url = new URL(`${API_BASE}/api/orchestration/workflows`);
+  if (status) url.searchParams.set('status', status);
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('offset', String(offset));
+
+  const res = await fetch(url.toString(), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to list workflows: ${res.status}`);
+  return (await res.json()) as WorkflowListResponse;
+}
+
+export async function getWorkflow(
+  workflowId: string,
+  signal?: AbortSignal
+): Promise<Workflow> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to load workflow: ${res.status}`);
+  return (await res.json()) as Workflow;
+}
+
+export async function getWorkflowPlan(
+  workflowId: string,
+  signal?: AbortSignal
+): Promise<WorkflowPlan> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}/plan`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to load workflow plan: ${res.status}`);
+  return (await res.json()) as WorkflowPlan;
+}
+
+export async function approveWorkflowPlan(
+  workflowId: string,
+  payload: WorkflowApproveRequest,
+  signal?: AbortSignal
+): Promise<Workflow> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}/approve`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to approve workflow: ${res.status} ${err}`);
+  }
+  return (await res.json()) as Workflow;
+}
+
+export async function submitWorkflowClarification(
+  workflowId: string,
+  payload: WorkflowClarifyRequest,
+  signal?: AbortSignal
+): Promise<Workflow> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}/clarify`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to submit clarification: ${res.status} ${err}`);
+  }
+  return (await res.json()) as Workflow;
+}
+
+export async function confirmWorkflowStep(
+  workflowId: string,
+  payload: WorkflowConfirmStepRequest,
+  signal?: AbortSignal
+): Promise<Workflow> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}/confirm`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to confirm step: ${res.status} ${err}`);
+  }
+  return (await res.json()) as Workflow;
+}
+
+export async function cancelWorkflow(
+  workflowId: string,
+  payload: WorkflowCancelRequest,
+  signal?: AbortSignal
+): Promise<Workflow> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}/cancel`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to cancel workflow: ${res.status} ${err}`);
+  }
+  return (await res.json()) as Workflow;
+}
+
+export async function listWorkflowEvents(
+  workflowId: string,
+  signal?: AbortSignal
+): Promise<WorkflowEvent[]> {
+  const res = await fetch(`${API_BASE}/api/orchestration/workflows/${encodeURIComponent(workflowId)}/events`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to list workflow events: ${res.status}`);
+  return (await res.json()) as WorkflowEvent[];
 }
 
 export { API_BASE };

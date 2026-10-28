@@ -473,3 +473,61 @@ flowchart TD
   - `/ready` executes active health queries across the database connection pool, Model Gateway provider status, Browser Worker availability, and Reminder Scheduler state. Returns HTTP 503 if critical dependencies are down.
 - **Structured Redacted Logging**: `SecretRedactionFilter` scrubs Bearer tokens, OpenAI/Anthropic/Gemini API keys, and database passwords from all standard logging handlers.
 - **Resource Constraints**: Maximum request body size capped at 15 MB; sliding-window in-memory rate limiting throttles requests exceeding 120 req/min.
+
+
+---
+
+## 11. Phase 9 — Unified AI Orchestration Engine
+
+### 11.1. Architectural Mission & Capabilities
+Phase 9 establishes the Unified Orchestration Engine as the single coordination layer for all assistant capabilities:
+1. **Ambiguity Detection & Clarification Gates**: Automatically halts vague requests (e.g., "create a task", "schedule a meeting", "research this") into `waiting_for_input` and prompts the user for clarification before constructing a plan.
+2. **Capability Allowlisting**: Strictly validates proposed steps against internal typed capabilities (`knowledge_search`, `web_research`, `browser_action`, `task_create`, `task_update`, `calendar_event_create`, `reminder_create`, `wifi_sensing_query`, `general_synthesis`), rejecting hallucinated or unsupported tools.
+3. **Consequential Action Gates**: Consequential operations that mutate user state (`task_create`, `calendar_event_create`, `reminder_create`, mutating browser interactions) are tagged with `is_consequential=True` and mandate explicit human confirmation before DB mutation.
+4. **Topological DAG Execution & Parallelism**: Safe independent steps (e.g. concurrent document search, web research, sensing queries) execute in parallel via `asyncio.gather`, while dependent steps await parent completion.
+5. **Context Blackboard & Variable Interpolation**: Downstream steps interpolate output parameters from preceding steps via `{step_N.output.field}` placeholders.
+6. **Provenance Citations**:
+   - Web Research: `[Web N: Title]` with canonical publisher and URL.
+   - Files & Knowledge: `[Doc: filename, Page X]` with page or chunk numbers.
+   - Wi-Fi Sensing: `[Synthetic Observation: Room X (Simulated)]` with mandatory simulation disclaimer.
+
+```mermaid
+flowchart TD
+    UserReq["User Natural Language Request"] --> AmbiguityCheck{"Ambiguous<br/>Request?"}
+    AmbiguityCheck -->|"Yes: Vague Goal"| ClarifyState["waiting_for_input<br/>(Prompt User for Details)"]
+    ClarifyState -->|"User Submits Answer"| Replan["Regenerate Plan (v+1)"]
+    AmbiguityCheck -->|"No: Clear Scope"| PlanGen["OrchestrationPlanner<br/>(Structured DAG Plan)"]
+    Replan --> PlanGen
+
+    PlanGen --> ConsequentialCheck{"Contains<br/>Consequential Steps?"}
+    ConsequentialCheck -->|"Yes: Mutating State"| AwaitingApproval["awaiting_approval<br/>(Present Plan to User)"]
+    ConsequentialCheck -->|"No: Safe Read Only"| AutoStart["running<br/>(Auto-Approved Execution)"]
+    AwaitingApproval -->|"User Approves Plan"| Running["running<br/>(DAG State Machine)"]
+    AwaitingApproval -->|"User Declines"| Cancelled["cancelled"]
+
+    subgraph DAGExecution["Durable DAG Execution Loop"]
+        Running --> ReadyQueue["Identify Ready Steps (all deps met)"]
+        ReadyQueue --> GateCheck{"Step is<br/>Consequential?"}
+        GateCheck -->|"Yes & Unconfirmed"| PauseGate["waiting_for_confirmation<br/>(Present Action Card)"]
+        PauseGate -->|"User Confirmed"| ResumeStep["Execute Consequential Step"]
+        PauseGate -->|"User Declined"| RejectStep["Cancel Step & Continue"]
+        GateCheck -->|"No: Safe Step"| ConcurrentExec["Concurrent asyncio.gather<br/>(Knowledge, Web, Sensing)"]
+        ResumeStep --> Blackboard["Update Shared Context Blackboard"]
+        ConcurrentExec --> Blackboard
+        RejectStep --> Blackboard
+        Blackboard --> CheckFinished{"All Steps<br/>Finished?"}
+        CheckFinished -->|"Pending Steps Exist"| ReadyQueue
+    end
+
+    CheckFinished -->|"Yes: All Complete"| Synthesis["Final Synthesis & Provenance Consolidation"]
+    Synthesis --> Completed["completed<br/>(Stored Report + SSE Stream)"]
+```
+
+### 11.2. Database Persistence Models
+- `Workflow`: Durable state, plan versioning, context data, worker lease (`claimed_by_worker`), pending confirmation payload, and final consolidated report.
+- `WorkflowStep`: 1-based sequence number, capability allowlist, parameter bindings, dependency list (`depends_on`), consequential flags (`is_consequential`, `confirmed_by_user`), execution status, output data, and structured citations.
+- `WorkflowEvent`: Append-only audit log tracking lifecycle events (`workflow_created`, `plan_generated`, `plan_approved`, `confirmation_required`, `step_confirmed`, `step_rejected`, `step_started`, `step_completed`, `workflow_completed`).
+
+### 11.3. Real-Time Streaming & Resilience
+- **In-Memory SSE Pub/Sub**: Real-time event broadcasting streams state transitions, step progress, confirmation requirements, and deltas over `GET /api/orchestration/workflows/{id}/stream`.
+- **Dangling Workflow Recovery**: `OrchestrationEngine.recover_dangling_workflows()` runs during application lifespan startup to reconcile tasks interrupted by host restarts.

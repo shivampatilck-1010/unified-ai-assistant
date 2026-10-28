@@ -4,6 +4,7 @@ from routers.chat import router as chat_router
 from routers.conversations import router as conversations_router
 from routers.files import router as files_router
 from routers.knowledge import router as knowledge_router
+from routers.orchestration import router as orchestration_router
 from routers.providers import router as providers_router
 from routers.reminders import router as reminders_router
 from routers.research import router as research_router
@@ -14,6 +15,7 @@ __all__ = [
     "browser_tasks_router",
     "chat_router",
     "conversations_router",
+    "orchestration_router",
     "providers_router",
     "tasks_router",
     "calendar_router",

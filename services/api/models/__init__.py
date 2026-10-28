@@ -9,6 +9,7 @@ from models.reminder import Reminder
 from models.research import ResearchEvent, ResearchJob, ResearchSource
 from models.task import Task
 from models.wifi_sensing import WifiSensingAudit, WifiSensingEvent, WifiSensorConfig
+from models.workflow import Workflow, WorkflowEvent, WorkflowStep
 
 __all__ = [
     "Base",
@@ -27,4 +28,7 @@ __all__ = [
     "WifiSensorConfig",
     "WifiSensingEvent",
     "WifiSensingAudit",
+    "Workflow",
+    "WorkflowStep",
+    "WorkflowEvent",
 ]

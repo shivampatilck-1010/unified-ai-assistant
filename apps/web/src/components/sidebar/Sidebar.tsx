@@ -78,6 +78,16 @@ const navItems: SidebarNavItem[] = [
     ),
   },
   {
+    id: 'orchestration',
+    label: 'Orchestration',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <path d="M3 4.5h4v4H3zM11 4.5h4v4h-4zM7 9.5h4v4H7z" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M5 8.5v3h2M13 8.5v3h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: (

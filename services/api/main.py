@@ -37,6 +37,7 @@ from routers import (
     conversations_router,
     files_router,
     knowledge_router,
+    orchestration_router,
     providers_router,
     reminders_router,
     research_router,
@@ -44,6 +45,7 @@ from routers import (
     wifi_sensing_router,
 )
 from services.model_gateway import get_model_gateway
+from services.orchestration.engine import OrchestrationEngine
 from services.reminder_scheduler import scheduler_instance
 from services.research.job_service import ResearchJobService
 from worker import get_worker_runner
@@ -58,6 +60,8 @@ async def lifespan(app: FastAPI):
     await create_tables()
     # Reconcile dangling research jobs from previous sessions
     await ResearchJobService.recover_dangling_jobs()
+    # Reconcile dangling orchestrated workflows from previous sessions
+    await OrchestrationEngine.recover_dangling_workflows()
     # Reconcile dangling browser tasks from previous sessions
     worker_runner = get_worker_runner(
         headless=settings.browser_headless,
@@ -115,6 +119,7 @@ app.include_router(files_router)
 app.include_router(knowledge_router)
 app.include_router(research_router)
 app.include_router(wifi_sensing_router)
+app.include_router(orchestration_router)
 
 
 class HealthResponse(BaseModel):

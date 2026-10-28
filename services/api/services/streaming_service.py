@@ -223,6 +223,164 @@ class StreamingService:
             except Exception as e:
                 logger.error("Chat research error: %s", e)
 
+        # 5c. Check unified orchestration engine workflow
+        if request.use_orchestration:
+            try:
+                import asyncio
+                from services.orchestration.engine import OrchestrationEngine
+
+                workflow = await OrchestrationEngine.create_workflow(
+                    db=db,
+                    owner_id=owner_id,
+                    prompt=request.message,
+                    file_ids=request.selected_file_ids,
+                    conversation_id=conversation_id,
+                )
+
+                if workflow.status == "waiting_for_input":
+                    msg_text = (
+                        f"❓ **Clarification Required**\n\n"
+                        f"{workflow.clarification_question}\n\n"
+                        f"*Orchestration Workflow: `{workflow.id}`*"
+                    )
+                    yield format_sse(
+                        SSEEventType.TEXT_DELTA,
+                        SSEEventPayload(
+                            event=SSEEventType.TEXT_DELTA,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"text": msg_text},
+                        ),
+                    )
+                    await ConversationService.update_message(
+                        db=db,
+                        message_id=assistant_msg_id,
+                        content=msg_text,
+                        status="completed",
+                        extra_metadata=json.dumps({
+                            "workflow_id": workflow.id,
+                            "workflow_status": workflow.status,
+                            "clarification_question": workflow.clarification_question,
+                        }),
+                    )
+                    yield format_sse(
+                        SSEEventType.MESSAGE_COMPLETE,
+                        SSEEventPayload(
+                            event=SSEEventType.MESSAGE_COMPLETE,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"finish_reason": "stop", "workflow_id": workflow.id},
+                        ),
+                    )
+                    return
+
+                elif workflow.status == "awaiting_approval":
+                    plan_data = workflow.plan or {}
+                    steps_list = plan_data.get("steps", [])
+                    steps_formatted = []
+                    for s in steps_list:
+                        conseq_tag = " ⚠️ *(Requires Confirmation)*" if s.get("is_consequential") else ""
+                        steps_formatted.append(f"{s.get('step_number')}. **{s.get('title')}** ({s.get('capability')}){conseq_tag}")
+
+                    steps_md = "\n".join(steps_formatted)
+                    msg_text = (
+                        f"📋 **Proposed Orchestration Plan** (v{workflow.plan_version})\n\n"
+                        f"{plan_data.get('summary', '')}\n\n"
+                        f"**Planned Steps:**\n{steps_md}\n\n"
+                        f"*Plan awaiting approval. Workflow ID: `{workflow.id}`*"
+                    )
+                    yield format_sse(
+                        SSEEventType.TEXT_DELTA,
+                        SSEEventPayload(
+                            event=SSEEventType.TEXT_DELTA,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"text": msg_text},
+                        ),
+                    )
+                    await ConversationService.update_message(
+                        db=db,
+                        message_id=assistant_msg_id,
+                        content=msg_text,
+                        status="completed",
+                        extra_metadata=json.dumps({
+                            "workflow_id": workflow.id,
+                            "workflow_status": workflow.status,
+                            "plan": plan_data,
+                        }),
+                    )
+                    yield format_sse(
+                        SSEEventType.MESSAGE_COMPLETE,
+                        SSEEventPayload(
+                            event=SSEEventType.MESSAGE_COMPLETE,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"finish_reason": "stop", "workflow_id": workflow.id},
+                        ),
+                    )
+                    return
+
+                elif workflow.status == "running":
+                    yield format_sse(
+                        SSEEventType.TEXT_DELTA,
+                        SSEEventPayload(
+                            event=SSEEventType.TEXT_DELTA,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"text": f"⚡ **Executing Orchestrated Plan** (Workflow `{workflow.id[:8]}`)\n\n"},
+                        ),
+                    )
+
+                    # Await workflow execution
+                    for _ in range(60):
+                        await asyncio.sleep(0.5)
+                        refreshed = await OrchestrationEngine.get_workflow(db, owner_id, workflow.id)
+                        if not refreshed or refreshed.status in ("completed", "failed", "partially_completed", "waiting_for_confirmation", "cancelled"):
+                            break
+
+                    refreshed = await OrchestrationEngine.get_workflow(db, owner_id, workflow.id)
+                    final_summary = refreshed.result_summary or "Workflow finished."
+                    if refreshed.status == "waiting_for_confirmation":
+                        conf = refreshed.pending_confirmation or {}
+                        final_summary += f"\n\n⏸️ **Confirmation Required**: {conf.get('title')} ({conf.get('consequential_reason')})"
+
+                    yield format_sse(
+                        SSEEventType.TEXT_DELTA,
+                        SSEEventPayload(
+                            event=SSEEventType.TEXT_DELTA,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"text": f"\n\n{final_summary}"},
+                        ),
+                    )
+
+                    citations = (refreshed.final_report or {}).get("citations", [])
+                    extra_meta = {
+                        "finish_reason": "stop",
+                        "workflow_id": workflow.id,
+                        "workflow_status": refreshed.status,
+                        "citations": citations,
+                    }
+                    await ConversationService.update_message(
+                        db=db,
+                        message_id=assistant_msg_id,
+                        content=final_summary,
+                        status="completed",
+                        extra_metadata=json.dumps(extra_meta),
+                    )
+                    yield format_sse(
+                        SSEEventType.MESSAGE_COMPLETE,
+                        SSEEventPayload(
+                            event=SSEEventType.MESSAGE_COMPLETE,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"finish_reason": "stop", "workflow_id": workflow.id, "citations": citations},
+                        ),
+                    )
+                    return
+            except Exception as e:
+                logger.error("Chat orchestration error: %s", e, exc_info=True)
+
         # 6. Build conversation history and apply knowledge grounding if requested
         conversation_history = []
         if conv_detail and conv_detail.messages:

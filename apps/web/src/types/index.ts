@@ -37,6 +37,7 @@ export interface ChatRequest {
   selected_file_ids?: string[];
   use_research?: boolean;
   research_depth?: 'quick' | 'standard' | 'deep' | string;
+  use_orchestration?: boolean;
 }
 
 export interface HealthResponse {
@@ -238,6 +239,7 @@ export type NavigationSection =
   | 'calendar'
   | 'files'
   | 'wifi-sensing'
+  | 'orchestration'
   | 'settings';
 
 export type BackendStatus = 'checking' | 'connected' | 'disconnected' | 'error';
@@ -753,4 +755,159 @@ export interface WifiSensingAudit {
   action: string;
   details: Record<string, unknown>;
   created_at: string;
+}
+
+// Phase 9: Unified AI Orchestration Engine Types
+
+export type WorkflowStatus =
+  | 'draft'
+  | 'planning'
+  | 'awaiting_approval'
+  | 'running'
+  | 'waiting_for_input'
+  | 'waiting_for_confirmation'
+  | 'partially_completed'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export type WorkflowStepStatus =
+  | 'pending'
+  | 'ready'
+  | 'running'
+  | 'waiting_for_confirmation'
+  | 'completed'
+  | 'failed'
+  | 'skipped'
+  | 'cancelled';
+
+export interface WorkflowStep {
+  id: string;
+  step_number: number;
+  title: string;
+  capability: string;
+  parameters?: Record<string, unknown>;
+  depends_on: number[];
+  is_consequential: boolean;
+  consequential_reason?: string | null;
+  requires_confirmation: boolean;
+  confirmed_by_user?: boolean | null;
+  status: WorkflowStepStatus;
+  retry_count: number;
+  max_retries: number;
+  output_data?: Record<string, unknown> | null;
+  citations?: Array<{
+    source_type: string;
+    citation_key: string;
+    title?: string;
+    url?: string;
+    snippet?: string;
+    is_simulated?: boolean;
+    disclaimer?: string;
+  }>;
+  is_simulated: boolean;
+  error_message?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface WorkflowPlan {
+  summary: string;
+  steps: Array<{
+    step_number: number;
+    title: string;
+    capability: string;
+    parameters: Record<string, unknown>;
+    depends_on: number[];
+    is_consequential: boolean;
+    consequential_reason?: string | null;
+    requires_confirmation: boolean;
+  }>;
+  estimated_duration_seconds?: number;
+  consequential_actions_count: number;
+}
+
+export interface Workflow {
+  id: string;
+  owner_id: string;
+  conversation_id?: string | null;
+  title: string;
+  request_prompt: string;
+  status: WorkflowStatus;
+  plan_version: number;
+  plan?: WorkflowPlan | null;
+  context_data?: Record<string, unknown> | null;
+  clarification_question?: string | null;
+  clarification_response?: string | null;
+  pending_confirmation?: {
+    step_id: string;
+    step_number: number;
+    title: string;
+    capability: string;
+    parameters?: Record<string, unknown>;
+    consequential_reason?: string;
+  } | null;
+  result_summary?: string | null;
+  final_report?: {
+    title: string;
+    status: string;
+    steps_count: number;
+    citations?: Array<{
+      source_type: string;
+      citation_key: string;
+      title?: string;
+      url?: string;
+      snippet?: string;
+      is_simulated?: boolean;
+    }>;
+    summary: string;
+    completed_at?: string;
+  } | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+  steps: WorkflowStep[];
+}
+
+export interface WorkflowListResponse {
+  items: Workflow[];
+  total: number;
+}
+
+export interface WorkflowEvent {
+  id: string;
+  workflow_id: string;
+  step_id?: string | null;
+  event_type: string;
+  message: string;
+  payload?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface WorkflowCreateRequest {
+  prompt: string;
+  conversation_id?: string | null;
+  auto_approve?: boolean;
+  file_ids?: string[];
+}
+
+export interface WorkflowApproveRequest {
+  approved: boolean;
+  modified_plan?: WorkflowPlan | null;
+  plan_version: number;
+}
+
+export interface WorkflowClarifyRequest {
+  clarification_response: string;
+}
+
+export interface WorkflowConfirmStepRequest {
+  step_number: number;
+  approved: boolean;
+  reason?: string | null;
+}
+
+export interface WorkflowCancelRequest {
+  reason?: string;
 }

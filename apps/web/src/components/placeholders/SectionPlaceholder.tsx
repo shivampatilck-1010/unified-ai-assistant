@@ -124,6 +124,25 @@ const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> 
       </svg>
     ),
   },
+  orchestration: {
+    title: 'Unified AI Orchestration Engine',
+    badge: 'Phase 9 Milestone',
+    phase: 'Phase 9',
+    description:
+      'Autonomous multi-capability coordination with strict dependency DAGs, human confirmation gates, and source provenance.',
+    plannedFeatures: [
+      'Ambiguity detection and clarification gates',
+      'Cross-system tool coordination (files, research, browser, calendar, sensing)',
+      'Concurrent execution of independent safe steps',
+      'Strict human confirmation for consequential actions',
+    ],
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <path d="M3 4.5h4v4H3zM11 4.5h4v4h-4zM7 9.5h4v4H7z" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M5 8.5v3h2M13 8.5v3h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
   settings: {
     title: 'Settings & Model Configuration',
     badge: 'Server Credentials & Keys',
