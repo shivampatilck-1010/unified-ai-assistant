@@ -40,6 +40,31 @@ class Settings:
         # Development identity boundary (for local single-user or auth mock)
         self.dev_user_id: str = os.getenv("DEV_USER_ID", "dev-user-default")
 
+        # Phase 8: Authentication & Security Hardening Settings
+        self.is_production: bool = (self.environment.lower() == "production")
+        self.auth_mode: str = os.getenv("AUTH_MODE", "jwt" if self.is_production else "dev_fallback")
+        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
+        self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+        self.jwt_issuer: str = os.getenv("JWT_ISSUER", "unified-ai-assistant")
+        self.jwt_audience: str = os.getenv("JWT_AUDIENCE", "unified-ai-assistant-api")
+        self.allow_dev_auth: bool = os.getenv(
+            "ALLOW_DEV_AUTH", "false" if self.is_production else "true"
+        ).lower() in ("true", "1", "yes")
+
+        # Rate limiting and concurrency
+        self.browser_worker_concurrency: int = int(os.getenv("BROWSER_WORKER_CONCURRENCY", "3"))
+        self.rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
+        self.max_request_body_bytes: int = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(25 * 1024 * 1024)))
+
+        # Production startup validations
+        if self.is_production:
+            if self.allow_dev_auth:
+                raise ValueError("Production configuration error: ALLOW_DEV_AUTH must be false in production.")
+            if not self.jwt_secret_key or len(self.jwt_secret_key) < 32:
+                raise ValueError(
+                    "Production configuration error: JWT_SECRET_KEY must be provided and at least 32 characters in production."
+                )
+
         # Browser Agent Worker settings
         self.browser_headless: bool = os.getenv("BROWSER_HEADLESS", "true").lower() in ("true", "1", "yes")
         self.browser_action_timeout_ms: int = int(os.getenv("BROWSER_ACTION_TIMEOUT_MS", "15000"))

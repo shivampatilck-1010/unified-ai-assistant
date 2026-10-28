@@ -52,6 +52,35 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000';
 
+let currentAuthToken: string | null =
+  typeof window !== 'undefined' ? localStorage.getItem('unified_ai_auth_token') : null;
+
+export function setAuthToken(token: string | null): void {
+  currentAuthToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('unified_ai_auth_token', token);
+    } else {
+      localStorage.removeItem('unified_ai_auth_token');
+    }
+  }
+}
+
+export function getAuthToken(): string | null {
+  return currentAuthToken;
+}
+
+export function getBaseHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...extra,
+  };
+  if (currentAuthToken) {
+    headers['Authorization'] = `Bearer ${currentAuthToken}`;
+  }
+  return headers;
+}
+
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
   const response = await fetch(`${API_BASE}/health`, {
     signal,
@@ -77,11 +106,45 @@ export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse>
   return data as HealthResponse;
 }
 
+export interface ReadinessResponse {
+  status: string;
+  service: string;
+  database: string;
+  model_gateway: {
+    default_provider?: string;
+    configured_providers: string[];
+  };
+  browser_worker: {
+    available: boolean;
+    worker_id?: string;
+    max_concurrency?: number;
+  };
+  scheduler: string;
+  timestamp: string;
+}
+
+export async function fetchReadiness(signal?: AbortSignal): Promise<ReadinessResponse> {
+  const response = await fetch(`${API_BASE}/ready`, {
+    signal,
+    headers: getBaseHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Readiness check failed with status: ${response.status}`);
+  }
+
+  return (await response.json()) as ReadinessResponse;
+}
+
 export async function fetchProviderStatus(signal?: AbortSignal): Promise<UnifiedProviderStatusResponse> {
   const response = await fetch(`${API_BASE}/api/provider/status`, {
     signal,
-    headers: { Accept: 'application/json' },
+    headers: getBaseHeaders(),
   });
+
+  if (response.status === 401) {
+    throw new Error('Authentication required (401 Unauthorized)');
+  }
 
   if (!response.ok) {
     throw new Error(`Provider status check failed: ${response.status}`);

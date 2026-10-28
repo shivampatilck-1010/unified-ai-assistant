@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -43,6 +43,7 @@ class ResearchJobService:
         db: AsyncSession,
         owner_id: str,
         payload: ResearchJobCreate,
+        auto_start: bool = True,
     ) -> ResearchJob:
         # Validate attached file ownership if any
         if payload.file_ids:
@@ -130,8 +131,9 @@ class ResearchJobService:
             db.add(run_event)
             await db.commit()
             await db.refresh(job)
-            # Spawn execution in background task
-            asyncio.create_task(ResearchJobService._execute_job(job_id))
+            # Spawn execution in background task if auto_start is True
+            if auto_start:
+                asyncio.create_task(ResearchJobService._execute_job(job_id))
 
         return job
 
@@ -396,7 +398,32 @@ class ResearchJobService:
     @staticmethod
     async def _execute_job(job_id: str) -> None:
         """Background pipeline: Discover -> Collect -> Synthesize."""
-        # 1. Fetch initial job parameters
+        worker_id = f"research-worker-{uuid.uuid4().hex[:8]}"
+
+        # 1. Atomically claim job
+        async with async_session_factory() as db:
+            stmt = (
+                update(ResearchJob)
+                .where(
+                    ResearchJob.id == job_id,
+                    ResearchJob.status.in_(["planning", "running", "awaiting_approval"]),
+                    or_(ResearchJob.claimed_by_worker.is_(None), ResearchJob.claimed_by_worker == worker_id),
+                )
+                .values(claimed_by_worker=worker_id, status="running", updated_at=utc_now())
+            )
+            res = await db.execute(stmt)
+            if res.rowcount == 0:
+                logger.info("Research job %s was already claimed; awaiting completion if running.", job_id)
+                # If already claimed by another concurrent task, wait for it to complete
+                for _ in range(60):
+                    await asyncio.sleep(0.1)
+                    existing = await db.get(ResearchJob, job_id)
+                    if existing and existing.status in ("completed", "failed", "cancelled"):
+                        return
+                return
+            await db.commit()
+
+        # 2. Fetch initial job parameters
         async with async_session_factory() as db:
             job = await db.get(ResearchJob, job_id)
             if not job or job.status == "cancelled":

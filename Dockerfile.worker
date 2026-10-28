@@ -1,0 +1,36 @@
+FROM python:3.12-bookworm AS runner
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libpq-dev \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root worker user
+RUN groupadd -g 10001 workergroup && \
+    useradd -u 10001 -g workergroup -s /bin/bash -m workeruser
+
+COPY services/api/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browser dependencies and chromium only
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN mkdir -p /ms-playwright && chown -R workeruser:workergroup /ms-playwright
+USER workeruser
+RUN playwright install chromium
+USER root
+
+# Copy application code
+COPY --chown=workeruser:workergroup services/api /app/services/api
+COPY --chown=workeruser:workergroup services/agent-worker /app/services/agent-worker
+
+WORKDIR /app/services/agent-worker
+USER workeruser
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Cloud execution command - standalone autonomous worker daemon
+CMD ["python", "-u", "-c", "import asyncio, sys; sys.path.insert(0, '/app/services/api'); sys.path.insert(0, '/app/services/agent-worker'); from worker import get_worker_runner; runner = get_worker_runner(headless=True, allow_local=False); print('Browser worker started in isolated execution boundary'); asyncio.get_event_loop().run_forever()"]

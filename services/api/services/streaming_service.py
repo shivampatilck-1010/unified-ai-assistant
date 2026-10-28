@@ -146,7 +146,7 @@ class StreamingService:
                     file_ids=request.selected_file_ids,
                     requires_approval=False,
                 )
-                r_job = await ResearchJobService.create_job(db, owner_id=owner_id, payload=job_create)
+                r_job = await ResearchJobService.create_job(db, owner_id=owner_id, payload=job_create, auto_start=False)
 
                 # Stream progress notification
                 yield format_sse(

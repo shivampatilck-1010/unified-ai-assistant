@@ -23,6 +23,7 @@ A unified personal AI workspace combining conversational intelligence, server pe
 * **Files & Knowledge Engine (Phase 5)**: Secure private document storage outside public web routes, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
 * **Web Research & Browser Intelligence (Phase 6)**: Autonomous, source-grounded research investigations with provider-neutral search discovery, isolated Playwright evidence extraction, SSRF/private IP blocking with post-navigation redirect revalidation, DOM prompt injection defense, grounded synthesis with traceable citations (`[Web N: Title]` and Phase 5 document correlation `[Doc: filename, Page X]`), honest insufficient evidence reporting, Markdown report exports, and SSE chat streaming integration.
 * **Wi-Fi Sensing Service (Phase 7)**: Modular, consent-based environmental awareness subsystem. Features deterministic synthetic CSI simulation (`is_simulated = True`), honest hardware adapter reporting unavailability when specialized CSI capture NICs are absent, statistical presence and motion estimation with explicit `unknown` state for degraded data, tenant-isolated zone configurations, configurable retention policies with one-click purge, immutable audit trail, assistant tool orchestration integration, and dark-themed frontend monitor.
+* **Production Hardening & Cloud Browser Execution (Phase 8)**: Production-ready operational boundary featuring fail-closed HMAC-SHA256 JWT authentication, Playwright network egress interception aborting subresource SSRF and cloud metadata access (`169.254.169.254`), atomic conditional SQL task claiming with worker restart recovery, defensive security headers, sliding-window rate limiting, payload bounds (15MB), structured logging with automated secret scrubbing, deep readiness probe (`/ready`), multi-stage Dockerfiles for non-root API, Worker, and Web services, and complete operational disaster recovery runbooks.
 * **Security First**: Hosted AI provider keys and database connection strings remain strictly server-side. Zero client-side API key exposure. Strict identity ownership boundaries enforce that users cannot read, mutate, or search conversations belonging to other identities.
 * **Modern Full-Stack Architecture**: React 19 + TypeScript + Vite frontend with a high-performance FastAPI backend.
 
@@ -48,6 +49,9 @@ unified-ai-assistant/
 │   │   └── main.py             # FastAPI entrypoint & lifespan
 │   ├── agent-worker/           # Autonomous browser agent execution worker
 │   └── wifi-sensing/           # Isolated Wi-Fi CSI sensing service (simulation)
+├── deploy/                     # Deployment configurations & operational runbooks
+│   ├── nginx.conf              # Nginx reverse proxy, security headers & SSE configuration
+│   └── backup-restore.md       # PostgreSQL backup, DR restore, migrations & secret rotation
 ├── packages/
 │   ├── shared-schemas/         # Shared TypeScript interfaces & API contracts
 │   └── ui/                     # UI components & dark theme design system
@@ -63,8 +67,16 @@ unified-ai-assistant/
 │   ├── test_streaming.py       # SSE streaming contract & error tests
 │   ├── test_browser_agent.py   # Autonomous browser agent integration tests
 │   ├── test_tasks_calendar_reminders.py # Tasks, calendar, recurrence, reminders & NL tests
-│   └── test_files_and_knowledge.py # Uploads, extraction, provenance, search, RAG & injection tests
-├── .env.example                # Environment variables template
+│   ├── test_files_and_knowledge.py # Uploads, extraction, provenance, search, RAG & injection tests
+│   ├── test_web_research.py    # Web research, SSRF defense, synthesis & citation tests
+│   ├── test_wifi_sensing.py    # Wi-Fi sensing simulation, tenant isolation & tool tests
+│   └── test_hardening_and_isolation.py # Production auth, SSRF, claiming, restart recovery & probes
+├── Dockerfile.api              # Non-root multi-stage Python API container
+├── Dockerfile.worker           # Isolated non-root Playwright Chromium execution boundary
+├── Dockerfile.web              # Multi-stage React 19 build + Nginx static asset runner
+├── docker-compose.prod.yml     # Production multi-service orchestration with resource limits
+├── .env.production.example     # Production environment secrets template
+├── .env.example                # Local environment variables template
 ├── .gitignore                  # Git ignore rules
 ├── README.md                   # This file
 └── THIRD_PARTY_NOTICES.md      # Audited dependency licenses & third-party notices

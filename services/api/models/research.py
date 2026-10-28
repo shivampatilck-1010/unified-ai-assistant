@@ -87,6 +87,24 @@ class ResearchJob(Base):
         String(255),
         nullable=True,
     )
+    claimed_by_worker: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+        index=True,
+        comment="Identifier of worker process holding execution claim",
+    )
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Count of retry attempts",
+    )
+    max_retries: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=2,
+        comment="Maximum retry limit",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

@@ -1,0 +1,109 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-unified_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-unified_ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unified_ai} -d ${POSTGRES_DB:-unified_ai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-unified_ai}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-unified_ai}
+      IS_PRODUCTION: "true"
+      AUTH_MODE: "jwt"
+      ALLOW_DEV_AUTH: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - frontend-net
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: always
+    shm_size: "1gb"
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-unified_ai}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-unified_ai}
+      IS_PRODUCTION: "true"
+      BROWSER_HEADLESS: "true"
+      ALLOW_LOCAL_BROWSER_TARGETS: "false"
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3072M
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - frontend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    internal: true
+    driver: bridge

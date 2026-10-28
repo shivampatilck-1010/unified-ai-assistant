@@ -396,3 +396,80 @@ flowchart TD
 ### 9.4. Assistant Tool Orchestration
 - `WifiSensingTool` exposes typed actions (`check_availability`, `get_status`, `summarize_room`, `explain_simulation`) for model grounding.
 - **Safety Invariant**: When answering questions regarding occupancy, the assistant is provided with strict prompt constraints requiring it to emphasize that all data is synthetic, refuse to infer human identities, and avoid asserting physical occupancy based on simulation.
+
+---
+
+## 10. Phase 8 Architecture — Production Hardening & Cloud Browser Execution Boundary
+
+Phase 8 elevates the system from development prototype to a secure, resilient production topology with explicit network boundaries, cryptographic identity verification, durable background job execution, and non-root container isolation.
+
+```mermaid
+flowchart TD
+    Client["Client Browser<br/>React 19 + TypeScript"]
+
+    subgraph IngressBoundary["Ingress & Perimeter Boundary"]
+        Nginx["Nginx Reverse Proxy (Port 80/443)<br/>TLS Termination • Gzip • Security Headers<br/>proxy_buffering off (SSE Streams)"]
+    end
+
+    subgraph APITier["API Gateway Tier (services/api)"]
+        SecMiddleware["Defensive Middleware Pipeline<br/>RequestCorrelation (X-Request-ID)<br/>SecurityHeaders (CSP, X-Frame, Nosniff)<br/>PayloadSizeLimit (15 MB Max)<br/>RateLimiting (120 req/min sliding window)"]
+        AuthModule["Cryptographic Authentication<br/>HMAC-SHA256 (HS256) JWT Engine<br/>Constant-Time Validation<br/>Fail-Closed in Production"]
+        FastAPIApp["FastAPI Lifespan & Routers<br/>Liveness (/health) & Readiness (/ready)<br/>SecretRedactionFilter Logging"]
+    end
+
+    subgraph WorkerTier["Autonomous Browser Execution Boundary (services/agent-worker)"]
+        Runner["BrowserWorkerRunner<br/>Bounded Concurrency (Semaphore)<br/>Atomic Task Claiming<br/>Restart Recovery"]
+        EgressFilter["Playwright Route Filter<br/>context.route('**/*')<br/>SSRF, Cloud Metadata & Private Subnet Blocking"]
+        Chromium["Isolated Chromium Process<br/>Ephemeral Incognito Context<br/>accept_downloads = False<br/>No Root Privileges"]
+    end
+
+    subgraph StorageTier["Persistence Tier (Internal Network)"]
+        Postgres[("PostgreSQL 16 Database<br/>WAL Mode • Connection Pooling<br/>Defensive Alembic Migrations")]
+        Uploads[("Persistent Files Storage<br/>Mounted Volume (Non-Root UID 10001)")]
+    end
+
+    Client -->|"HTTPS / WSS"| Nginx
+    Nginx -->|"HTTP"| SecMiddleware
+    SecMiddleware --> AuthModule
+    AuthModule --> FastAPIApp
+    FastAPIApp -->|"Atomic Conditional Claims"| Postgres
+    FastAPIApp -->|"Reads & Writes"| Uploads
+    Runner -->|"Atomic Task Lease & Updates"| Postgres
+    Runner --> EgressFilter
+    EgressFilter --> Chromium
+    Chromium -.->|"Allowed Public Web (80/443)"| ExternalInternet(("External Internet"))
+    Chromium x-.-x|"ABORTED: 169.254.169.254<br/>RFC 1918 Private IPs<br/>Prohibited Ports"| BlockedEgress(("Prohibited Targets"))
+```
+
+### 10.1. Cryptographic Authentication & Fail-Closed Model
+- **Token Format**: Standard RFC 7519 HMAC-SHA256 (`HS256`) JSON Web Tokens generated using Python's standard `hmac`, `hashlib`, and base64url encoding without opaque external bloat.
+- **Verification Guarantees**:
+  - Signatures are verified using `hmac.compare_digest` to prevent timing side-channel attacks.
+  - Mandatory claim enforcement: `exp` (expiration), `iat` (issued-at), `iss` (expected issuer), and `aud` (expected audience).
+- **Production Mode Invariant**: When `IS_PRODUCTION=true` or `ALLOW_DEV_AUTH=false`, all endpoints strictly require valid `Authorization: Bearer <token>` credentials. Requests without valid tokens immediately fail closed with HTTP 401 Unauthorized. Development user spoofing headers (`X-User-Id`) are strictly rejected.
+
+### 10.2. Browser Worker Isolation & Network Egress Filtering
+- **Two-Tier SSRF Prevention**:
+  1. *Application-Level Pre-Flight*: `validate_url` performs strict scheme allowlisting (`http`, `https`), port restriction (`80`, `443`, `8080`), cloud metadata blocking (`169.254.169.254`, `169.254.170.2`, `100.100.100.200`, `metadata.google.internal`), decimal/hex/octal IP evasion decoding, and DNS resolution checks.
+  2. *Browser-Level Network Egress Interception*: Playwright's `context.route("**/*")` intercepts all network traffic at the browser process level. Subresources, scripts, images, and iframes attempting to query local, private, or metadata endpoints are immediately aborted via `route.abort("blockedbyclient")`.
+- **Sandbox Configuration**: Dedicated ephemeral Chromium context with `accept_downloads=False`, empty permissions (`permissions=[]`), and non-root execution (`workeruser` uid 10001).
+
+### 10.3. Durable Job Execution & Atomic Claiming
+- **Race Condition Prevention**: Workers claim tasks via atomic conditional SQL updates:
+  ```sql
+  UPDATE browser_tasks 
+  SET status = 'running', claimed_by_worker = :worker_id, started_at = NOW() 
+  WHERE id = :task_id 
+    AND status IN ('awaiting_approval', 'pending', 'running') 
+    AND (claimed_by_worker IS NULL OR claimed_by_worker = :worker_id);
+  ```
+  If another worker has already acquired the lease, the statement affects zero rows and the worker returns immediately.
+- **Dangling Task Recovery**: On startup, `BrowserWorkerRunner.recover_dangling_tasks()` and `ResearchJobService.recover_dangling_jobs()` scan for tasks left in-flight from sudden host restarts. Tasks within retry bounds (`retry_count < max_retries`) are safely re-queued; tasks exceeding limits fail with clear audit events.
+- **Error Taxonomy**: Transient network drops and browser launch timeouts are retried up to `max_retries`; selector failures, policy violations, SSRF attempts, and 404 errors fail permanently on the first occurrence.
+
+### 10.4. Observability & Defensive Probing
+- **Liveness vs. Readiness Probes**:
+  - `/health` verifies process liveness.
+  - `/ready` executes active health queries across the database connection pool, Model Gateway provider status, Browser Worker availability, and Reminder Scheduler state. Returns HTTP 503 if critical dependencies are down.
+- **Structured Redacted Logging**: `SecretRedactionFilter` scrubs Bearer tokens, OpenAI/Anthropic/Gemini API keys, and database passwords from all standard logging handlers.
+- **Resource Constraints**: Maximum request body size capped at 15 MB; sliding-window in-memory rate limiting throttles requests exceeding 120 req/min.

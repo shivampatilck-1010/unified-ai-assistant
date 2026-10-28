@@ -38,6 +38,7 @@ def get_runner() -> BrowserWorkerRunner:
     return get_worker_runner(
         headless=settings.browser_headless,
         allow_local=settings.allow_local_browser_targets,
+        max_concurrency=settings.browser_worker_concurrency,
     )
 
 

@@ -72,6 +72,24 @@ class BrowserTask(Base):
         String(255),
         nullable=True,
     )
+    claimed_by_worker: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+        index=True,
+        comment="Identifier of worker process currently holding execution claim",
+    )
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Count of retry attempts on retryable failures",
+    )
+    max_retries: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3,
+        comment="Maximum bounded retries permitted before terminal failure",
+    )
     evidence: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
         JSON,
         nullable=True,
