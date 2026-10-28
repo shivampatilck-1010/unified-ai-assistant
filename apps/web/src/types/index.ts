@@ -33,6 +33,8 @@ export interface ChatRequest {
   message: string;
   provider?: string | null;
   model?: string | null;
+  use_knowledge?: boolean;
+  selected_file_ids?: string[];
 }
 
 export interface HealthResponse {
@@ -75,6 +77,7 @@ export interface ChatMessage {
   created_at?: string;
   isStreaming?: boolean;
   isError?: boolean;
+  citations?: ChunkCitation[];
 }
 
 export interface ConversationSummary {
@@ -427,4 +430,94 @@ export interface ExtractResponse {
   timezone: string;
   explanation?: string | null;
   requires_confirmation: boolean;
+}
+
+// --- Phase 5: Files & Knowledge Engine Types ---
+
+export type FileStatus = 'uploaded' | 'processing' | 'ready' | 'failed';
+
+export interface FileMetadata {
+  id: string;
+  owner_id: string;
+  filename: string;
+  file_type: string;
+  mime_type: string;
+  file_size: number;
+  content_hash: string;
+  status: FileStatus;
+  error_message?: string | null;
+  page_count?: number | null;
+  chunk_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChunkPreview {
+  id: string;
+  chunk_index: number;
+  page_number?: number | null;
+  section_title?: string | null;
+  content: string;
+  token_count: number;
+}
+
+export interface FileDetailResponse {
+  file: FileMetadata;
+  preview_chunks: ChunkPreview[];
+}
+
+export interface FileStatusResponse {
+  id: string;
+  status: FileStatus;
+  chunk_count: number;
+  error_message?: string | null;
+  updated_at: string;
+}
+
+export interface FileListResponse {
+  items: FileMetadata[];
+  total: number;
+  total_storage_bytes: number;
+  max_storage_bytes: number;
+  file_count: number;
+  max_file_count: number;
+}
+
+export interface ChunkCitation {
+  file_id: string;
+  filename: string;
+  chunk_index: number;
+  page_number?: number | null;
+  section_title?: string | null;
+  snippet: string;
+  score?: number | null;
+}
+
+export interface KnowledgeSearchRequest {
+  query: string;
+  file_ids?: string[];
+  top_k?: number;
+}
+
+export interface KnowledgeSearchResponse {
+  query: string;
+  results: ChunkCitation[];
+  citations: ChunkCitation[];
+  total_results: number;
+  strategy_used: 'semantic' | 'lexical' | 'hybrid' | string;
+}
+
+export interface KnowledgeAnswerRequest {
+  query: string;
+  file_ids?: string[];
+  provider?: string | null;
+  model?: string | null;
+}
+
+export interface KnowledgeAnswerResponse {
+  query: string;
+  answer: string;
+  citations: ChunkCitation[];
+  sufficient_evidence: boolean;
+  strategy_used: 'semantic' | 'lexical' | 'hybrid' | string;
 }

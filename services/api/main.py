@@ -24,6 +24,8 @@ from routers import (
     calendar_router,
     chat_router,
     conversations_router,
+    files_router,
+    knowledge_router,
     providers_router,
     reminders_router,
     tasks_router,
@@ -70,6 +72,8 @@ app.include_router(browser_tasks_router)
 app.include_router(tasks_router)
 app.include_router(calendar_router)
 app.include_router(reminders_router)
+app.include_router(files_router)
+app.include_router(knowledge_router)
 
 
 class HealthResponse(BaseModel):
@@ -107,4 +111,7 @@ def get_root():
         "tasks_url": "/api/tasks",
         "calendar_events_url": "/api/calendar/events",
         "reminders_url": "/api/reminders",
+        "files_url": "/api/files",
+        "knowledge_search_url": "/api/knowledge/search",
+        "knowledge_answer_url": "/api/knowledge/answer",
     }

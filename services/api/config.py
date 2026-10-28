@@ -19,12 +19,9 @@ class Settings:
         self.cors_origins: List[str] = [origin.strip() for origin in cors_str.split(",") if origin.strip()]
 
         # Database URL
-        # Standard format: postgresql+asyncpg://user:pass@host:port/dbname
-        # Default for local testing/dev when Postgres is unconfigured: sqlite+aiosqlite:///<absolute_path>/unified_ai.db
         default_db_file = os.path.join(_BASE_DIR, "unified_ai.db").replace("\\", "/")
         raw_db_url = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{default_db_file}")
 
-        # Normalize postgres:// and postgresql:// to postgresql+asyncpg:// if needed
         if raw_db_url.startswith("postgres://"):
             raw_db_url = raw_db_url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif raw_db_url.startswith("postgresql://") and not raw_db_url.startswith("postgresql+"):
@@ -49,6 +46,13 @@ class Settings:
         self.browser_task_deadline_seconds: int = int(os.getenv("BROWSER_TASK_DEADLINE_SECONDS", "180"))
         self.browser_max_steps: int = int(os.getenv("BROWSER_MAX_STEPS", "15"))
         self.allow_local_browser_targets: bool = os.getenv("ALLOW_LOCAL_BROWSER_TARGETS", "false").lower() in ("true", "1", "yes")
+
+        # Phase 5: Files & Knowledge Storage & Quota Settings
+        self.storage_dir: str = os.getenv("STORAGE_DIR", os.path.join(_BASE_DIR, "data", "storage"))
+        self.max_upload_size_bytes: int = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(20 * 1024 * 1024)))  # 20 MB
+        self.max_user_storage_bytes: int = int(os.getenv("MAX_USER_STORAGE_BYTES", str(100 * 1024 * 1024)))  # 100 MB
+        self.max_user_file_count: int = int(os.getenv("MAX_USER_FILE_COUNT", "50"))
+        self.max_extraction_chars: int = int(os.getenv("MAX_EXTRACTION_CHARS", "2000000"))
 
 
 @lru_cache()

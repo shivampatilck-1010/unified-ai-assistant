@@ -174,6 +174,18 @@ export function ChatView({
                   {msg.isStreaming && (
                     <span className="chat-message__cursor" aria-hidden="true" />
                   )}
+                  {msg.citations && msg.citations.length > 0 && (
+                    <div className="chat-message__citations">
+                      <div className="chat-message__citations-header">Sources & Citations:</div>
+                      <div className="chat-message__citations-list">
+                        {msg.citations.map((c, i) => (
+                          <span key={i} className="chat-message__citation-pill" title={c.snippet}>
+                            [Doc: {c.filename}{c.page_number ? `, Page ${c.page_number}` : ''}]
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {msg.model && (
                     <div className="chat-message__meta">
                       Generated via {msg.model}

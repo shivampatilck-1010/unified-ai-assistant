@@ -254,5 +254,28 @@ Supported event types:
 * **Phase 2 — Persistence & Model Gateway** *(Completed)*: Dual-dialect database persistence (PostgreSQL/SQLite), Alembic migrations, ownership boundaries, Unified Model Gateway with OpenAI/Anthropic/Gemini adapters, conversation CRUD, database text search, and client UI integration.
 * **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright-powered local browser execution engine in dedicated background worker, isolated ephemeral contexts, database task persistence and Alembic migrations, action allowlist, SSRF/private IP blocking, post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, real-time SSE progress streaming, and interactive frontend Browser Agent workspace.
 * **Phase 4 — Task & Calendar Engine** *(Completed)*: Internal task tracking with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving restarts, natural language task/event extraction with mandatory operator confirmation, strict ownership isolation, and Claude-inspired dark Calendar & Tasks workspace.
-* **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
-* **Phase 6 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.
+* **Phase 5 — Files & Knowledge Engine** *(Completed)*: Secure private document storage outside public web roots, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
+* **Phase 6 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
+* **Phase 7 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.
+
+---
+
+## 8. Files & Knowledge Engine Architecture (Phase 5)
+
+### 8.1. Document Lifecycle & Storage Isolation
+All uploaded files are saved into private directory trees segmented by owner ID hash (`data/storage/{owner_hash}/{file_id}.ext`), entirely isolated from static public file serving routes.
+- **Quota Enforcements**: Maximum 20 MB per file, 100 MB aggregate storage quota per user, 50 file limit per user.
+- **Security Boundaries**: Filename sanitization blocks path-traversal attempts (`../`, `..\`). File headers undergo magic byte signature verification (preventing disguised `.exe` / `.bin` binaries from executing).
+- **Deduplication**: Content SHA-256 hashes are calculated upon upload; identical byte streams reuse storage files without redundant disk usage.
+
+### 8.2. Extraction & Provenance Tracking
+- **`PdfExtractor`**: Uses `pypdf` to extract text page-by-page, recording 1-based `page_number` provenance for every paragraph.
+- **`DocxExtractor`**: Uses `python-docx` to extract structured headings and paragraphs, preserving section hierarchy.
+- **`CsvExtractor`**: Parses rows into tabular text representations preserving column headers.
+- **`TextExtractor`**: Handles plain text, markdown, source code (`.py`, `.ts`, `.json`, `.sql`) with UTF-8 / Latin-1 encoding fallbacks.
+- **Bounded Extraction**: Extracted text is capped at 2,000,000 characters to prevent resource exhaustion.
+
+### 8.3. Dual Retrieval & Grounded Q&A
+- **Pluggable Embeddings**: Implements `BaseEmbeddingProvider` supporting OpenAI (`text-embedding-3-small`), Gemini (`text-embedding-004`), and `MockEmbeddingProvider`. Embeddings are stored as JSON float arrays in the database to support both PostgreSQL and local SQLite.
+- **Retrieval Strategy**: When embeddings are configured, cosine similarity ranks relevant chunks. When no embedding API key is present, an honest lexical keyword matching strategy is used.
+- **Grounded Synthesis**: Grounded answers quote verified excerpts in `[Doc: filename, Page X]` format. Extracted document text is strictly isolated in the prompt as untrusted reference material, preventing prompt injection attacks from overriding system instructions. If document evidence is insufficient, the system honestly reports insufficient context.

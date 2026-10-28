@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from config import get_settings
 from providers.base import (
     AuthenticationError,
@@ -30,9 +30,20 @@ class ModelGateway:
             "gemini": GeminiProvider(),
         }
 
-    def register_provider(self, adapter: BaseProviderAdapter) -> None:
-        """Register or override an adapter (useful for dependency injection in tests)."""
-        self._providers[adapter.provider_id] = adapter
+    def register_provider(
+        self,
+        adapter_or_id: Any,
+        adapter: Optional[BaseProviderAdapter] = None,
+    ) -> None:
+        """Register or override an adapter (useful for dependency injection in tests).
+        Accepts either `register_provider(adapter)` or `register_provider('openai', adapter)`.
+        """
+        if isinstance(adapter_or_id, str) and adapter is not None:
+            self._providers[adapter_or_id] = adapter
+        elif isinstance(adapter_or_id, BaseProviderAdapter):
+            self._providers[adapter_or_id.provider_id] = adapter_or_id
+        elif adapter is not None:
+            self._providers[adapter.provider_id] = adapter
 
     def get_provider(self, provider_id: str) -> Optional[BaseProviderAdapter]:
         return self._providers.get(provider_id)

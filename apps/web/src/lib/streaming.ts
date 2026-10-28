@@ -1,12 +1,12 @@
 // SSE streaming client for the chat endpoint
 
-import type { SSEEvent, SSEEventType, ChatRequest } from '../types';
+import type { SSEEvent, SSEEventType, ChatRequest, ChunkCitation } from '../types';
 import { getStreamUrl } from './api';
 
 export interface StreamCallbacks {
   onMessageStart: (conversationId: string, messageId: string) => void;
   onTextDelta: (text: string) => void;
-  onMessageComplete: (finishReason: string) => void;
+  onMessageComplete: (finishReason: string, citations?: ChunkCitation[]) => void;
   onError: (code: string, message: string) => void;
   onStreamError: (error: Error) => void;
 }
@@ -112,11 +112,14 @@ export async function streamChat(
             case 'text_delta':
               callbacks.onTextDelta((event.data as { text?: string }).text ?? '');
               break;
-            case 'message_complete':
+            case 'message_complete': {
+              const compData = event.data as { finish_reason?: string; citations?: ChunkCitation[] };
               callbacks.onMessageComplete(
-                (event.data as { finish_reason?: string }).finish_reason ?? 'stop'
+                compData.finish_reason ?? 'stop',
+                compData.citations
               );
               break;
+            }
             case 'error':
               callbacks.onError(
                 (event.data as { code?: string }).code ?? 'UNKNOWN',
@@ -139,11 +142,14 @@ export async function streamChat(
           case 'text_delta':
             callbacks.onTextDelta((event.data as { text?: string }).text ?? '');
             break;
-          case 'message_complete':
+          case 'message_complete': {
+            const compData = event.data as { finish_reason?: string; citations?: ChunkCitation[] };
             callbacks.onMessageComplete(
-              (event.data as { finish_reason?: string }).finish_reason ?? 'stop'
+              compData.finish_reason ?? 'stop',
+              compData.citations
             );
             break;
+          }
           case 'error':
             callbacks.onError(
               (event.data as { code?: string }).code ?? 'UNKNOWN',

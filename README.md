@@ -20,6 +20,7 @@ A unified personal AI workspace combining conversational intelligence, server pe
 * **Unified Model Gateway**: Server-side client adapters for OpenAI, Anthropic, and Google Gemini with normalized error handling (`RATE_LIMIT_EXCEEDED`, `TIMEOUT`, `PROVIDER_UNAVAILABLE`, `AUTHENTICATION_FAILED`).
 * **Autonomous Browser Agent (Phase 3)**: Microsoft Playwright-powered background execution worker running in isolated ephemeral sessions without touching user everyday profiles. Features structured plan generation, strict action allowlists, SSRF/private IP blocking with post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, and real-time SSE progress streaming.
 * **Task & Calendar Engine (Phase 4)**: Internal task management with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving server restarts, and natural language task/event extraction via the ModelGateway with mandatory operator review and confirmation before database persistence.
+* **Files & Knowledge Engine (Phase 5)**: Secure private document storage outside public web routes, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
 * **Security First**: Hosted AI provider keys and database connection strings remain strictly server-side. Zero client-side API key exposure. Strict identity ownership boundaries enforce that users cannot read, mutate, or search conversations belonging to other identities.
 * **Modern Full-Stack Architecture**: React 19 + TypeScript + Vite frontend with a high-performance FastAPI backend.
 
@@ -57,7 +58,10 @@ unified-ai-assistant/
 │   ├── test_conversations_api.py # Database CRUD, pagination, search & ownership tests
 │   ├── test_model_gateway.py   # Gateway resolution, mock streaming & error tests
 │   ├── test_health.py          # Backend health-check integration test
-│   └── test_streaming.py       # SSE streaming contract & error tests
+│   ├── test_streaming.py       # SSE streaming contract & error tests
+│   ├── test_browser_agent.py   # Autonomous browser agent integration tests
+│   ├── test_tasks_calendar_reminders.py # Tasks, calendar, recurrence, reminders & NL tests
+│   └── test_files_and_knowledge.py # Uploads, extraction, provenance, search, RAG & injection tests
 ├── .env.example                # Environment variables template
 ├── .gitignore                  # Git ignore rules
 ├── README.md                   # This file
@@ -122,6 +126,8 @@ The FastAPI backend will be available at:
 * **Tasks API**: `http://127.0.0.1:8000/api/tasks`
 * **Calendar Events API**: `http://127.0.0.1:8000/api/calendar/events`
 * **Reminders API**: `http://127.0.0.1:8000/api/reminders`
+* **Files Management API**: `http://127.0.0.1:8000/api/files`
+* **Knowledge Retrieval & Grounded Q&A**: `http://127.0.0.1:8000/api/knowledge/search`, `/api/knowledge/answer`
 * **Interactive Docs**: `http://127.0.0.1:8000/docs`
 
 ### 2. Frontend Setup & Run
@@ -174,5 +180,6 @@ npm run build
 * **Phase 2 — Server Persistence & Unified AI Model Gateway** *(Completed)*: Dual-dialect PostgreSQL/SQLite database persistence, Alembic migrations, strict identity ownership boundaries, Unified Model Gateway with OpenAI, Anthropic, and Gemini adapters, conversation CRUD, database text search, and client UI integration.
 * **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright background execution worker in isolated sessions, structured plan approval workflow, strict action allowlist, SSRF private IP blocking, redirect revalidation, prompt-injection defense, consequential action confirmation gates, SSE progress streaming, and interactive frontend Browser Agent workspace.
 * **Phase 4 — Task & Calendar Engine** *(Completed)*: Internal task tracking with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving restarts, natural language task/event extraction via ModelGateway with mandatory operator confirmation, strict ownership isolation, and Claude-inspired dark Calendar & Tasks workspace.
-* **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
-* **Phase 6 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.
+* **Phase 5 — Files & Knowledge Engine** *(Completed)*: Secure private document storage outside public web routes, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
+* **Phase 6 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
+* **Phase 7 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.

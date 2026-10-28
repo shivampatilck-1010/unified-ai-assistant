@@ -12,7 +12,15 @@ import type {
   ConversationSummary,
   ExtractRequest,
   ExtractResponse,
+  FileDetailResponse,
+  FileListResponse,
+  FileMetadata,
+  FileStatusResponse,
   HealthResponse,
+  KnowledgeAnswerRequest,
+  KnowledgeAnswerResponse,
+  KnowledgeSearchRequest,
+  KnowledgeSearchResponse,
   Reminder,
   ReminderCreatePayload,
   ReminderListResponse,
@@ -522,6 +530,147 @@ export async function deleteReminder(reminderId: string, signal?: AbortSignal): 
     signal,
   });
   if (!res.ok) throw new Error(`Failed to delete reminder: ${res.status}`);
+}
+
+// ==========================================
+// Phase 5: Files & Knowledge Endpoints
+// ==========================================
+
+export async function uploadFile(
+  file: File,
+  signal?: AbortSignal
+): Promise<FileMetadata> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_BASE}/api/files/upload`, {
+    method: 'POST',
+    signal,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorDetail = `Upload failed with status ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (errJson.detail) errorDetail = errJson.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail);
+  }
+
+  return (await res.json()) as FileMetadata;
+}
+
+export async function fetchFiles(
+  statusFilter?: string,
+  search?: string,
+  signal?: AbortSignal
+): Promise<FileListResponse> {
+  const url = new URL(`${API_BASE}/api/files`);
+  if (statusFilter) url.searchParams.set('status', statusFilter);
+  if (search) url.searchParams.set('search', search);
+
+  const res = await fetch(url.toString(), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch files: ${res.status}`);
+  return (await res.json()) as FileListResponse;
+}
+
+export async function fetchFileDetail(
+  fileId: string,
+  signal?: AbortSignal
+): Promise<FileDetailResponse> {
+  const res = await fetch(`${API_BASE}/api/files/${encodeURIComponent(fileId)}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch file details: ${res.status}`);
+  return (await res.json()) as FileDetailResponse;
+}
+
+export async function fetchFileStatus(
+  fileId: string,
+  signal?: AbortSignal
+): Promise<FileStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/files/${encodeURIComponent(fileId)}/status`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch file status: ${res.status}`);
+  return (await res.json()) as FileStatusResponse;
+}
+
+export async function deleteFile(
+  fileId: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/files/${encodeURIComponent(fileId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+
+  if (!res.ok) throw new Error(`Failed to delete file: ${res.status}`);
+}
+
+export async function reprocessFile(
+  fileId: string,
+  signal?: AbortSignal
+): Promise<FileMetadata> {
+  const res = await fetch(`${API_BASE}/api/files/${encodeURIComponent(fileId)}/reprocess`, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to reprocess file: ${res.status}`);
+  return (await res.json()) as FileMetadata;
+}
+
+export async function searchKnowledge(
+  payload: KnowledgeSearchRequest,
+  signal?: AbortSignal
+): Promise<KnowledgeSearchResponse> {
+  const res = await fetch(`${API_BASE}/api/knowledge/search`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) throw new Error(`Knowledge search failed: ${res.status}`);
+  return (await res.json()) as KnowledgeSearchResponse;
+}
+
+export async function answerKnowledge(
+  payload: KnowledgeAnswerRequest,
+  signal?: AbortSignal
+): Promise<KnowledgeAnswerResponse> {
+  const res = await fetch(`${API_BASE}/api/knowledge/answer`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let errorDetail = `Knowledge answer failed with status ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (errJson.detail) errorDetail = errJson.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail);
+  }
+
+  return (await res.json()) as KnowledgeAnswerResponse;
 }
 
 export { API_BASE };

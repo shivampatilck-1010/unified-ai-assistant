@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ConversationSummary, ConversationDetail, ChatMessage } from '../types';
+import type { ConversationSummary, ConversationDetail, ChatMessage, ChunkCitation } from '../types';
 import {
   fetchConversations,
   fetchConversation,
@@ -126,7 +126,13 @@ export function useConversations(backendConnected: boolean = true) {
   );
 
   const sendMessage = useCallback(
-    async (content: string, provider?: string | null, model?: string | null) => {
+    async (
+      content: string,
+      provider?: string | null,
+      model?: string | null,
+      useKnowledge?: boolean,
+      selectedFileIds?: string[]
+    ) => {
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -163,6 +169,8 @@ export function useConversations(backendConnected: boolean = true) {
           message: content,
           provider: provider || undefined,
           model: model || undefined,
+          use_knowledge: useKnowledge,
+          selected_file_ids: selectedFileIds,
         },
         {
           onMessageStart: (conversationId: string) => {
@@ -181,13 +189,13 @@ export function useConversations(backendConnected: boolean = true) {
               };
             });
           },
-          onMessageComplete: () => {
+          onMessageComplete: (_finishReason: string, citations?: ChunkCitation[]) => {
             setActiveConversation((prev) => {
               if (!prev) return null;
               return {
                 ...prev,
                 messages: prev.messages.map((m) =>
-                  m.id === assistantMsgId ? { ...m, isStreaming: false } : m
+                  m.id === assistantMsgId ? { ...m, isStreaming: false, citations } : m
                 ),
               };
             });

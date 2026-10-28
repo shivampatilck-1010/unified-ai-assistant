@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -15,6 +15,8 @@ class ChatStreamRequest(BaseModel):
     message: str = Field(min_length=1, max_length=32000, description="User message content")
     provider: Optional[str] = Field(default=None, description="Requested provider: openai, anthropic, gemini")
     model: Optional[str] = Field(default=None, description="Requested model ID")
+    use_knowledge: Optional[bool] = Field(default=False, description="Whether to ground answer in indexed document knowledge")
+    selected_file_ids: Optional[List[str]] = Field(default=None, description="Optional target file IDs for document grounding")
 
 
 class SSEEventPayload(BaseModel):

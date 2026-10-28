@@ -2,6 +2,8 @@ from models.base import Base
 from models.browser_task import BrowserTask, BrowserTaskEvent
 from models.calendar_event import CalendarEvent
 from models.conversation import Conversation
+from models.document_chunk import DocumentChunk
+from models.file_record import FileRecord
 from models.message import Message
 from models.reminder import Reminder
 from models.task import Task
@@ -15,4 +17,6 @@ __all__ = [
     "Task",
     "CalendarEvent",
     "Reminder",
+    "FileRecord",
+    "DocumentChunk",
 ]

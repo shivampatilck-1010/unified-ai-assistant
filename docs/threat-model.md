@@ -96,12 +96,23 @@ flowchart LR
 | Browser agent escapes sandbox and accesses local files | Host Operating System | Critical | When executing in cloud mode, run within unprivileged Docker containers with dropped capabilities. When local, restrict CDP commands to browser viewport and disallow arbitrary file protocol (`file:///`) navigation unless explicitly permitted by the user. |
 | Server-Side Request Forgery (SSRF) via Browser Agent | Internal Networks & Cloud Metadata | Critical | Egress firewall rules blocking access to RFC 1918 private subnets and cloud metadata endpoints (`169.254.169.254`). |
 
+### 3.7. Files & Knowledge Engine Threats (Phase 5)
+| Threat | Target | Risk | Mitigation |
+| :--- | :--- | :--- | :--- |
+| Path-traversal in file uploads (`../../etc/passwd`) | Server Filesystem | Critical | Strict sanitization of filenames via `Path(filename).name`, sandboxed directory trees (`data/storage/{owner_hash}/`), and absence of public static routes. |
+| Executable binaries or disguised malware uploads | Server Execution Environment | High | Format allowlist (PDF, DOCX, TXT, MD, CSV, Code/JSON) combined with magic byte verification (`%PDF-`, `PK\x03\x04`). Unsupported files rejected with 400 Bad Request. |
+| Storage exhaustion DOS attacks | Disk Storage & Database | High | 20 MB per-file limit, 100 MB aggregate user quota, 50 file count limit, and 2,000,000 char extraction cap. Content SHA-256 deduplication reuses disk files for identical uploads. |
+| Prompt injection via untrusted document content | LLM Gateway / RAG Agent | High | Document text is strictly formatted as untrusted reference data with explicit system guardrails prohibiting the model from obeying instructions embedded inside document context. |
+| Cross-tenant document or chunk leakage | Document & Vector Index | Critical | Tenant isolation enforced at database query level (`owner_id` filtering on both `FileRecord` and `DocumentChunk`). Cross-tenant requests return 404 to avoid enumeration. |
+| Internal path leakage in extraction errors | Error Responses | Low | Extraction and processing errors are sanitized to remove server filesystem paths before persistence or API serialization. |
+
 ---
 
 ## 4. Key Security Invariants
 
 1. **Server-Side API Key Storage**: No external model provider key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) is ever sent to the browser or embedded in client assets.
-2. **Strict Ownership Boundaries**: Every conversation query, modification, deletion, and message search enforces user ownership. Cross-user attempts return HTTP 404 to eliminate enumeration vectors.
+2. **Strict Ownership Boundaries**: Every conversation query, file record, document chunk, and message search enforces user ownership. Cross-user attempts return HTTP 404 to eliminate enumeration vectors.
 3. **Database Parameterization & Migrations**: Schema alterations are governed exclusively by audited Alembic migrations. Runtime schema mutations and raw unescaped SQL are prohibited.
 4. **Human-in-the-Loop Safeguards**: High-risk browser actions (form submissions with payment or credential indicators, deletions, email sending) require explicit user consent via the UI.
 5. **Network Boundary Segregation**: Background worker services (`services/agent-worker`, `services/wifi-sensing`) do not expose public ports directly; all traffic flows through the authenticated API gateway.
+6. **Untrusted Document Boundaries**: Extracted document content is never executed as shell commands, scripts, or instructions. Evidence must be cited with verified provenance `[Doc: filename, Page X]`.

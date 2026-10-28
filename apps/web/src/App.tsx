@@ -7,6 +7,7 @@ import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
 import { BrowserAgentView } from './components/browser/BrowserAgentView';
 import { CalendarTasksView } from './components/calendar/CalendarTasksView';
+import { FilesKnowledgeView } from './components/files/FilesKnowledgeView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -169,6 +170,8 @@ export default function App() {
             <BrowserAgentView />
           ) : activeSection === 'calendar' ? (
             <CalendarTasksView />
+          ) : activeSection === 'files' ? (
+            <FilesKnowledgeView />
           ) : (
             <SectionPlaceholder
               section={activeSection}

@@ -262,6 +262,39 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.chat-message__citations {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-sans);
+}
+
+.chat-message__citations-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary, #888);
+  margin-bottom: 4px;
+}
+
+.chat-message__citations-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-message__citation-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  color: #f59e0b;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: default;
+}
+
 @media (max-width: 768px) {
   .chat-view__message-list {
     padding: 16px 12px 12px;

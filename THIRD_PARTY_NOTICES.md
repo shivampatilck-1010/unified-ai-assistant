@@ -75,6 +75,7 @@ Audited via Python `importlib.metadata` and `requirements.lock` on 2026-10-28.
 | `httpx` | 0.28.1 | BSD-3-Clause | Verified |
 | `idna` | 3.20 | BSD-3-Clause | Verified |
 | `iniconfig` | 2.3.1 | MIT | Verified |
+| `lxml` | 6.1.3 | BSD-3-Clause | Verified (Phase 5 XML/HTML parsing for python-docx) |
 | `mako` | 1.4.3 | MIT | Verified (Alembic template engine) |
 | `markupsafe` | 3.0.4 | BSD-3-Clause | Verified (Mako dependency) |
 | `openai` | 1.109.1 | Apache-2.0 | Verified (Phase 2 OpenAI client) |
@@ -87,9 +88,12 @@ Audited via Python `importlib.metadata` and `requirements.lock` on 2026-10-28.
 | `pydantic_core` | 2.50.1 | MIT | Verified |
 | `pyee` | 14.0.0 | MIT | Verified (Playwright event emitter) |
 | `Pygments` | 2.21.0 | BSD-2-Clause | Verified |
+| `pypdf` | 6.21.3 | BSD-3-Clause | Verified (Phase 5 PDF document extractor) |
 | `pytest` | 8.4.2 | MIT | Verified |
 | `pytest-asyncio` | 1.4.1 | Apache-2.0 | Verified (Phase 2 async pytest extension) |
+| `python-docx` | 1.2.0 | MIT | Verified (Phase 5 Word DOCX document extractor) |
 | `python-dotenv` | 1.2.4 | BSD-3-Clause | Verified |
+| `python-multipart` | 0.0.32 | Apache-2.0 | Verified (Phase 5 multipart file upload streaming) |
 | `PyYAML` | 6.0.3 | MIT | Verified |
 | `sqlalchemy` | 2.1.6 | MIT | Verified (Phase 2 ORM & async engine) |
 | `starlette` | 1.10.0 | BSD-3-Clause | Verified |

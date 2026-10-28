@@ -38,6 +38,21 @@ from schemas.extraction import (
     ExtractedReminderProposal,
     ExtractedTaskProposal,
 )
+from schemas.file import (
+    ChunkPreview,
+    FileDetailResponse,
+    FileListResponse,
+    FileMetadataResponse,
+    FileStatus,
+    FileStatusResponse,
+)
+from schemas.knowledge import (
+    ChunkCitation,
+    KnowledgeAnswerRequest,
+    KnowledgeAnswerResponse,
+    KnowledgeSearchRequest,
+    KnowledgeSearchResponse,
+)
 from schemas.message import MessageBase, MessageCreate, MessageResponse
 from schemas.provider import ModelInfo, ProviderStatus, UnifiedProviderStatusResponse
 from schemas.reminder import (
@@ -110,4 +125,15 @@ __all__ = [
     "ExtractedTaskProposal",
     "ExtractedEventProposal",
     "ExtractedReminderProposal",
+    "FileMetadataResponse",
+    "FileStatusResponse",
+    "FileListResponse",
+    "FileDetailResponse",
+    "ChunkPreview",
+    "FileStatus",
+    "ChunkCitation",
+    "KnowledgeSearchRequest",
+    "KnowledgeSearchResponse",
+    "KnowledgeAnswerRequest",
+    "KnowledgeAnswerResponse",
 ]
