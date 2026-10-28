@@ -24,6 +24,12 @@ import type {
   Reminder,
   ReminderCreatePayload,
   ReminderListResponse,
+  ResearchJob,
+  ResearchJobCreate,
+  ResearchJobDetailResponse,
+  ResearchJobListResponse,
+  ResearchReport,
+  ResearchSource,
   SearchResponse,
   Task,
   TaskCreatePayload,
@@ -671,6 +677,166 @@ export async function answerKnowledge(
   }
 
   return (await res.json()) as KnowledgeAnswerResponse;
+}
+
+// --- Phase 6: Web Research & Intelligence API ---
+
+export async function createResearchJob(
+  payload: ResearchJobCreate,
+  signal?: AbortSignal
+): Promise<ResearchJob> {
+  const res = await fetch(`${API_BASE}/api/research/jobs`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let detail = `Failed to create research job (${res.status})`;
+    try {
+      const err = await res.json();
+      if (err.detail) detail = err.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+
+  return (await res.json()) as ResearchJob;
+}
+
+export async function fetchResearchJobs(
+  params?: { status?: string; limit?: number; offset?: number },
+  signal?: AbortSignal
+): Promise<ResearchJobListResponse> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set('status', params.status);
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.offset) query.set('offset', String(params.offset));
+
+  const qs = query.toString();
+  const url = `${API_BASE}/api/research/jobs${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+
+  if (!res.ok) throw new Error(`Failed to fetch research jobs: ${res.status}`);
+  return (await res.json()) as ResearchJobListResponse;
+}
+
+export async function fetchResearchJobDetail(
+  jobId: string,
+  signal?: AbortSignal
+): Promise<ResearchJobDetailResponse> {
+  const res = await fetch(`${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch research job detail: ${res.status}`);
+  return (await res.json()) as ResearchJobDetailResponse;
+}
+
+export async function approveResearchJob(
+  jobId: string,
+  signal?: AbortSignal
+): Promise<ResearchJob> {
+  const res = await fetch(`${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}/approve`, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) {
+    let detail = `Failed to approve research plan: ${res.status}`;
+    try {
+      const err = await res.json();
+      if (err.detail) detail = err.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+
+  return (await res.json()) as ResearchJob;
+}
+
+export async function cancelResearchJob(
+  jobId: string,
+  reason?: string,
+  signal?: AbortSignal
+): Promise<ResearchJob> {
+  const res = await fetch(`${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ reason: reason || 'Cancelled by user' }),
+  });
+
+  if (!res.ok) {
+    let detail = `Failed to cancel research job: ${res.status}`;
+    try {
+      const err = await res.json();
+      if (err.detail) detail = err.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+
+  return (await res.json()) as ResearchJob;
+}
+
+export async function fetchResearchSources(
+  jobId: string,
+  signal?: AbortSignal
+): Promise<ResearchSource[]> {
+  const res = await fetch(`${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}/sources`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch research sources: ${res.status}`);
+  return (await res.json()) as ResearchSource[];
+}
+
+export async function fetchResearchSource(
+  jobId: string,
+  sourceId: string,
+  signal?: AbortSignal
+): Promise<ResearchSource> {
+  const res = await fetch(
+    `${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}/sources/${encodeURIComponent(sourceId)}`,
+    { signal, headers: { Accept: 'application/json' } }
+  );
+
+  if (!res.ok) throw new Error(`Failed to fetch research source: ${res.status}`);
+  return (await res.json()) as ResearchSource;
+}
+
+export async function fetchResearchReport(
+  jobId: string,
+  signal?: AbortSignal
+): Promise<ResearchReport> {
+  const res = await fetch(`${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}/report`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch research report: ${res.status}`);
+  return (await res.json()) as ResearchReport;
+}
+
+export async function exportResearchReportMarkdown(
+  jobId: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/research/jobs/${encodeURIComponent(jobId)}/export`, {
+    signal,
+    headers: { Accept: 'text/markdown' },
+  });
+
+  if (!res.ok) throw new Error(`Failed to export research report: ${res.status}`);
+  return await res.text();
 }
 
 export { API_BASE };

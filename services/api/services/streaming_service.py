@@ -134,6 +134,95 @@ class StreamingService:
             yield format_sse(SSEEventType.MESSAGE_COMPLETE, complete_payload)
             return
 
+        # 5b. Check web research workflow
+        if request.use_research:
+            try:
+                from schemas.research import ResearchJobCreate
+                from services.research.job_service import ResearchJobService
+
+                job_create = ResearchJobCreate(
+                    question=request.message,
+                    depth=request.research_depth or "standard",
+                    file_ids=request.selected_file_ids,
+                    requires_approval=False,
+                )
+                r_job = await ResearchJobService.create_job(db, owner_id=owner_id, payload=job_create)
+
+                # Stream progress notification
+                yield format_sse(
+                    SSEEventType.TEXT_DELTA,
+                    SSEEventPayload(
+                        event=SSEEventType.TEXT_DELTA,
+                        conversation_id=conversation_id,
+                        message_id=assistant_msg_id,
+                        data={"text": f"🔍 **Initiating web research investigation** (Job `{r_job.id[:8]}`)\n\n"},
+                    ),
+                )
+
+                # Run research execution
+                await ResearchJobService._execute_job(r_job.id)
+                await db.refresh(r_job)
+
+                if r_job.status == "completed" and r_job.final_report:
+                    report_md = await ResearchJobService.export_report_markdown(
+                        db, owner_id=owner_id, job_id=r_job.id
+                    )
+                    yield format_sse(
+                        SSEEventType.TEXT_DELTA,
+                        SSEEventPayload(
+                            event=SSEEventType.TEXT_DELTA,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"text": report_md},
+                        ),
+                    )
+
+                    citations = r_job.final_report.get("citations", [])
+                    extra_meta = {
+                        "finish_reason": "stop",
+                        "provider": adapter.provider_id,
+                        "model": model_id,
+                        "research_job_id": r_job.id,
+                        "citations": citations,
+                    }
+                    await ConversationService.update_message(
+                        db=db,
+                        message_id=assistant_msg_id,
+                        content=report_md,
+                        status="completed",
+                        extra_metadata=json.dumps(extra_meta),
+                    )
+
+                    yield format_sse(
+                        SSEEventType.MESSAGE_COMPLETE,
+                        SSEEventPayload(
+                            event=SSEEventType.MESSAGE_COMPLETE,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={
+                                "finish_reason": "stop",
+                                "provider": adapter.provider_id,
+                                "model": model_id,
+                                "research_job_id": r_job.id,
+                                "citations": citations,
+                            },
+                        ),
+                    )
+                    return
+                else:
+                    err_msg = r_job.error_message or "Research execution failed."
+                    yield format_sse(
+                        SSEEventType.TEXT_DELTA,
+                        SSEEventPayload(
+                            event=SSEEventType.TEXT_DELTA,
+                            conversation_id=conversation_id,
+                            message_id=assistant_msg_id,
+                            data={"text": f"\n\n⚠️ {err_msg}"},
+                        ),
+                    )
+            except Exception as e:
+                logger.error("Chat research error: %s", e)
+
         # 6. Build conversation history and apply knowledge grounding if requested
         conversation_history = []
         if conv_detail and conv_detail.messages:

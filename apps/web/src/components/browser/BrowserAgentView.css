@@ -10,6 +10,35 @@
   overflow: hidden;
 }
 
+.browser-agent__tabs {
+  display: flex;
+  background: #1c1c1c;
+  border-bottom: 1px solid #2d2d2d;
+  padding: 0 16px;
+  gap: 8px;
+}
+
+.browser-agent__tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #a3a3a3;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.browser-agent__tab-btn:hover {
+  color: #ffffff;
+}
+
+.browser-agent__tab-btn--active {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+
 .browser-agent__status-bar {
   display: flex;
   align-items: center;

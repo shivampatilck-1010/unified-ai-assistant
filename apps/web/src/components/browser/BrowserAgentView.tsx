@@ -11,9 +11,11 @@ import {
   fetchBrowserTaskEvents,
   getBrowserStreamUrl,
 } from '../../lib/api';
+import { WebResearchView } from '../research/WebResearchView';
 import './BrowserAgentView.css';
 
 export function BrowserAgentView() {
+  const [activeTab, setActiveTab] = useState<'tasks' | 'research'>('tasks');
   const [workerStatus, setWorkerStatus] = useState<WorkerStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -201,37 +203,57 @@ export function BrowserAgentView() {
 
   return (
     <div className="browser-agent">
-      {/* Top Banner / Worker Status */}
-      <div className="browser-agent__status-bar">
-        <div className="browser-agent__status-left">
-          <div className="browser-agent__badge">
-            <span
-              className={`browser-agent__dot ${
-                workerStatus?.available ? 'browser-agent__dot--ready' : 'browser-agent__dot--offline'
-              }`}
-            />
-            <span>
-              {statusLoading
-                ? 'Checking worker...'
-                : workerStatus?.available
-                ? `Worker: ${workerStatus.runtime} (${workerStatus.browser_session_strategy})`
-                : `Worker Offline: ${statusError || 'Playwright not reachable'}`}
-            </span>
-          </div>
-          <span className="browser-agent__tag">Phase 3 Autonomous Agent</span>
-        </div>
-
+      {/* Top Tab Bar: Tasks vs Web Research */}
+      <div className="browser-agent__tabs">
         <button
-          className="browser-agent__refresh-btn"
-          onClick={checkStatus}
-          title="Re-check browser worker"
-          type="button"
+          className={`browser-agent__tab-btn ${activeTab === 'tasks' ? 'browser-agent__tab-btn--active' : ''}`}
+          onClick={() => setActiveTab('tasks')}
         >
-          Check Worker
+          🌐 Autonomous Tasks
+        </button>
+        <button
+          className={`browser-agent__tab-btn ${activeTab === 'research' ? 'browser-agent__tab-btn--active' : ''}`}
+          onClick={() => setActiveTab('research')}
+        >
+          🔬 Web Research & Intelligence
         </button>
       </div>
 
-      <div className="browser-agent__body">
+      {activeTab === 'research' ? (
+        <WebResearchView />
+      ) : (
+        <>
+          {/* Top Banner / Worker Status */}
+          <div className="browser-agent__status-bar">
+            <div className="browser-agent__status-left">
+              <div className="browser-agent__badge">
+                <span
+                  className={`browser-agent__dot ${
+                    workerStatus?.available ? 'browser-agent__dot--ready' : 'browser-agent__dot--offline'
+                  }`}
+                />
+                <span>
+                  {statusLoading
+                    ? 'Checking worker...'
+                    : workerStatus?.available
+                    ? `Worker: ${workerStatus.runtime} (${workerStatus.browser_session_strategy})`
+                    : `Worker Offline: ${statusError || 'Playwright not reachable'}`}
+                </span>
+              </div>
+              <span className="browser-agent__tag">Phase 3 Autonomous Agent</span>
+            </div>
+
+            <button
+              className="browser-agent__refresh-btn"
+              onClick={checkStatus}
+              title="Re-check browser worker"
+              type="button"
+            >
+              Check Worker
+            </button>
+          </div>
+
+          <div className="browser-agent__body">
         {/* Left Column: Creator and Recent Runs */}
         <div className="browser-agent__sidebar">
           <div className="browser-agent__section-title">New Browser Task</div>
@@ -501,6 +523,8 @@ export function BrowserAgentView() {
           )}
         </div>
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 }

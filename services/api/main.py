@@ -28,9 +28,11 @@ from routers import (
     knowledge_router,
     providers_router,
     reminders_router,
+    research_router,
     tasks_router,
 )
 from services.reminder_scheduler import scheduler_instance
+from services.research.job_service import ResearchJobService
 
 settings = get_settings()
 
@@ -39,6 +41,8 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup (ensuring dev SQLite / fallback is ready)
     await create_tables()
+    # Reconcile dangling research jobs from previous sessions
+    await ResearchJobService.recover_dangling_jobs()
     # Start background reminder scheduler
     scheduler_instance.start()
     try:
@@ -74,6 +78,7 @@ app.include_router(calendar_router)
 app.include_router(reminders_router)
 app.include_router(files_router)
 app.include_router(knowledge_router)
+app.include_router(research_router)
 
 
 class HealthResponse(BaseModel):

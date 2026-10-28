@@ -1,11 +1,19 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { ChatMessage, ModelInfo } from '../../types';
 import { Composer } from '../composer/Composer';
 import './ChatView.css';
 
 interface ChatViewProps {
   messages: ChatMessage[];
-  onSend: (message: string, provider?: string | null, model?: string | null) => void;
+  onSend: (
+    message: string,
+    provider?: string | null,
+    model?: string | null,
+    useKnowledge?: boolean,
+    selectedFileIds?: string[],
+    useResearch?: boolean,
+    researchDepth?: string
+  ) => void;
   isStreaming: boolean;
   onCancel: () => void;
   onNewChat: () => void;
@@ -46,10 +54,11 @@ export function ChatView({
 
   const isEmpty = messages.length === 0;
 
+  const [useResearch, setUseResearch] = useState(false);
   const currentModel = availableModels.find((m) => m.id === selectedModelId) ?? availableModels[0];
 
   const handleSend = (text: string) => {
-    onSend(text, currentModel?.provider, currentModel?.id);
+    onSend(text, currentModel?.provider, currentModel?.id, false, undefined, useResearch, 'standard');
   };
 
   return (
@@ -69,26 +78,50 @@ export function ChatView({
           <span>New Chat</span>
         </button>
 
-        {availableModels.length > 0 ? (
-          <div className="chat-view__model-selector">
-            <select
-              className="chat-view__model-select"
-              value={selectedModelId || availableModels[0]?.id}
-              onChange={(e) => onSelectModel?.(e.target.value)}
-              aria-label="Select AI Model"
-            >
-              {availableModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.provider})
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="chat-view__model-unconfigured">
-            <span>Model: Unconfigured</span>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            className={`chat-view__research-toggle ${useResearch ? 'chat-view__research-toggle--active' : ''}`}
+            onClick={() => setUseResearch((v) => !v)}
+            title="Ground answers in live web research"
+            type="button"
+            style={{
+              background: useResearch ? '#1e3a5f' : '#262626',
+              border: `1px solid ${useResearch ? '#3b82f6' : '#3d3d3d'}`,
+              color: useResearch ? '#93c5fd' : '#a3a3a3',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>🔬 Web Research</span>
+            <span style={{ fontSize: '10px', fontWeight: 600 }}>{useResearch ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {availableModels.length > 0 ? (
+            <div className="chat-view__model-selector">
+              <select
+                className="chat-view__model-select"
+                value={selectedModelId || availableModels[0]?.id}
+                onChange={(e) => onSelectModel?.(e.target.value)}
+                aria-label="Select AI Model"
+              >
+                {availableModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.provider})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="chat-view__model-unconfigured">
+              <span>Model: Unconfigured</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Messages area */}
@@ -140,11 +173,20 @@ export function ChatView({
               <div className="chat-view__capability">
                 <span className="chat-view__capability-icon" aria-hidden="true">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                    <path d="M2 7a10 10 0 0114 0M4.5 10a6.5 6.5 0 019 0M7 13a3 3 0 014 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    <circle cx="9" cy="15" r="1" fill="currentColor" />
+                    <path d="M4 2h7l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M11 2v4h4" stroke="currentColor" strokeWidth="1.5" />
                   </svg>
                 </span>
-                Wi-Fi presence sensing (Phase 5)
+                Files & Knowledge RAG engine (Phase 5)
+              </div>
+              <div className="chat-view__capability">
+                <span className="chat-view__capability-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M12 12l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </span>
+                Web Research & Browser Intelligence (Phase 6)
               </div>
             </div>
           </div>

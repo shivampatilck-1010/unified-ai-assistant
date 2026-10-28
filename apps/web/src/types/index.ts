@@ -35,6 +35,8 @@ export interface ChatRequest {
   model?: string | null;
   use_knowledge?: boolean;
   selected_file_ids?: string[];
+  use_research?: boolean;
+  research_depth?: 'quick' | 'standard' | 'deep' | string;
 }
 
 export interface HealthResponse {
@@ -520,4 +522,117 @@ export interface KnowledgeAnswerResponse {
   citations: ChunkCitation[];
   sufficient_evidence: boolean;
   strategy_used: 'semantic' | 'lexical' | 'hybrid' | string;
+}
+
+// --- Phase 6: Web Research & Browser Intelligence ---
+
+export type ResearchStatus =
+  | 'draft'
+  | 'planning'
+  | 'awaiting_approval'
+  | 'running'
+  | 'synthesizing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export type ResearchDepth = 'quick' | 'standard' | 'deep';
+
+export interface ResearchStep {
+  step_number: number;
+  action: 'search' | 'browse' | 'compare_documents' | 'synthesize' | string;
+  query_or_target: string;
+  rationale: string;
+}
+
+export interface ResearchPlan {
+  rationale: string;
+  steps: ResearchStep[];
+  target_domains?: string[];
+  estimated_sources: number;
+  requires_approval: boolean;
+}
+
+export interface ResearchCitation {
+  citation_type: 'web' | 'document';
+  citation_tag: string;
+  source_id?: string | null;
+  url_or_filename: string;
+  title: string;
+  page_number?: number | null;
+  snippet: string;
+}
+
+export interface ResearchReport {
+  title: string;
+  executive_summary: string;
+  key_findings: string[];
+  evidence_and_analysis: string;
+  conflicting_claims: string[];
+  limitations_and_unresolved: string[];
+  citations: ResearchCitation[];
+}
+
+export interface ResearchJob {
+  id: string;
+  owner_id: string;
+  question: string;
+  status: ResearchStatus;
+  depth: ResearchDepth;
+  allowed_domains?: string[] | null;
+  file_ids?: string[] | null;
+  max_sources: number;
+  requires_approval: boolean;
+  plan?: ResearchPlan | null;
+  final_report?: ResearchReport | null;
+  error_message?: string | null;
+  cancellation_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+}
+
+export interface ResearchSource {
+  id: string;
+  job_id: string;
+  owner_id: string;
+  canonical_url: string;
+  title: string;
+  publisher: string;
+  retrieval_timestamp: string;
+  publication_date?: string | null;
+  content_hash?: string | null;
+  status: 'retrieved' | 'rejected' | 'failed' | 'pending';
+  validation_status: 'valid' | 'blocked_ssrf' | 'flagged_injection' | 'unsupported_content_type' | 'unreachable';
+  snippets: string[];
+  created_at: string;
+}
+
+export interface ResearchEvent {
+  id: string;
+  job_id: string;
+  event_type: string;
+  message: string;
+  payload?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ResearchJobCreate {
+  question: string;
+  depth?: ResearchDepth;
+  allowed_domains?: string[];
+  file_ids?: string[];
+  max_sources?: number;
+  requires_approval?: boolean;
+}
+
+export interface ResearchJobListResponse {
+  items: ResearchJob[];
+  total: number;
+}
+
+export interface ResearchJobDetailResponse {
+  job: ResearchJob;
+  sources: ResearchSource[];
+  events: ResearchEvent[];
 }

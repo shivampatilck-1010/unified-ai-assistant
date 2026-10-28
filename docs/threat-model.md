@@ -116,3 +116,16 @@ flowchart LR
 4. **Human-in-the-Loop Safeguards**: High-risk browser actions (form submissions with payment or credential indicators, deletions, email sending) require explicit user consent via the UI.
 5. **Network Boundary Segregation**: Background worker services (`services/agent-worker`, `services/wifi-sensing`) do not expose public ports directly; all traffic flows through the authenticated API gateway.
 6. **Untrusted Document Boundaries**: Extracted document content is never executed as shell commands, scripts, or instructions. Evidence must be cited with verified provenance `[Doc: filename, Page X]`.
+
+---
+
+## 7. Phase 6 Web Research & Browser Intelligence Threat Analysis
+
+| Threat & STRIDE Category | Attack Scenario | Implemented Mitigation & Security Control |
+| :--- | :--- | :--- |
+| **SSRF / Egress Violation** *(Information Disclosure / Elevation of Privilege)* | Target URL or HTTP 302/301 redirect points to loopback (`127.0.0.1`), AWS/GCP metadata (`169.254.169.254`), or private subnets (`10.0.0.0/8`, `192.168.0.0/16`). | `validate_url` performs IP resolution and blocks loopback, private ranges, link-local, and cloud metadata. `WebCollector` re-validates the destination URL after any browser redirects before extracting DOM content. |
+| **Indirect Prompt Injection** *(Tampering / Elevation of Privilege)* | Untrusted third-party web pages contain hidden adversarial instructions attempting to hijack assistant behavior or exfiltrate private data. | `sanitize_page_text` strips control characters and truncates length. `detect_prompt_injection` flags heuristic override patterns. Flagged sources are tagged `flagged_injection`, prepended with security advisories, and the synthesizer prompt enforces that evidence is untrusted data, never instructions. |
+| **Cross-Tenant Knowledge Leakage** *(Information Disclosure)* | User A attempts to correlate web research against User B's private uploaded documents by passing foreign `file_ids`. | `ResearchJobService.create_job` verifies file ownership against `FileRecord.owner_id`. Unauthorized documents are rejected with HTTP 400. All knowledge searches and file fetches strictly filter by authenticated `owner_id`. |
+| **Resource Exhaustion / Malicious Payloads** *(Denial of Service)* | Discovered links point to multi-gigabyte ISOs, archives, or streaming endpoints designed to freeze the browser worker. | `WebCollector` verifies HTTP `Content-Type` (`text/html` or `text/plain` only), sets strict navigation timeouts (15s), and limits extracted text length to 15,000 characters. |
+| **Session & State Contamination** *(Information Disclosure)* | Third-party cookies, tracking tokens, or session state persist across research jobs or identities. | Playwright worker executes within fresh ephemeral `BrowserContext` instances. No session storage, cookies, or browser profiles persist between collection runs. |
+

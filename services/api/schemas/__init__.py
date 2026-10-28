@@ -53,6 +53,21 @@ from schemas.knowledge import (
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
 )
+from schemas.research import (
+    ResearchCitation,
+    ResearchDepth,
+    ResearchEventResponse,
+    ResearchJobCancelRequest,
+    ResearchJobCreate,
+    ResearchJobDetailResponse,
+    ResearchJobListResponse,
+    ResearchJobResponse,
+    ResearchPlan,
+    ResearchReport,
+    ResearchSourceResponse,
+    ResearchStatus,
+    ResearchStep,
+)
 from schemas.message import MessageBase, MessageCreate, MessageResponse
 from schemas.provider import ModelInfo, ProviderStatus, UnifiedProviderStatusResponse
 from schemas.reminder import (
@@ -136,4 +151,17 @@ __all__ = [
     "KnowledgeSearchResponse",
     "KnowledgeAnswerRequest",
     "KnowledgeAnswerResponse",
+    "ResearchStatus",
+    "ResearchDepth",
+    "ResearchStep",
+    "ResearchPlan",
+    "ResearchCitation",
+    "ResearchReport",
+    "ResearchJobCreate",
+    "ResearchJobCancelRequest",
+    "ResearchJobResponse",
+    "ResearchSourceResponse",
+    "ResearchEventResponse",
+    "ResearchJobListResponse",
+    "ResearchJobDetailResponse",
 ]

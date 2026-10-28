@@ -255,8 +255,63 @@ Supported event types:
 * **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright-powered local browser execution engine in dedicated background worker, isolated ephemeral contexts, database task persistence and Alembic migrations, action allowlist, SSRF/private IP blocking, post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, real-time SSE progress streaming, and interactive frontend Browser Agent workspace.
 * **Phase 4 — Task & Calendar Engine** *(Completed)*: Internal task tracking with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving restarts, natural language task/event extraction with mandatory operator confirmation, strict ownership isolation, and Claude-inspired dark Calendar & Tasks workspace.
 * **Phase 5 — Files & Knowledge Engine** *(Completed)*: Secure private document storage outside public web roots, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
-* **Phase 6 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
-* **Phase 7 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.
+* **Phase 6 — Web Research & Browser Intelligence** *(Completed)*: Autonomous, source-grounded research investigations with provider-neutral search discovery, isolated Playwright evidence extraction, SSRF/private IP blocking with post-navigation redirect revalidation, DOM prompt injection defense, grounded synthesis with traceable citations (`[Web N: Title]` and Phase 5 document correlation `[Doc: filename, Page X]`), honest insufficient evidence reporting, Markdown report exports, and SSE chat streaming integration.
+* **Phase 7 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
+* **Phase 8 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.
+
+---
+
+## 8. Web Research & Browser Intelligence Architecture (Phase 6)
+
+The Web Research subsystem enables autonomous, source-grounded investigations that discover web sources, crawl relevant pages safely using isolated browser infrastructure, extract verified evidence, correlate findings against the user's uploaded documents (Phase 5 Knowledge Engine), and synthesize structured reports with traceable citations.
+
+### 8.1 Subsystem Design
+
+```
++----------------------------------------------------------------------------------+
+|                            Web Research Subsystem                                |
++----------------------------------------------------------------------------------+
+  1. POST /api/research/jobs
+     ├── ResearchJobService.create_job()
+     ├── Dynamic Plan Generation (search, browse, compare_documents, synthesize)
+     └── State: 'awaiting_approval' (if deep / requested) or 'running'
+  
+  2. Plan Approval & Cancellation
+     ├── POST /api/research/jobs/{id}/approve -> 'running' (starts background pipeline)
+     └── POST /api/research/jobs/{id}/cancel -> 'cancelled' with audited reason
+  
+  3. Search & Source Discovery
+     ├── BaseSearchProvider interface (DuckDuckGo, Mock, extensible)
+     ├── URL Canonicalization & Deduplication (strips utm_*, fbclid, fragments, slashes)
+     └── Persists ResearchSource records with status 'pending'
+  
+  4. Evidence Collection (WebCollector)
+     ├── Pre-navigation SSRF Policy Check (validate_url blocks loopback, private IPs, metadata)
+     ├── Ephemeral Playwright Browser Session (BrowserSessionManager)
+     ├── Post-Navigation Redirect Re-validation (blocks redirect targets violating SSRF policy)
+     ├── Content-Type Check (rejects non-HTML binary payloads)
+     ├── Publication Date & SHA-256 Content Hash Extraction
+     └── DOM Prompt-Injection Defense (sanitize_page_text, detect_prompt_injection)
+  
+  5. Document Correlation (Phase 5 Knowledge Integration)
+     └── KnowledgeService.search() scoped strictly to authenticated owner's files
+  
+  6. Grounded Synthesis (ResearchSynthesizer)
+     ├── Multi-Provider ModelGateway invocation with strict untrusted data prompt guardrails
+     ├── Structured Schema: Executive Summary, Key Findings, Evidence, Conflicts, Limitations
+     ├── Traceable Citations: [Web N: Title] and [Doc: filename, Page X]
+     └── Honest Fallback: Highlights insufficient evidence when sources are scarce
+  
+  7. Delivery & Export
+     ├── GET /api/research/jobs/{id}/report (JSON) & /api/research/jobs/{id}/export (Markdown)
+     └── POST /api/chat/stream with use_research=True emitting progress & citations
+```
+
+### 8.2 State Machine & Recovery
+
+Jobs transition through explicit, audited states:
+`planning` -> `awaiting_approval` -> `running` -> `synthesizing` -> `completed` (or `cancelled` / `failed`).
+On application startup, `ResearchJobService.recover_dangling_jobs()` reconciles any jobs left in `planning`, `running`, or `synthesizing` state from an unexpected server termination, safely transitioning them to `failed` with clear recovery guidance.
 
 ---
 

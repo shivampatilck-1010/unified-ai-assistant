@@ -6,6 +6,7 @@ from routers.files import router as files_router
 from routers.knowledge import router as knowledge_router
 from routers.providers import router as providers_router
 from routers.reminders import router as reminders_router
+from routers.research import router as research_router
 from routers.tasks import router as tasks_router
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "reminders_router",
     "files_router",
     "knowledge_router",
+    "research_router",
 ]

@@ -11,6 +11,7 @@ settings = get_settings()
 connect_args = {}
 if "sqlite" in settings.database_url:
     connect_args["check_same_thread"] = False
+    connect_args["timeout"] = 30
 
 engine = create_async_engine(
     settings.database_url,
