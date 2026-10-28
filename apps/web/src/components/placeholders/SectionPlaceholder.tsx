@@ -1,4 +1,6 @@
-import { type NavigationSection } from '../../types';
+import { useState } from 'react';
+import type { NavigationSection, SearchMatch } from '../../types';
+import { searchConversations } from '../../lib/api';
 import './SectionPlaceholder.css';
 
 interface SectionConfig {
@@ -13,14 +15,15 @@ interface SectionConfig {
 const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> = {
   search: {
     title: 'Search & History',
-    badge: 'Phase 2 Milestone',
+    badge: 'Database Text Search (Active)',
     phase: 'Phase 2',
     description:
-      'Full-text conversational search across historical chats, messages, citations, and attached documents.',
+      'Database-backed text search across conversation titles and message content using PostgreSQL/SQLite text indexes.',
     plannedFeatures: [
-      'Keyword and semantic search across all conversations',
-      'Filters by date range, model provider, and project tags',
-      'Snippet preview with instant deep-linking to message contexts',
+      'Database-backed substring and title matching',
+      'Scoped strictly to your identity boundary',
+      'Snippet previews with deep-linking to conversations',
+      'Semantic / vector search (deferred to later phase)',
     ],
     icon: (
       <svg width="32" height="32" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -123,7 +126,7 @@ const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> 
   },
   settings: {
     title: 'Settings & Model Configuration',
-    badge: 'Phase 2 Milestone',
+    badge: 'Server Credentials & Keys',
     phase: 'Phase 2',
     description:
       'Server-side model provider status, API key configuration instructions, and assistant preferences.',
@@ -145,10 +148,32 @@ const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> 
 interface SectionPlaceholderProps {
   section: Exclude<NavigationSection, 'chat'>;
   onBackToChat: () => void;
+  onSelectConversation?: (id: string) => void;
 }
 
-export function SectionPlaceholder({ section, onBackToChat }: SectionPlaceholderProps) {
+export function SectionPlaceholder({ section, onBackToChat, onSelectConversation }: SectionPlaceholderProps) {
   const config = sectionConfigs[section];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchMatch[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    try {
+      setIsSearching(true);
+      const res = await searchConversations(searchQuery.trim());
+      setSearchResults(res.matches);
+      setHasSearched(true);
+    } catch {
+      setSearchResults([]);
+      setHasSearched(true);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   return (
     <div className="section-placeholder">
@@ -158,13 +183,66 @@ export function SectionPlaceholder({ section, onBackToChat }: SectionPlaceholder
         <h2 className="section-placeholder__title">{config.title}</h2>
         <p className="section-placeholder__desc">{config.description}</p>
 
-        <div className="section-placeholder__status-box">
-          <div className="section-placeholder__status-label">Implementation Status</div>
-          <div className="section-placeholder__status-value">
-            <span className="section-placeholder__status-dot" />
-            Not Implemented Yet — Scheduled for {config.phase}
+        {section === 'search' ? (
+          <div className="section-placeholder__search-box">
+            <form onSubmit={handleSearch} className="section-placeholder__search-form">
+              <input
+                type="text"
+                className="section-placeholder__search-input"
+                placeholder="Search conversation titles and messages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="section-placeholder__search-btn"
+                disabled={isSearching || !searchQuery.trim()}
+              >
+                {isSearching ? 'Searching...' : 'Search'}
+              </button>
+            </form>
+
+            {hasSearched && (
+              <div className="section-placeholder__results">
+                {searchResults.length === 0 ? (
+                  <p className="section-placeholder__no-results">
+                    No matching conversations found for &ldquo;{searchQuery}&rdquo;.
+                  </p>
+                ) : (
+                  <ul className="section-placeholder__results-list">
+                    {searchResults.map((match, i) => (
+                      <li key={i} className="section-placeholder__result-item">
+                        <button
+                          type="button"
+                          className="section-placeholder__result-btn"
+                          onClick={() => onSelectConversation?.(match.conversation_id)}
+                        >
+                          <div className="section-placeholder__result-title">
+                            {match.conversation_title}
+                          </div>
+                          <div className="section-placeholder__result-snippet">
+                            {match.snippet}
+                          </div>
+                          <span className="section-placeholder__result-tag">
+                            {match.matched_type}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="section-placeholder__status-box">
+            <div className="section-placeholder__status-label">Implementation Status</div>
+            <div className="section-placeholder__status-value">
+              <span className="section-placeholder__status-dot" />
+              Not Implemented Yet — Scheduled for {config.phase}
+            </div>
+          </div>
+        )}
 
         <div className="section-placeholder__features">
           <div className="section-placeholder__features-title">Planned Capabilities:</div>

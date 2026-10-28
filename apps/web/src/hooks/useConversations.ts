@@ -1,222 +1,264 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Conversation, ChatMessage } from '../types';
+import type { ConversationSummary, ConversationDetail, ChatMessage } from '../types';
 import {
-  loadConversations,
-  saveConversations,
+  fetchConversations,
+  fetchConversation,
   createConversation,
-  deriveTitle,
-  generateId,
-} from '../lib/conversations';
+  renameConversation as apiRenameConversation,
+  deleteConversation as apiDeleteConversation,
+} from '../lib/api';
 import { streamChat } from '../lib/streaming';
 
-export function useConversations() {
-  const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
+export function useConversations(backendConnected: boolean = true) {
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeConversation, setActiveConversation] = useState<ConversationDetail | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const abortRef = useRef<AbortController | null>(null);
 
-  // Persist on change
+  // Load conversation list from backend
+  const refreshList = useCallback(async () => {
+    if (!backendConnected) return;
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await fetchConversations(50, 0);
+      setConversations(res.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [backendConnected]);
+
   useEffect(() => {
-    saveConversations(conversations);
-  }, [conversations]);
+    if (backendConnected) {
+      void refreshList();
+    }
+  }, [backendConnected, refreshList]);
 
-  const activeConversation = conversations.find((c) => c.id === activeId) ?? null;
-
-  const startNewChat = useCallback(() => {
-    // Cancel any in-progress stream
-    abortRef.current?.abort();
-    setIsStreaming(false);
-
-    const conv = createConversation();
-    setConversations((prev) => [conv, ...prev]);
-    setActiveId(conv.id);
-    return conv.id;
-  }, []);
-
-  const selectConversation = useCallback((id: string) => {
-    abortRef.current?.abort();
-    setIsStreaming(false);
-    setActiveId(id);
-  }, []);
-
-  const deleteConversation = useCallback((id: string) => {
-    if (id === activeId) {
+  // Load active conversation messages from backend
+  const selectConversation = useCallback(
+    async (id: string) => {
       abortRef.current?.abort();
       setIsStreaming(false);
+      setActiveId(id);
+
+      try {
+        setIsLoading(true);
+        const detail = await fetchConversation(id);
+        setActiveConversation(detail);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load conversation');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const startNewChat = useCallback(async () => {
+    abortRef.current?.abort();
+    setIsStreaming(false);
+
+    try {
+      const created = await createConversation('New conversation');
+      setConversations((prev) => [created, ...prev]);
+      setActiveId(created.id);
+      setActiveConversation({
+        id: created.id,
+        owner_id: created.owner_id,
+        title: created.title,
+        created_at: created.created_at,
+        updated_at: created.updated_at,
+        messages: [],
+      });
+      return created.id;
+    } catch {
+      // In case backend is unreachable, prepare local draft
+      const tempId = crypto.randomUUID();
+      setActiveId(tempId);
+      setActiveConversation({
+        id: tempId,
+        owner_id: 'local',
+        title: 'New conversation',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        messages: [],
+      });
+      return tempId;
     }
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (id === activeId) {
-      setActiveId(null);
+  }, []);
+
+  const rename = useCallback(async (id: string, newTitle: string) => {
+    try {
+      const updated = await apiRenameConversation(id, newTitle);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c))
+      );
+      setActiveConversation((prev) =>
+        prev && prev.id === id ? { ...prev, title: updated.title } : prev
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename conversation');
     }
-  }, [activeId]);
+  }, []);
+
+  const deleteConv = useCallback(
+    async (id: string) => {
+      if (id === activeId) {
+        abortRef.current?.abort();
+        setIsStreaming(false);
+        setActiveConversation(null);
+        setActiveId(null);
+      }
+      try {
+        await apiDeleteConversation(id);
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete conversation');
+      }
+    },
+    [activeId]
+  );
 
   const sendMessage = useCallback(
-    async (content: string) => {
-      let convId = activeId;
-
-      // Create a conversation if none is active
-      if (!convId) {
-        const conv = createConversation();
-        setConversations((prev) => [conv, ...prev]);
-        setActiveId(conv.id);
-        convId = conv.id;
-      }
-
-      const userMessage: ChatMessage = {
-        id: generateId(),
+    async (content: string, provider?: string | null, model?: string | null) => {
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
         role: 'user',
         content,
-        timestamp: Date.now(),
+        created_at: new Date().toISOString(),
       };
 
-      // Add user message
-      setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id !== convId) return c;
-          const isFirst = c.messages.length === 0;
-          return {
-            ...c,
-            messages: [...c.messages, userMessage],
-            title: isFirst ? deriveTitle(content) : c.title,
-            updatedAt: Date.now(),
-          };
-        })
-      );
+      const assistantMsgId = crypto.randomUUID();
+      const assistantMsg: ChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString(),
+        isStreaming: true,
+      };
 
-      // Cancel any existing stream
+      // Optimistic update to current view
+      setActiveConversation((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          messages: [...prev.messages, userMsg, assistantMsg],
+        };
+      });
+
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
       setIsStreaming(true);
 
-      // Create placeholder assistant message
-      const assistantMsgId = generateId();
-      const assistantMessage: ChatMessage = {
-        id: assistantMsgId,
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        isStreaming: true,
-      };
-
-      setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id !== convId) return c;
-          return {
-            ...c,
-            messages: [...c.messages, assistantMessage],
-            updatedAt: Date.now(),
-          };
-        })
-      );
-
-      const currentConvId = convId;
-
       await streamChat(
-        { conversation_id: currentConvId, message: content },
         {
-          onMessageStart: () => {
-            // Stream has begun — already have placeholder
+          conversation_id: activeId,
+          message: content,
+          provider: provider || undefined,
+          model: model || undefined,
+        },
+        {
+          onMessageStart: (conversationId: string) => {
+            if (activeId !== conversationId) {
+              setActiveId(conversationId);
+            }
           },
           onTextDelta: (text: string) => {
-            setConversations((prev) =>
-              prev.map((c) => {
-                if (c.id !== currentConvId) return c;
-                return {
-                  ...c,
-                  messages: c.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? { ...m, content: m.content + text }
-                      : m
-                  ),
-                };
-              })
-            );
+            setActiveConversation((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                messages: prev.messages.map((m) =>
+                  m.id === assistantMsgId ? { ...m, content: m.content + text } : m
+                ),
+              };
+            });
           },
           onMessageComplete: () => {
-            setConversations((prev) =>
-              prev.map((c) => {
-                if (c.id !== currentConvId) return c;
-                return {
-                  ...c,
-                  messages: c.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? { ...m, isStreaming: false }
-                      : m
-                  ),
-                  updatedAt: Date.now(),
-                };
-              })
-            );
+            setActiveConversation((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                messages: prev.messages.map((m) =>
+                  m.id === assistantMsgId ? { ...m, isStreaming: false } : m
+                ),
+              };
+            });
             setIsStreaming(false);
+            void refreshList();
           },
           onError: (_code: string, message: string) => {
-            setConversations((prev) =>
-              prev.map((c) => {
-                if (c.id !== currentConvId) return c;
-                return {
-                  ...c,
-                  messages: c.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? { ...m, content: message, isStreaming: false, isError: true }
-                      : m
-                  ),
-                  updatedAt: Date.now(),
-                };
-              })
-            );
+            setActiveConversation((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                messages: prev.messages.map((m) =>
+                  m.id === assistantMsgId
+                    ? { ...m, content: message, isStreaming: false, isError: true }
+                    : m
+                ),
+              };
+            });
           },
-          onStreamError: (error: Error) => {
-            setConversations((prev) =>
-              prev.map((c) => {
-                if (c.id !== currentConvId) return c;
-                return {
-                  ...c,
-                  messages: c.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content: `Unable to reach the server. ${error.message}`,
-                          isStreaming: false,
-                          isError: true,
-                        }
-                      : m
-                  ),
-                  updatedAt: Date.now(),
-                };
-              })
-            );
+          onStreamError: (streamErr: Error) => {
+            setActiveConversation((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                messages: prev.messages.map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: `Connection error: ${streamErr.message}`,
+                        isStreaming: false,
+                        isError: true,
+                      }
+                    : m
+                ),
+              };
+            });
             setIsStreaming(false);
           },
         },
         controller.signal
       );
     },
-    [activeId]
+    [activeId, refreshList]
   );
 
   const cancelStream = useCallback(() => {
     abortRef.current?.abort();
     setIsStreaming(false);
-    // Mark any streaming messages as complete
-    setConversations((prev) =>
-      prev.map((c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
+    setActiveConversation((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        messages: prev.messages.map((m) =>
           m.isStreaming ? { ...m, isStreaming: false } : m
         ),
-      }))
-    );
+      };
+    });
   }, []);
 
   return {
     conversations,
     activeConversation,
     activeId,
+    isLoading,
     isStreaming,
-    startNewChat,
+    error,
+    refreshList,
     selectConversation,
-    deleteConversation,
+    startNewChat,
+    renameConversation: rename,
+    deleteConversation: deleteConv,
     sendMessage,
     cancelStream,
   };

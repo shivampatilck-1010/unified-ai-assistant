@@ -1,0 +1,49 @@
+import os
+from functools import lru_cache
+from typing import List, Optional
+
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+class Settings:
+    """Application configuration loaded from environment variables."""
+
+    def __init__(self):
+        # Server settings
+        self.host: str = os.getenv("API_HOST", os.getenv("HOST", "127.0.0.1"))
+        self.port: int = int(os.getenv("API_PORT", os.getenv("PORT", "8000")))
+        self.environment: str = os.getenv("ENVIRONMENT", "development")
+
+        # CORS origins (narrowly configured for development)
+        cors_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+        self.cors_origins: List[str] = [origin.strip() for origin in cors_str.split(",") if origin.strip()]
+
+        # Database URL
+        # Standard format: postgresql+asyncpg://user:pass@host:port/dbname
+        # Default for local testing/dev when Postgres is unconfigured: sqlite+aiosqlite:///<absolute_path>/unified_ai.db
+        default_db_file = os.path.join(_BASE_DIR, "unified_ai.db").replace("\\", "/")
+        raw_db_url = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{default_db_file}")
+
+        # Normalize postgres:// and postgresql:// to postgresql+asyncpg:// if needed
+        if raw_db_url.startswith("postgres://"):
+            raw_db_url = raw_db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif raw_db_url.startswith("postgresql://") and not raw_db_url.startswith("postgresql+"):
+            raw_db_url = raw_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        self.database_url: str = raw_db_url
+
+        # AI Provider API Keys (server-side ONLY)
+        self.openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+        self.anthropic_api_key: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+        self.gemini_api_key: Optional[str] = os.getenv("GEMINI_API_KEY")
+
+        # Default provider / model selection
+        self.default_provider: Optional[str] = os.getenv("DEFAULT_PROVIDER")
+        self.default_model: Optional[str] = os.getenv("DEFAULT_MODEL")
+
+        # Development identity boundary (for local single-user or auth mock)
+        self.dev_user_id: str = os.getenv("DEV_USER_ID", "dev-user-default")
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()

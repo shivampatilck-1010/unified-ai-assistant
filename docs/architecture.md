@@ -5,10 +5,10 @@
 The **Unified AI Assistant** is designed as a single cohesive AI workspace combining conversational intelligence, autonomous browser workflows, task/calendar orchestration, and environmental presence awareness (via Wi-Fi sensing).
 
 The user experience centers around an uncluttered, distraction-free environment:
-* **Claude-Inspired Dark Chat Interface**: Minimalist aesthetics, dark backgrounds, and large, elegant serif typography for model responses.
+* **Claude-Inspired Dark Chat Interface**: Minimalist aesthetics, dark backgrounds (`#171717`, `#202020`, `#262626`), and large, elegant serif typography (Georgia 21px / line-height 1.6) for model responses.
 * **Unified Sidebar Navigation**:
   1. **New Chat** (instant conversation reset and model selector)
-  2. **Search** (full-text conversation and knowledge base indexing)
+  2. **Search** (database-backed full-text conversation and message search)
   3. **Projects** (isolated workspaces with scoped instructions and documents)
   4. **Browser Agent** (autonomous web execution, visual preview, action controls)
   5. **Calendar & Tasks** (natural-language task creation, scheduling, reminders)
@@ -28,29 +28,33 @@ flowchart TD
     end
 
     subgraph GatewayLayer["API Gateway & Services (services/)"]
-        FastAPI["Core Backend (services/api)<br/>FastAPI + Python 3.12<br/>Health, Auth & Router"]
+        FastAPI["Core Backend (services/api)<br/>FastAPI + Python 3.12<br/>Identity & Model Gateway"]
         AgentWorker["Browser Agent Worker (services/agent-worker)<br/>Local Chrome / Cloud Isolated Execution"]
         WiFiService["Wi-Fi Sensing Service (services/wifi-sensing)<br/>CSI Simulation & Presence Engine"]
     end
 
-    subgraph DataLayer["Persistence & Message Broker (Phase 2+)"]
-        Postgres[("PostgreSQL<br/>Chats, Tasks, Projects")]
+    subgraph DataLayer["Persistence & Database Layer (Phase 2 Completed)"]
+        Postgres[("PostgreSQL / SQLite Dual Dialect<br/>SQLAlchemy 2.x + Alembic<br/>Conversations & Messages")]
         Queue[("Task Queue / Redis<br/>Async Job Scheduling")]
     end
 
     subgraph ExternalLayer["External Providers (Server-Side Only)"]
-        LLMs["Hosted Model APIs<br/>Anthropic / OpenAI / Gemini"]
+        OpenAI["OpenAI API<br/>gpt-4o, gpt-4o-mini"]
+        Anthropic["Anthropic API<br/>claude-3-5-sonnet, claude-3-5-haiku"]
+        Gemini["Google Gemini API<br/>gemini-2.5-pro, gemini-2.5-flash"]
         LocalBrowser["Local Chrome Browser (CDP)"]
     end
 
     WebUI -->|"HTTP / REST / SSE"| FastAPI
     ChromeExt -->|"Secure WebSocket"| FastAPI
+    FastAPI -->|"SQLAlchemy 2.x Async Engine"| Postgres
+    FastAPI -->|"Unified Model Gateway<br/>(Server-Side Protected Keys)"| OpenAI
+    FastAPI -->|"Unified Model Gateway<br/>(Server-Side Protected Keys)"| Anthropic
+    FastAPI -->|"Unified Model Gateway<br/>(Server-Side Protected Keys)"| Gemini
     FastAPI -->|"RPC / Message Queue"| AgentWorker
     FastAPI -->|"Internal RPC / SSE"| WiFiService
-    FastAPI -->|"Server-Side HTTPS Only<br/>(Protected API Keys)"| LLMs
     AgentWorker -->|"CDP Automation"| LocalBrowser
-    FastAPI -.->|"Phase 2"| Postgres
-    AgentWorker -.->|"Phase 2"| Queue
+    AgentWorker -.->|"Phase 4"| Queue
 ```
 
 ---
@@ -63,14 +67,23 @@ unified-ai-assistant/
 │   ├── web/                    # React 19 + Vite frontend
 │   └── chrome-extension/       # Browser control extension
 ├── services/
-│   ├── api/                    # Core FastAPI service
+│   ├── api/                    # Core FastAPI backend service
+│   │   ├── alembic/            # Alembic database migration scripts & versions
+│   │   ├── models/             # SQLAlchemy 2.x ORM models (Conversation, Message)
+│   │   ├── schemas/            # Pydantic v2 validation & response contracts
+│   │   ├── providers/          # Hosted AI adapter implementations (OpenAI, Anthropic, Gemini)
+│   │   ├── services/           # Business logic: ModelGateway, ConversationService, StreamingService
+│   │   ├── routers/            # FastAPI route handlers (chat, conversations, providers)
+│   │   ├── database.py         # Async engine & sessionmaker lifecycle
+│   │   ├── config.py           # Environment settings & validation
+│   │   └── main.py             # Application entrypoint & lifespan
 │   ├── agent-worker/           # Autonomous execution worker
 │   └── wifi-sensing/           # Isolated Wi-Fi CSI sensing daemon
 ├── packages/
 │   ├── shared-schemas/         # Common TypeScript & Pydantic models
 │   └── ui/                     # Design tokens & UI components
 ├── docs/                       # Architecture, threat model, audits
-├── tests/                      # Global end-to-end and health tests
+├── tests/                      # Pytest test suite (DB CRUD, Gateway, Streaming)
 ├── .env.example                # Configuration template
 ├── .gitignore                  # Unified exclusion rules
 ├── README.md                   # Repository entrypoint
@@ -82,53 +95,85 @@ unified-ai-assistant/
 ## 4. Subsystem Specifications
 
 ### 4.1. Core API (`services/api`)
-* **Role**: Primary orchestrator, authentication layer, and proxy to hosted LLM APIs.
+* **Role**: Primary orchestrator, identity boundary, persistence engine, and gateway to hosted LLM APIs.
 * **Key Constraint**: Hosted model APIs only. All secret keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`) reside exclusively in server-side configuration. The frontend never accesses or proxies third-party provider keys directly.
-* **Streaming**: Emits Server-Sent Events (SSE) or WebSocket streams to `apps/web` for incremental response delivery.
+* **Streaming**: Emits Server-Sent Events (SSE) over HTTP (`text/event-stream`) with typed events (`message_start`, `text_delta`, `message_complete`, `error`).
+* **Database**: SQLAlchemy 2.x async engine with dual-dialect support: production PostgreSQL (`postgresql+asyncpg://`) and local development fallback SQLite (`sqlite+aiosqlite:///`). Controlled strictly via Alembic migrations.
 
-### 4.2. Autonomous Browser Agent (`services/agent-worker`)
+### 4.2. Development Identity Boundary
+* **Design**: Dedicated request dependency in `services/api/routers/deps.py` extracting `Authorization: Bearer <token>` or falling back to `DEV_USER_ID` (`dev-user-default`).
+* **Isolation**: All conversation queries (list, get, patch, delete, search) and message insertions filter strictly by `owner_id`. Cross-user access attempts return HTTP 404 (preventing user enumeration).
+* **Migration to Production**: Pluggable architecture allowing seamless swap for JWT/OAuth2 session token validation in future authentication phases without changing database schemas or service layer logic.
+
+### 4.3. Unified Model Gateway (`services/api/services/model_gateway.py`)
+* **Abstraction**: Pluggable adapter architecture inheriting from `BaseProviderAdapter`.
+* **Supported Adapters**:
+  * `OpenAIProviderAdapter`: Implemented via `AsyncOpenAI` (`gpt-4o`, `gpt-4o-mini`).
+  * `AnthropicProviderAdapter`: Implemented via `AsyncAnthropic` (`claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`).
+  * `GeminiProviderAdapter`: Implemented via `google.genai.Client` (`gemini-2.5-pro`, `gemini-2.5-flash`).
+* **Error Normalization**: Maps vendor exceptions into normalized `ProviderError` codes:
+  * `AUTHENTICATION_FAILED`: Invalid API key or credentials.
+  * `RATE_LIMIT_EXCEEDED`: Upstream quota or concurrency limit reached.
+  * `TIMEOUT`: Upstream connection or read timeout.
+  * `PROVIDER_UNAVAILABLE`: Upstream service down.
+  * `INVALID_REQUEST`: Malformed model request.
+* **Streaming Persistence**: Saves the user message prior to stream emission, updates the assistant record status to `streaming`, writes incremental chunks or finalized content, and marks status as `completed`, `interrupted`, or `error`.
+
+### 4.4. Autonomous Browser Agent (`services/agent-worker`)
 * **Role**: Executes multi-step web browsing tasks.
 * **Phased Execution**:
   * *Local Execution*: Connects to the user's running Chrome via Chrome DevTools Protocol (CDP) or via the dedicated extension in `apps/chrome-extension`.
-  * *Isolated Cloud Execution (Later Phase)*: Spins up ephemeral containerized headless browsers for untrusted web navigation.
+  * *Isolated Cloud Execution (Later Phase)*: Ephemeral containerized headless browsers for untrusted web navigation.
 * **Safety & Guardrails**: Human-in-the-loop confirmation before sensitive actions (e.g., submitting forms with credentials, financial transactions, data downloads).
 
-### 4.3. Wi-Fi Sensing Service (`services/wifi-sensing`)
+### 4.5. Wi-Fi Sensing Service (`services/wifi-sensing`)
 * **Role**: Provides ambient environmental awareness through Wi-Fi Channel State Information (CSI) perturbation analysis.
 * **Isolation**: Operates as a distinct service communicating through internal events.
 * **Initial Simulation**: Uses simulated CSI streams generating synthetic subcarrier variance to model room entry, exit, sitting, and breathing patterns.
 
-### 4.4. Calendar & Task Management
-* **Role**: Translates conversational requests ("remind me to review PR tomorrow at 10 AM") into structured tasks, calendar entries, and alert triggers.
-* **Persistence (Phase 2+)**: PostgreSQL with indexed timestamps and recurrence rules.
-
 ---
 
-## 5. Streaming API Contract & Protocol (Phase 1)
+## 5. Streaming API Contract & Protocol
 
 The assistant uses Server-Sent Events (SSE) over standard HTTP streaming (`text/event-stream`) to stream AI responses incrementally to the client.
 
 ### 5.1. Endpoints
 
 * **`POST /api/chat/stream`**: Initiates a streaming response for a user message.
-  * **Request Header**: `Content-Type: application/json`, `Accept: text/event-stream`
+  * **Request Header**: `Content-Type: application/json`, `Accept: text/event-stream`, `Authorization: Bearer <token>` (optional in dev)
   * **Request Body**:
     ```json
     {
       "conversation_id": "optional-uuid-string-or-null",
-      "message": "User text input string"
+      "message": "User text input string",
+      "provider": "optional-provider-id-or-null",
+      "model": "optional-model-id-or-null"
     }
     ```
   * **Response Format**: `text/event-stream` with blocks separated by double newlines (`\n\n`).
-* **`GET /api/provider/status`**: Returns the server-side configuration status of hosted AI model providers without exposing secrets.
+* **`GET /api/provider/status`**: Returns the server-side configuration status and available models without exposing secrets.
   * **Response**:
     ```json
     {
       "configured": false,
       "provider": null,
-      "message": "No AI provider configured"
+      "active_provider": null,
+      "active_model": null,
+      "available_models": [],
+      "providers": {
+        "openai": false,
+        "anthropic": false,
+        "gemini": false
+      },
+      "message": "No AI provider configured. Add an API key to the server environment."
     }
     ```
+* **`GET /api/conversations`**: Paginated conversation history for the authenticated user.
+* **`POST /api/conversations`**: Explicitly create a new conversation.
+* **`GET /api/conversations/{id}`**: Retrieve full conversation details and persisted message history.
+* **`PATCH /api/conversations/{id}`**: Update conversation title.
+* **`DELETE /api/conversations/{id}`**: Delete conversation and all cascaded messages.
+* **`GET /api/conversations/search?q={query}`**: Database text search across conversation titles and message content.
 
 ### 5.2. Event Protocol Types
 
@@ -144,18 +189,17 @@ Supported event types:
 2. `text_delta`: Emitted incrementally for every new token or text chunk.
    * `data`: `{"text": "chunk string"}`
 3. `message_complete`: Emitted when the assistant response stream finishes cleanly or after an error.
-   * `data`: `{"finish_reason": "stop" | "error" | "cancelled"}`
+   * `data`: `{"finish_reason": "stop" | "error" | "cancelled", "provider": "openai", "model": "gpt-4o"}`
 4. `error`: Emitted when an operational or configuration failure occurs.
    * `data`: `{"code": "<ERROR_CODE>", "message": "<Human-readable explanation>"}`
 
-### 5.3. Error Invariants & Current Limitations
+### 5.3. Error Invariants
 
 * **No Fake AI Output**: If no model provider API key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) is configured on the server, the stream emits:
   1. `message_start`
   2. `error` (`code: "PROVIDER_NOT_CONFIGURED"`)
   3. `message_complete` (`finish_reason: "error"`)
-* **Client Handling**: The client detects the `error` event, displays the honest message in an accessible error state, and stops the stream without attempting to invent or demonstrate dummy AI responses.
-* **Storage**: In Phase 1, conversations are stored in browser `localStorage` under `unified-ai-conversations`. Multi-device synchronization and server persistence are deferred to Phase 2 (PostgreSQL).
+* **Persistence Guarantee**: User prompts and streaming assistant messages are recorded in the database. If a stream is aborted, disconnected, or encounters an upstream provider error, the message record is persisted with status `interrupted` or `error`.
 
 ---
 
@@ -167,7 +211,9 @@ Supported event types:
 | **Build Tool** | Vite 8 | Near-instant HMR, optimized production builds |
 | **Backend Framework** | FastAPI 0.162, Pydantic 2.14 | High-throughput asynchronous endpoints, automatic OpenAPI documentation, strict schema validation |
 | **Server Runtime** | Python 3.12 (Uvicorn 0.54) | Broad ecosystem compatibility for signal processing and backend services |
-| **Persistence (Phase 2+)** | PostgreSQL | Robust relational integrity for chat histories, project scopes, and tasks |
+| **Database & ORM** | SQLAlchemy 2.x + Alembic | Async relational persistence with declarative schema migration version control |
+| **Database Drivers** | asyncpg, aiosqlite, psycopg2-binary | Native async drivers for PostgreSQL production and SQLite dev fallback |
+| **AI SDKs** | openai, anthropic, google-genai | Official client libraries running strictly server-side |
 | **Styling** | Modern CSS Custom Properties | Custom design system adhering to Georgia serif typography and Claude-style dark palette |
 
 ---
@@ -176,7 +222,7 @@ Supported event types:
 
 * **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
 * **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation, Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
-* **Phase 2 — Persistence & Model Gateway**: Database models (PostgreSQL), server-side hosted model provider integration (OpenAI, Anthropic, Gemini), chat persistence, and search.
+* **Phase 2 — Persistence & Model Gateway** *(Completed)*: Dual-dialect database persistence (PostgreSQL/SQLite), Alembic migrations, ownership boundaries, Unified Model Gateway with OpenAI/Anthropic/Gemini adapters, conversation CRUD, database text search, and client UI integration.
 * **Phase 3 — Autonomous Browser Agent**: Local Chrome CDP integration and safety guardrails.
 * **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
 * **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.

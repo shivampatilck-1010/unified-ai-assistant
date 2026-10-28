@@ -19,6 +19,8 @@ export interface TextDeltaData {
 
 export interface MessageCompleteData {
   finish_reason: 'stop' | 'error' | 'cancelled';
+  provider?: string;
+  model?: string;
 }
 
 export interface ErrorData {
@@ -29,18 +31,33 @@ export interface ErrorData {
 export interface ChatRequest {
   conversation_id: string | null;
   message: string;
+  provider?: string | null;
+  model?: string | null;
 }
 
 export interface HealthResponse {
   status: string;
   service: string;
   version: string;
+  database?: string;
   timestamp: string;
 }
 
-export interface ProviderConfigStatus {
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  context_window?: number | null;
+  is_default: boolean;
+}
+
+export interface UnifiedProviderStatusResponse {
   configured: boolean;
-  provider: string | null;
+  provider?: string | null;
+  active_provider?: string | null;
+  active_model?: string | null;
+  available_models: ModelInfo[];
+  providers: Record<string, boolean>;
   message: string;
 }
 
@@ -48,19 +65,68 @@ export type MessageRole = 'user' | 'assistant';
 
 export interface ChatMessage {
   id: string;
+  conversation_id?: string;
   role: MessageRole;
   content: string;
-  timestamp: number;
+  status?: string;
+  provider?: string | null;
+  model?: string | null;
+  timestamp?: number;
+  created_at?: string;
   isStreaming?: boolean;
   isError?: boolean;
 }
 
+export interface ConversationSummary {
+  id: string;
+  owner_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count?: number;
+}
+
+export interface ConversationListResponse {
+  items: ConversationSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ConversationDetail {
+  id: string;
+  owner_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ChatMessage[];
+}
+
+// Backward-compatible alias for local storage helper
 export interface Conversation {
   id: string;
   title: string;
   messages: ChatMessage[];
-  createdAt: number;
-  updatedAt: number;
+  createdAt?: number;
+  updatedAt?: number;
+  created_at?: string;
+  updated_at?: string;
+  owner_id?: string;
+}
+
+export interface SearchMatch {
+  conversation_id: string;
+  conversation_title: string;
+  matched_type: string;
+  message_id?: string | null;
+  snippet: string;
+  created_at: string;
+}
+
+export interface SearchResponse {
+  query: string;
+  matches: SearchMatch[];
+  total: number;
 }
 
 export type NavigationSection =

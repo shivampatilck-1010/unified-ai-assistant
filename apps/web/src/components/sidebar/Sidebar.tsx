@@ -93,10 +93,11 @@ interface SidebarProps {
   activeSection: NavigationSection;
   onNavigate: (section: NavigationSection) => void;
   onNewChat: () => void;
-  conversations: { id: string; title: string; updatedAt: number }[];
+  conversations: { id: string; title: string; updated_at?: string; updatedAt?: number }[];
   activeConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
+  onRenameConversation?: (id: string, newTitle: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
@@ -111,6 +112,7 @@ export function Sidebar({
   activeConversationId,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
   collapsed,
   onToggleCollapse,
   mobileOpen,
@@ -208,19 +210,37 @@ export function Sidebar({
                     title={conv.title}
                   >
                     <span className="sidebar__history-title">{conv.title}</span>
-                    <button
-                      className="sidebar__history-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteConversation(conv.id);
-                      }}
-                      aria-label={`Delete conversation: ${conv.title}`}
-                      title="Delete"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                        <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      </svg>
-                    </button>
+                    <div className="sidebar__history-actions">
+                      <button
+                        className="sidebar__history-action"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newTitle = window.prompt('Rename conversation:', conv.title);
+                          if (newTitle && newTitle.trim()) {
+                            onRenameConversation?.(conv.id, newTitle.trim());
+                          }
+                        }}
+                        aria-label={`Rename conversation: ${conv.title}`}
+                        title="Rename"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <button
+                        className="sidebar__history-action sidebar__history-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteConversation(conv.id);
+                        }}
+                        aria-label={`Delete conversation: ${conv.title}`}
+                        title="Delete"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                          <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
                   </button>
                 </li>
               ))}

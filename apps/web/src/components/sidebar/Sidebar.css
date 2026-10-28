@@ -217,32 +217,38 @@
   min-width: 0;
 }
 
-.sidebar__history-delete {
+.sidebar__history-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.sidebar__history-item:hover .sidebar__history-actions {
+  display: flex;
+}
+
+.sidebar__history-action {
   background: none;
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: 2px;
+  padding: 3px;
   border-radius: 4px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: color 0.12s;
+  transition: color 0.12s, background 0.12s;
 }
 
-.sidebar__history-item:hover .sidebar__history-delete {
-  display: flex;
-}
-
-.sidebar__history-delete:hover {
+.sidebar__history-action:hover {
   color: var(--text-primary);
+  background: var(--surface-sidebar);
 }
 
-.sidebar__history-delete:focus-visible {
+.sidebar__history-action:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-  display: flex;
 }
 
 /* --- Footer / Account --- */

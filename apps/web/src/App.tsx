@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { NavigationSection, ProviderConfigStatus } from './types';
+import type { NavigationSection, UnifiedProviderStatusResponse } from './types';
 import { useConversations } from './hooks/useConversations';
 import { useHealthCheck } from './hooks/useHealthCheck';
 import { fetchProviderStatus } from './lib/api';
@@ -13,7 +13,8 @@ export default function App() {
   const [activeSection, setActiveSection] = useState<NavigationSection>('chat');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [providerStatus, setProviderStatus] = useState<ProviderConfigStatus | null>(null);
+  const [providerStatus, setProviderStatus] = useState<UnifiedProviderStatusResponse | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
   const {
     conversations,
@@ -22,6 +23,7 @@ export default function App() {
     isStreaming,
     startNewChat,
     selectConversation,
+    renameConversation,
     deleteConversation,
     sendMessage,
     cancelStream,
@@ -35,7 +37,12 @@ export default function App() {
     if (healthStatus === 'connected') {
       void fetchProviderStatus()
         .then((res) => {
-          if (active) setProviderStatus(res);
+          if (active) {
+            setProviderStatus(res);
+            if (res.active_model && !selectedModelId) {
+              setSelectedModelId(res.active_model);
+            }
+          }
         })
         .catch(() => {
           if (active) setProviderStatus(null);
@@ -44,7 +51,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [healthStatus]);
+  }, [healthStatus, selectedModelId]);
 
   const effectiveProviderStatus = healthStatus === 'connected' ? providerStatus : null;
 
@@ -54,7 +61,7 @@ export default function App() {
   };
 
   const handleSelectConversation = (id: string) => {
-    selectConversation(id);
+    void selectConversation(id);
     setActiveSection('chat');
     setMobileSidebarOpen(false);
   };
@@ -90,6 +97,7 @@ export default function App() {
         activeConversationId={activeId}
         onSelectConversation={handleSelectConversation}
         onDeleteConversation={deleteConversation}
+        onRenameConversation={renameConversation}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         mobileOpen={mobileSidebarOpen}
@@ -127,7 +135,7 @@ export default function App() {
                 <span className="app-header__provider-dot" aria-hidden="true" />
                 <span>
                   {effectiveProviderStatus.configured
-                    ? `AI: ${effectiveProviderStatus.provider}`
+                    ? `AI: ${effectiveProviderStatus.active_provider || effectiveProviderStatus.provider}`
                     : 'AI Provider Not Configured'}
                 </span>
               </div>
@@ -151,11 +159,15 @@ export default function App() {
               isStreaming={isStreaming}
               onCancel={cancelStream}
               onNewChat={handleNewChat}
+              availableModels={effectiveProviderStatus?.available_models ?? []}
+              selectedModelId={selectedModelId ?? effectiveProviderStatus?.active_model ?? null}
+              onSelectModel={setSelectedModelId}
             />
           ) : (
             <SectionPlaceholder
               section={activeSection}
               onBackToChat={() => setActiveSection('chat')}
+              onSelectConversation={handleSelectConversation}
             />
           )}
         </div>

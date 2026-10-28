@@ -1,22 +1,24 @@
 # Unified AI Assistant
 
-A unified personal AI workspace combining conversational intelligence, an autonomous browser agent, calendar/task management, and non-intrusive Wi-Fi sensing in a single, cohesive interface.
+A unified personal AI workspace combining conversational intelligence, server persistence, hosted AI model providers, an autonomous browser agent, calendar/task management, and non-intrusive Wi-Fi sensing in a single, cohesive interface.
 
 ---
 
 ## Highlights
 
-* **Claude-Inspired Dark Chat Interface**: Minimalist, distraction-free environment featuring large serif typography for AI responses.
+* **Claude-Inspired Dark Chat Interface**: Minimalist, distraction-free environment featuring large serif typography for AI responses (Georgia 21px / line-height 1.6).
 * **Unified Workspace Sidebar**:
-  * 💬 **New Chat**: Clean conversation reset with model configuration.
-  * 🔍 **Search**: Full-text conversational and resource search.
+  * 💬 **New Chat**: Clean conversation reset with dynamic model selection.
+  * 🔍 **Search**: Database-backed full-text search across titles and messages.
   * 📁 **Projects**: Scoped workspaces with custom instructions and context.
   * 🌐 **Browser Agent**: Autonomous web task execution with interactive step preview.
   * 📅 **Calendar & Tasks**: Natural-language task creation, agenda, and reminders.
   * 📚 **Files & Knowledge**: Uploaded documents, citations, and knowledge store.
   * 📡 **Wi-Fi Sensing**: Ambient presence awareness and room activity state.
   * ⚙️ **Settings**: Server-side model key management and preferences.
-* **Security First**: Hosted AI provider keys remain strictly server-side. Zero client-side API key exposure.
+* **Server Persistence & Dual Dialect**: SQLAlchemy 2.x and Alembic migrations supporting production PostgreSQL and local SQLite fallback.
+* **Unified Model Gateway**: Server-side client adapters for OpenAI, Anthropic, and Google Gemini with normalized error handling (`RATE_LIMIT_EXCEEDED`, `TIMEOUT`, `PROVIDER_UNAVAILABLE`, `AUTHENTICATION_FAILED`).
+* **Security First**: Hosted AI provider keys and database connection strings remain strictly server-side. Zero client-side API key exposure. Strict identity ownership boundaries enforce that users cannot read, mutate, or search conversations belonging to other identities.
 * **Modern Full-Stack Architecture**: React 19 + TypeScript + Vite frontend with a high-performance FastAPI backend.
 
 ---
@@ -29,7 +31,16 @@ unified-ai-assistant/
 │   ├── web/                    # React 19 + TypeScript + Vite frontend
 │   └── chrome-extension/       # Chrome extension for local browser bridge
 ├── services/
-│   ├── api/                    # Core FastAPI backend & gateway
+│   ├── api/                    # Core FastAPI backend & Unified Model Gateway
+│   │   ├── alembic/            # Alembic database migrations
+│   │   ├── models/             # SQLAlchemy 2.x models (Conversation, Message)
+│   │   ├── schemas/            # Pydantic v2 schemas
+│   │   ├── providers/          # OpenAI, Anthropic, Gemini provider adapters
+│   │   ├── services/           # ModelGateway, ConversationService, StreamingService
+│   │   ├── routers/            # API endpoints: chat, conversations, providers
+│   │   ├── database.py         # Async engine & session lifecycle
+│   │   ├── config.py           # Environment settings & validation
+│   │   └── main.py             # FastAPI entrypoint & lifespan
 │   ├── agent-worker/           # Autonomous browser agent execution worker
 │   └── wifi-sensing/           # Isolated Wi-Fi CSI sensing service (simulation)
 ├── packages/
@@ -40,7 +51,11 @@ unified-ai-assistant/
 │   ├── repository-audit.md     # Phase 0 environment, dependency & license audit
 │   └── threat-model.md         # STRIDE threat model & security controls
 ├── tests/
-│   └── test_health.py          # Backend health-check integration test
+│   ├── conftest.py             # Test database setup fixture
+│   ├── test_conversations_api.py # Database CRUD, pagination, search & ownership tests
+│   ├── test_model_gateway.py   # Gateway resolution, mock streaming & error tests
+│   ├── test_health.py          # Backend health-check integration test
+│   └── test_streaming.py       # SSE streaming contract & error tests
 ├── .env.example                # Environment variables template
 ├── .gitignore                  # Git ignore rules
 ├── README.md                   # This file
@@ -82,6 +97,9 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
+# Run database migrations
+alembic upgrade head
+
 # Start backend server
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
@@ -90,6 +108,8 @@ The FastAPI backend will be available at:
 * **Root API info**: `http://127.0.0.1:8000/`
 * **Health Check**: `http://127.0.0.1:8000/health`
 * **Provider Status**: `http://127.0.0.1:8000/api/provider/status`
+* **Conversations API**: `http://127.0.0.1:8000/api/conversations`
+* **Search API**: `http://127.0.0.1:8000/api/conversations/search?q={query}`
 * **Chat SSE Stream**: `http://127.0.0.1:8000/api/chat/stream`
 * **Interactive Docs**: `http://127.0.0.1:8000/docs`
 
@@ -104,7 +124,7 @@ cd apps/web
 # Optional: configure backend URL in .env (defaults to http://127.0.0.1:8000)
 cp .env.example .env
 
-# Install dependencies (already satisfied in Phase 0)
+# Install dependencies
 npm install
 
 # Start development server
@@ -116,10 +136,10 @@ The web application will be accessible at `http://localhost:5173/`.
 ### 3. Running Verification Tests
 
 ```bash
-# Run all backend unit & streaming tests:
+# Run all backend tests (CRUD, gateway, streaming, health, ownership):
 services/api/.venv/Scripts/python -m pytest tests -v
 
-# Run frontend type-checking, linting & production build:
+# Run frontend linting & production build:
 cd apps/web
 npm run lint
 npm run build
@@ -129,9 +149,9 @@ npm run build
 
 ## Documentation
 
-* [System Architecture](file:///docs/architecture.md) — Subsystem designs, SSE streaming contract, data flows, and phased roadmap.
+* [System Architecture](file:///docs/architecture.md) — Subsystem designs, SSE streaming contract, database persistence, and phased roadmap.
 * [Repository Audit Report](file:///docs/repository-audit.md) — Pre-modification audit, lockfiles, and license findings.
-* [Security Threat Model](file:///docs/threat-model.md) — STRIDE analysis, trust boundaries, and mitigations.
+* [Security Threat Model](file:///docs/threat-model.md) — STRIDE analysis, trust boundaries, ownership controls, and secret isolation.
 * [Third-Party Notices](file:///THIRD_PARTY_NOTICES.md) — License inventory for all dependencies.
 
 ---
@@ -140,7 +160,7 @@ npm run build
 
 * **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
 * **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation (8 items), Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
-* **Phase 2 — Persistence & Model Gateway**: Database models (PostgreSQL), server-side hosted model integration (OpenAI, Anthropic, Gemini), chat persistence, and search.
+* **Phase 2 — Server Persistence & Unified AI Model Gateway** *(Completed)*: Dual-dialect PostgreSQL/SQLite database persistence, Alembic migrations, strict identity ownership boundaries, Unified Model Gateway with OpenAI, Anthropic, and Gemini adapters, conversation CRUD, database text search, and client UI integration.
 * **Phase 3 — Autonomous Browser Agent**: Local Chrome CDP integration and safety guardrails.
 * **Phase 4 — Task & Calendar Engine**: Natural-language scheduling and internal calendar.
 * **Phase 5 — Wi-Fi Sensing Service**: Environmental CSI simulation and presence events.
