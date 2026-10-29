@@ -32,9 +32,9 @@ docker run --rm \
 
 # Verify Nginx configuration syntax before reloading
 echo "Testing Nginx configuration syntax..."
-docker compose -f "${COMPOSE_FILE}" exec web nginx -t
+docker compose -f "${COMPOSE_FILE}" exec -T web nginx -t
 
 # Reload Nginx configuration to pick up any renewed certificates
 echo "Reloading Nginx web proxy..."
-docker compose -f "${COMPOSE_FILE}" exec web nginx -s reload
+docker compose -f "${COMPOSE_FILE}" exec -T web nginx -s reload
 echo "Renewal check and reload completed successfully."

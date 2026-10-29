@@ -23,7 +23,7 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 # 2. Parse domain and email arguments
-RAW_DOMAIN="${1:-}"
+RAW_DOMAIN="${1:-auto}"
 EMAIL="${2:-}"
 
 DOMAIN=""
@@ -39,6 +39,8 @@ if [ "$RAW_DOMAIN" = "auto" ]; then
     else
         echo "WARNING: Could not automatically detect valid IPv4. Falling back to HTTP on port 80."
     fi
+elif [ "$RAW_DOMAIN" = "none" ] || [ "$RAW_DOMAIN" = "local" ]; then
+    echo "Running in local/HTTP mode without domain configuration."
 elif [ -n "$RAW_DOMAIN" ]; then
     # If a raw IP address was passed, format it with sslip.io dashed notation
     RAW_DOMAIN_CLEAN=$(echo "$RAW_DOMAIN" | tr -d '[:space:]')

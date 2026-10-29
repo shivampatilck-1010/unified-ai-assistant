@@ -18,4 +18,12 @@ async def chat_stream(
 ):
     """Initiates an SSE streaming AI response, persisting conversation and messages."""
     generator = StreamingService.stream_chat(db, request, user_id)
-    return StreamingResponse(generator, media_type="text/event-stream")
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

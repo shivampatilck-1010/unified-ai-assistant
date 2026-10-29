@@ -34,7 +34,16 @@ if [ -z "$WWW_VOLUME" ] || [ -z "$CERTS_VOLUME" ]; then
     exit 1
 fi
 
-# 2. Run Certbot via official container
+# 2. DNS Pre-flight check
+echo "Checking DNS resolution for ${DOMAIN}..."
+RESOLVED_IP=$(python3 -c "import socket; print(socket.gethostbyname('${DOMAIN}'))" 2>/dev/null || true)
+if [ -n "$RESOLVED_IP" ]; then
+    echo "Verified DNS resolution: ${DOMAIN} -> ${RESOLVED_IP}"
+else
+    echo "WARNING: DNS resolution for ${DOMAIN} could not be confirmed locally. Certbot verification will proceed."
+fi
+
+# 3. Run Certbot via official container
 echo "Running Certbot webroot verification for domain: ${DOMAIN}..."
 docker run --rm \
   -v "${WWW_VOLUME}:/var/www/certbot" \
@@ -68,20 +77,20 @@ echo "Applying HTTPS Nginx configuration..."
 sed "s/\${DOMAIN}/${DOMAIN}/g" "${SCRIPT_DIR}/nginx-ssl.conf.template" > "${SCRIPT_DIR}/nginx-active.conf"
 
 # Backup existing Nginx config inside the container
-docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web cp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak || true
+docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec -T web cp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak || true
 
 # Copy active configuration into the running web container
 docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" cp "${SCRIPT_DIR}/nginx-active.conf" web:/etc/nginx/conf.d/default.conf
 
 # 5. Reload Nginx without downtime (roll back on syntax failure)
 echo "Testing Nginx configuration and reloading..."
-if ! docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -t; then
+if ! docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec -T web nginx -t; then
     echo "ERROR: Nginx syntax test failed with new SSL configuration. Rolling back..." >&2
-    docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web cp /etc/nginx/conf.d/default.conf.bak /etc/nginx/conf.d/default.conf
-    docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -t
+    docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec -T web cp /etc/nginx/conf.d/default.conf.bak /etc/nginx/conf.d/default.conf
+    docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec -T web nginx -t
     exit 1
 fi
-docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -s reload
+docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec -T web nginx -s reload
 
 echo "=== HTTPS is now active at: https://${DOMAIN} ==="
 echo ""
