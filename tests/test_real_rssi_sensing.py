@@ -90,6 +90,8 @@ def test_parse_connected_interface():
     assert res["state"] == "connected"
     assert "Realtek RTL8852BE" in res["description"]
     assert res["rssi_dbm"] == -54.0
+    assert res["rssi_is_estimated"] is False
+    assert res["measurement_source"] == "direct_driver_rssi"
     assert res["signal_pct"] == 95
     assert res["channel"] == 52
     assert res["band"] == "5 GHz"
@@ -126,6 +128,8 @@ def test_parse_fallback_when_rssi_field_missing():
     assert res["signal_pct"] == 80
     # Formula: (80 / 2) - 100 = -60 dBm
     assert res["rssi_dbm"] == -60.0
+    assert res["rssi_is_estimated"] is True
+    assert res["measurement_source"] == "estimated_from_signal_pct"
     assert res["channel"] == 36
 
 
@@ -192,8 +196,13 @@ async def test_live_hardware_capture():
     assert sample.sensor_type == "real_wifi_rssi"
     assert -100.0 <= sample.rssi_dbm <= -10.0
     assert 0.0 <= sample.quality_score <= 1.0
-    assert sample.metadata["measurement_type"] == "real_rssi"
+    assert sample.metadata["measurement_type"] in ("direct_hardware_rssi", "estimated_rssi_from_signal_pct")
     assert sample.metadata["csi_supported"] is False
+    assert sample.metadata["is_subcarrier_variance"] is False
+    assert sample.metadata["variance_source"] == "rssi_temporal_variance"
+    assert sample.metadata["is_doppler_phase"] is False
+    assert "experimental_validation_disclaimer" in sample.metadata
+    assert "life-safety" in sample.metadata["experimental_validation_disclaimer"]
 
     # Privacy verification: Raw SSID must not be present in metadata
     assert "Corporate-Secure-5G" not in str(sample.metadata)

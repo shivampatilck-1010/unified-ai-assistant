@@ -40,6 +40,8 @@ class RealRssiSensorAdapter(BaseSensorProvider):
         self._rssi_history: Deque[float] = deque(maxlen=10)
         self._last_error: Optional[str] = None
         self._last_rssi: Optional[float] = None
+        self._cached_info: Optional[Dict[str, Any]] = None
+        self._cached_info_time: Optional[datetime] = None
 
     @property
     def provider_id(self) -> str:
@@ -95,6 +97,7 @@ class RealRssiSensorAdapter(BaseSensorProvider):
 
         # Parse RSSI (dBm)
         rssi_dbm: Optional[float] = None
+        is_estimated = False
         if "Rssi" in data:
             try:
                 rssi_dbm = float(data["Rssi"])
@@ -111,9 +114,10 @@ class RealRssiSensorAdapter(BaseSensorProvider):
         # Fallback RSSI approximation if Windows driver omits explicit Rssi line
         if rssi_dbm is None:
             rssi_dbm = (signal_pct / 2.0) - 100.0
+            is_estimated = True
 
         # Privacy protection: Irreversibly hash AP BSSID; never store raw BSSID or SSID
-        bssid = data.get("AP BSSID", "")
+        bssid = data.get("AP BSSID") or data.get("BSSID") or ""
         anonymized_network_hash: Optional[str] = None
         if bssid:
             anonymized_network_hash = hashlib.sha256(bssid.encode("utf-8")).hexdigest()[:12]
@@ -147,6 +151,8 @@ class RealRssiSensorAdapter(BaseSensorProvider):
             "description": description,
             "name": name,
             "rssi_dbm": rssi_dbm,
+            "rssi_is_estimated": is_estimated,
+            "measurement_source": "direct_driver_rssi" if not is_estimated else "estimated_from_signal_pct",
             "signal_pct": signal_pct,
             "anonymized_network_hash": anonymized_network_hash,
             "channel": channel,
@@ -156,15 +162,28 @@ class RealRssiSensorAdapter(BaseSensorProvider):
             "tx_rate_mbps": tx_rate,
         }
 
-    def _query_os_wifi_sync(self) -> Dict[str, Any]:
-        """Synchronous OS call executed inside a worker thread to prevent event loop blocking."""
+    def _query_os_wifi_sync(self, force_refresh: bool = False) -> Dict[str, Any]:
+        """Synchronous OS call executed inside a worker thread to prevent event loop blocking.
+        Includes a 2.0s bounded cache to avoid repeated child process spawning."""
+        now = utc_now()
+        if (
+            not force_refresh
+            and self._cached_info is not None
+            and self._cached_info_time is not None
+            and (now - self._cached_info_time).total_seconds() < 2.0
+        ):
+            return self._cached_info
+
         if platform.system() != "Windows":
-            return {
+            res_data = {
                 "is_available": False,
                 "connected": False,
                 "state": "unsupported_os",
                 "error": f"Real Wi-Fi RSSI scanning via netsh is not supported on {platform.system()}.",
             }
+            self._cached_info = res_data
+            self._cached_info_time = now
+            return res_data
 
         try:
             # 2.0s bounded timeout to prevent hanging the worker thread
@@ -177,31 +196,38 @@ class RealRssiSensorAdapter(BaseSensorProvider):
                 check=False,
             )
             if res.returncode != 0:
-                return {
+                res_data = {
                     "is_available": False,
                     "connected": False,
                     "state": "error",
                     "error": res.stderr.strip() or f"netsh returned exit code {res.returncode}",
                 }
-            return self.parse_netsh_interfaces(res.stdout)
+            else:
+                # Bounded output reading (up to 64 KB)
+                stdout = res.stdout[:65536] if res.stdout else ""
+                res_data = self.parse_netsh_interfaces(stdout)
         except subprocess.TimeoutExpired:
-            return {
+            res_data = {
                 "is_available": False,
                 "connected": False,
                 "state": "timeout",
-                "error": "netsh wlan interface query timed out.",
+                "error": "netsh wlan interface query timed out after 2.0s.",
             }
         except Exception as exc:
-            return {
+            res_data = {
                 "is_available": False,
                 "connected": False,
                 "state": "error",
                 "error": f"Failed to query Wi-Fi interfaces: {exc}",
             }
 
-    async def _query_os_wifi_async(self) -> Dict[str, Any]:
+        self._cached_info = res_data
+        self._cached_info_time = now
+        return res_data
+
+    async def _query_os_wifi_async(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Non-blocking asynchronous wrapper running the OS query in a thread."""
-        return await asyncio.to_thread(self._query_os_wifi_sync)
+        return await asyncio.to_thread(self._query_os_wifi_sync, force_refresh)
 
     def discover_capabilities(self) -> SensorCapabilities:
         """Inspects physical NIC support synchronously."""
@@ -318,6 +344,9 @@ class RealRssiSensorAdapter(BaseSensorProvider):
 
         quality_score = round(min(1.0, max(0.2, info.get("signal_pct", 50) / 100.0)), 2)
 
+        is_estimated = bool(info.get("rssi_is_estimated", False))
+        measurement_type = "estimated_rssi_from_signal_pct" if is_estimated else "direct_hardware_rssi"
+
         return RawSensorSample(
             timestamp=self._last_sample_time,
             room_id=self._room_id,
@@ -338,11 +367,30 @@ class RealRssiSensorAdapter(BaseSensorProvider):
                 "link_quality_pct": info.get("signal_pct"),
                 "tx_rate_mbps": info.get("tx_rate_mbps"),
                 "rx_rate_mbps": info.get("rx_rate_mbps"),
-                "measurement_type": "real_rssi",
+                "measurement_type": measurement_type,
+                "measurement_source": info.get("measurement_source", "direct_driver_rssi"),
+                "rssi_is_estimated": is_estimated,
+                "direct_dbm_available": not is_estimated,
+                "variance_source": "rssi_temporal_variance",
+                "is_subcarrier_variance": False,
+                "variance_note": (
+                    "Value in subcarrier_variance represents temporal RSSI rolling variance across time, "
+                    "not multi-subcarrier CSI frequency variance."
+                ),
+                "doppler_source": "rssi_delta_proxy",
+                "is_doppler_phase": False,
+                "doppler_note": (
+                    "Value in doppler_energy represents absolute RSSI rate-of-change, "
+                    "not RF Doppler phase shift."
+                ),
                 "csi_supported": False,
                 "csi_status_note": (
                     "Physical hardware exposes real RSSI signal telemetry; "
                     "raw CSI frame capture requires specialized firmware."
+                ),
+                "experimental_validation_disclaimer": (
+                    "Uncalibrated heuristic model for demonstration only. "
+                    "Does NOT claim validated human presence or life-safety detection."
                 ),
             },
         )
