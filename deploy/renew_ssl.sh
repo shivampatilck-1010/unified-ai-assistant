@@ -8,8 +8,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 COMPOSE_FILE="${ROOT_DIR}/docker-compose.prod.yml"
 
-WWW_VOLUME=$(docker volume ls -q --filter name=certbot_www | head -n 1)
-CERTS_VOLUME=$(docker volume ls -q --filter name=certbot_certs | head -n 1)
+WWW_VOLUME=$(docker volume ls -q --filter label=com.docker.compose.volume=certbot_www | head -n 1)
+if [ -z "$WWW_VOLUME" ]; then
+    WWW_VOLUME=$(docker volume ls -q --filter name=certbot_www | head -n 1)
+fi
+
+CERTS_VOLUME=$(docker volume ls -q --filter label=com.docker.compose.volume=certbot_certs | head -n 1)
+if [ -z "$CERTS_VOLUME" ]; then
+    CERTS_VOLUME=$(docker volume ls -q --filter name=certbot_certs | head -n 1)
+fi
 
 if [ -z "$WWW_VOLUME" ] || [ -z "$CERTS_VOLUME" ]; then
     echo "ERROR: Certbot persistent volumes not found." >&2
@@ -21,7 +28,7 @@ echo "Attempting Certbot renewal check..."
 docker run --rm \
   -v "${WWW_VOLUME}:/var/www/certbot" \
   -v "${CERTS_VOLUME}:/etc/letsencrypt" \
-  certbot/certbot renew --quiet
+  certbot/certbot renew --quiet --non-interactive
 
 # Verify Nginx configuration syntax before reloading
 echo "Testing Nginx configuration syntax..."

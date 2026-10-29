@@ -18,8 +18,15 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 echo "=== Initializing SSL Certificate Issuance for: ${DOMAIN} ==="
 
 # 1. Locate Docker Compose project volume names
-WWW_VOLUME=$(docker volume ls -q --filter name=certbot_www | head -n 1)
-CERTS_VOLUME=$(docker volume ls -q --filter name=certbot_certs | head -n 1)
+WWW_VOLUME=$(docker volume ls -q --filter label=com.docker.compose.volume=certbot_www | head -n 1)
+if [ -z "$WWW_VOLUME" ]; then
+    WWW_VOLUME=$(docker volume ls -q --filter name=certbot_www | head -n 1)
+fi
+
+CERTS_VOLUME=$(docker volume ls -q --filter label=com.docker.compose.volume=certbot_certs | head -n 1)
+if [ -z "$CERTS_VOLUME" ]; then
+    CERTS_VOLUME=$(docker volume ls -q --filter name=certbot_certs | head -n 1)
+fi
 
 if [ -z "$WWW_VOLUME" ] || [ -z "$CERTS_VOLUME" ]; then
     echo "ERROR: Docker volumes for certbot (certbot_www and certbot_certs) not found." >&2
@@ -33,6 +40,8 @@ docker run --rm \
   -v "${WWW_VOLUME}:/var/www/certbot" \
   -v "${CERTS_VOLUME}:/etc/letsencrypt" \
   certbot/certbot certonly --webroot \
+  --non-interactive \
+  --keep-until-expiring \
   -w /var/www/certbot \
   -d "${DOMAIN}" \
   --email "${EMAIL}" \
@@ -58,12 +67,20 @@ docker run --rm \
 echo "Applying HTTPS Nginx configuration..."
 sed "s/\${DOMAIN}/${DOMAIN}/g" "${SCRIPT_DIR}/nginx-ssl.conf.template" > "${SCRIPT_DIR}/nginx-active.conf"
 
+# Backup existing Nginx config inside the container
+docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web cp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak || true
+
 # Copy active configuration into the running web container
 docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" cp "${SCRIPT_DIR}/nginx-active.conf" web:/etc/nginx/conf.d/default.conf
 
-# 5. Reload Nginx without downtime
+# 5. Reload Nginx without downtime (roll back on syntax failure)
 echo "Testing Nginx configuration and reloading..."
-docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -t
+if ! docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -t; then
+    echo "ERROR: Nginx syntax test failed with new SSL configuration. Rolling back..." >&2
+    docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web cp /etc/nginx/conf.d/default.conf.bak /etc/nginx/conf.d/default.conf
+    docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -t
+    exit 1
+fi
 docker compose -f "${ROOT_DIR}/docker-compose.prod.yml" exec web nginx -s reload
 
 echo "=== HTTPS is now active at: https://${DOMAIN} ==="

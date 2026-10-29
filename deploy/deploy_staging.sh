@@ -29,20 +29,25 @@ EMAIL="${2:-}"
 DOMAIN=""
 if [ "$RAW_DOMAIN" = "auto" ]; then
     echo "Resolving VPS public IP for automatic free HTTPS hostname..."
-    PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org || curl -s --max-time 5 https://ifconfig.me || true)
-    if [ -n "$PUBLIC_IP" ]; then
-        DOMAIN="${PUBLIC_IP}.sslip.io"
-        echo "Using automated wildcard DNS hostname: ${DOMAIN} (resolves to ${PUBLIC_IP})"
+    PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org || curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://icanhazip.com || true)
+    PUBLIC_IP=$(echo "$PUBLIC_IP" | tr -d '[:space:]')
+    if [[ "$PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        DASHED_IP="${PUBLIC_IP//./-}"
+        DOMAIN="${DASHED_IP}.sslip.io"
+        echo "Auto-detected public IP: ${PUBLIC_IP}"
+        echo "Using single-label wildcard DNS hostname: ${DOMAIN} (resolves to ${PUBLIC_IP})"
     else
-        echo "WARNING: Could not automatically detect public IP. Falling back to HTTP on port 80."
+        echo "WARNING: Could not automatically detect valid IPv4. Falling back to HTTP on port 80."
     fi
 elif [ -n "$RAW_DOMAIN" ]; then
-    # If a raw IP address was passed, format it with sslip.io
-    if [[ "$RAW_DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        DOMAIN="${RAW_DOMAIN}.sslip.io"
+    # If a raw IP address was passed, format it with sslip.io dashed notation
+    RAW_DOMAIN_CLEAN=$(echo "$RAW_DOMAIN" | tr -d '[:space:]')
+    if [[ "$RAW_DOMAIN_CLEAN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        DASHED_IP="${RAW_DOMAIN_CLEAN//./-}"
+        DOMAIN="${DASHED_IP}.sslip.io"
         echo "IP address provided. Using wildcard DNS hostname: ${DOMAIN}"
     else
-        DOMAIN="$RAW_DOMAIN"
+        DOMAIN="$RAW_DOMAIN_CLEAN"
     fi
 fi
 
@@ -118,6 +123,8 @@ fi
 
 HEALTH_URL="${SCHEME}://${TARGET_HOST}/health"
 READY_URL="${SCHEME}://${TARGET_HOST}/ready"
+PROVIDER_URL="${SCHEME}://${TARGET_HOST}/api/provider/status"
+ROOT_URL="${SCHEME}://${TARGET_HOST}/"
 
 if curl -skf "${HEALTH_URL}" >/dev/null; then
     echo "[PASS] Health probe: OK (${HEALTH_URL})"
@@ -129,6 +136,14 @@ if curl -skf "${READY_URL}" >/dev/null; then
     echo "[PASS] Readiness probe: OK (${READY_URL})"
 else
     echo "[WARN] Readiness probe pending. Inspect container logs with: docker compose -f ${COMPOSE_FILE} logs api"
+fi
+
+if curl -skf "${PROVIDER_URL}" >/dev/null; then
+    echo "[PASS] AI Model Gateway probe: OK (${PROVIDER_URL})"
+fi
+
+if curl -skf "${ROOT_URL}" | grep -qi "<html" >/dev/null 2>&1; then
+    echo "[PASS] Web frontend SPA probe: OK (${ROOT_URL})"
 fi
 
 echo ""

@@ -30,7 +30,9 @@ def main():
     jwt_secret = generate_secure_secret(32)
     db_password = generate_secure_secret(24)
     worker_token = generate_secure_secret(24)
-    gemini_key = extract_existing_gemini_key(root_dir)
+    gemini_key = os.environ.get("GEMINI_API_KEY") or extract_existing_gemini_key(root_dir)
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
     staging_content = f"""# Staging Environment Configuration - Auto-generated
 # Generated with cryptographically strong secrets. DO NOT COMMIT TO VERSION CONTROL.
@@ -66,6 +68,8 @@ BROWSER_WORKER_CONCURRENCY=3
 WORKER_AUTH_TOKEN={worker_token}
 
 # AI Model Provider Credentials (Server-Side Only)
+OPENAI_API_KEY={openai_key}
+ANTHROPIC_API_KEY={anthropic_key}
 GEMINI_API_KEY={gemini_key}
 DEFAULT_PROVIDER=gemini
 DEFAULT_MODEL=gemini-3.8-flash
