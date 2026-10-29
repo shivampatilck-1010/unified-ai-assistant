@@ -12,7 +12,8 @@ echo "=== Unified AI Assistant Production Deployment ==="
 
 # 1. Check Docker & Docker Compose
 if ! command -v docker >/dev/null 2>&1; then
-    echo "ERROR: 'docker' command not found. Please install Docker Engine first." >&2
+    echo "ERROR: 'docker' command not found. Please install Docker Engine first:" >&2
+    echo "  curl -fsSL https://get.docker.com | sh" >&2
     exit 1
 fi
 
@@ -21,25 +22,56 @@ if ! docker compose version >/dev/null 2>&1; then
     exit 1
 fi
 
-# 2. Check or generate .env.production
+# 2. Parse domain and email arguments
+RAW_DOMAIN="${1:-}"
+EMAIL="${2:-}"
+
+DOMAIN=""
+if [ "$RAW_DOMAIN" = "auto" ]; then
+    echo "Resolving VPS public IP for automatic free HTTPS hostname..."
+    PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org || curl -s --max-time 5 https://ifconfig.me || true)
+    if [ -n "$PUBLIC_IP" ]; then
+        DOMAIN="${PUBLIC_IP}.sslip.io"
+        echo "Using automated wildcard DNS hostname: ${DOMAIN} (resolves to ${PUBLIC_IP})"
+    else
+        echo "WARNING: Could not automatically detect public IP. Falling back to HTTP on port 80."
+    fi
+elif [ -n "$RAW_DOMAIN" ]; then
+    # If a raw IP address was passed, format it with sslip.io
+    if [[ "$RAW_DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        DOMAIN="${RAW_DOMAIN}.sslip.io"
+        echo "IP address provided. Using wildcard DNS hostname: ${DOMAIN}"
+    else
+        DOMAIN="$RAW_DOMAIN"
+    fi
+fi
+
+# 3. Check or generate .env.production
 if [ ! -f "${ROOT_DIR}/.env.production" ]; then
-    echo "Notice: .env.production not found. Generating secure credentials..."
+    echo "Notice: .env.production not found. Generating cryptographically secure credentials..."
     python3 "${SCRIPT_DIR}/generate_staging_secrets.py"
     cp "${ROOT_DIR}/.env.staging" "${ROOT_DIR}/.env.production"
     chmod 600 "${ROOT_DIR}/.env.production"
     echo "Created ${ROOT_DIR}/.env.production with 0600 permissions."
-    echo "IMPORTANT: Verify GEMINI_API_KEY, CORS_ORIGINS, and domain settings in .env.production."
 fi
 
-# 3. Build all production images
+# Ensure domain is in CORS_ORIGINS
+if [ -n "$DOMAIN" ]; then
+    if ! grep -q "${DOMAIN}" "${ROOT_DIR}/.env.production"; then
+        echo "Adding https://${DOMAIN} to CORS_ORIGINS in .env.production..."
+        sed -i "s|CORS_ORIGINS=\[|CORS_ORIGINS=[\"https://${DOMAIN}\", \"http://${DOMAIN}\", |" "${ROOT_DIR}/.env.production"
+    fi
+fi
+
+# 4. Build all production images
 echo "Building production Docker images (API, Worker, Web)..."
 docker compose -f "${COMPOSE_FILE}" build
 
-# 4. Bootstrap Database & Web HTTP Proxy
+# 5. Bootstrap Database & Web HTTP Proxy
 echo "Starting PostgreSQL database and HTTP bootstrap proxy..."
 docker compose -f "${COMPOSE_FILE}" up -d db web
 
-# 5. Wait for Database Health
+# 6. Wait for Database Health
 echo "Waiting for PostgreSQL database to report healthy..."
 for i in {1..30}; do
     STATUS=$(docker compose -f "${COMPOSE_FILE}" ps db --format json 2>/dev/null | grep -o '"Health":"[^"]*"' | cut -d'"' -f4 || true)
@@ -51,53 +83,63 @@ for i in {1..30}; do
     sleep 2
 done
 
-# 6. Optional SSL Setup if DOMAIN and EMAIL are provided
-DOMAIN="${1:-}"
-EMAIL="${2:-}"
-
+# 7. Optional SSL Setup if DOMAIN and EMAIL are available
 if [ -n "$DOMAIN" ] && [ -n "$EMAIL" ]; then
-    echo "Configuring HTTPS for domain: ${DOMAIN}..."
+    echo "Requesting Let's Encrypt SSL certificate for: ${DOMAIN}..."
     "${SCRIPT_DIR}/setup_ssl.sh" "${DOMAIN}" "${EMAIL}"
 else
-    echo "NOTICE: DOMAIN and EMAIL not passed. Skipping Let's Encrypt certificate issuance."
-    echo "Application running in HTTP mode on port 80."
-    echo "To activate HTTPS later, run: ./deploy/setup_ssl.sh <DOMAIN> <EMAIL>"
+    echo "NOTICE: Domain and email not both provided. Running in HTTP mode on port 80."
+    echo "To activate HTTPS at any time, run: ./deploy/setup_ssl.sh <DOMAIN> <EMAIL>"
 fi
 
-# 7. Mandatory Verified Pre-Migration Backup
-echo "Executing pre-migration backup check..."
+# 8. Mandatory Verified Pre-Migration Backup
+echo "Executing pre-migration database backup check..."
 "${SCRIPT_DIR}/backup_database.sh" /backups/postgresql --allow-empty
 
-# 8. Apply Alembic Database Migrations
+# 9. Apply Alembic Database Migrations
 echo "Applying database schema migrations..."
 docker compose -f "${COMPOSE_FILE}" run --rm api \
     alembic -c alembic.ini upgrade head
 
-# 9. Start Complete Stack
+# 10. Start Complete Stack
 echo "Starting full application stack (API, Worker, Web, DB)..."
 docker compose -f "${COMPOSE_FILE}" up -d
 
-# 10. Post-Deployment Smoke Test
-echo "Verifying application readiness..."
+# 11. Post-Deployment Smoke Test
+echo "Running post-deployment readiness and health checks..."
 sleep 5
-HEALTH_URL="http://localhost/health"
-READY_URL="http://localhost/ready"
+
+SCHEME="http"
+TARGET_HOST="localhost"
 if [ -n "$DOMAIN" ] && [ -n "$EMAIL" ]; then
-    HEALTH_URL="https://localhost/health"
-    READY_URL="https://localhost/ready"
+    SCHEME="https"
+    TARGET_HOST="${DOMAIN}"
 fi
 
+HEALTH_URL="${SCHEME}://${TARGET_HOST}/health"
+READY_URL="${SCHEME}://${TARGET_HOST}/ready"
+
 if curl -skf "${HEALTH_URL}" >/dev/null; then
-    echo "[PASS] Health probe: OK"
+    echo "[PASS] Health probe: OK (${HEALTH_URL})"
 else
-    echo "[WARN] Health probe did not respond immediately. Check 'docker compose -f docker-compose.prod.yml logs api'."
+    echo "[WARN] Health probe pending. Inspect container logs with: docker compose -f ${COMPOSE_FILE} logs api"
 fi
 
 if curl -skf "${READY_URL}" >/dev/null; then
-    echo "[PASS] Readiness probe: OK"
+    echo "[PASS] Readiness probe: OK (${READY_URL})"
 else
-    echo "[WARN] Readiness probe pending. Check 'docker compose -f docker-compose.prod.yml logs api'."
+    echo "[WARN] Readiness probe pending. Inspect container logs with: docker compose -f ${COMPOSE_FILE} logs api"
 fi
 
-echo "=== Deployment Completed Successfully ==="
+echo ""
+echo "================================================================================"
+if [ -n "$DOMAIN" ] && [ -n "$EMAIL" ]; then
+    echo " SUCCESS: Unified AI Assistant is publicly accessible at:"
+    echo " https://${DOMAIN}/"
+else
+    PUBLIC_IP=$(curl -s --max-time 3 https://api.ipify.org || echo "localhost")
+    echo " SUCCESS: Unified AI Assistant is running at:"
+    echo " http://${PUBLIC_IP}/"
+fi
+echo "================================================================================"
 docker compose -f "${COMPOSE_FILE}" ps
