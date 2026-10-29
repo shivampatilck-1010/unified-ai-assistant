@@ -601,7 +601,7 @@ class BrowserWorkerRunner:
         sanitized = re.sub(r"[A-Za-z]:\\[^:\s\n]+", "[redacted-path]", raw_err)
         sanitized = re.sub(r"/(?:[a-zA-Z0-9_\-\.]+/?)+", "[redacted-path]", sanitized)
         # Strip API keys or token patterns
-        sanitized = re.sub(r"(?:sk-[a-zA-Z0-9_\-]{15,}|AIza[a-zA-Z0-9_\-]{15,})", "[redacted-secret]", sanitized)
+        sanitized = re.sub(r"(?:sk-[a-zA-Z0-9_\-]{15,}|AIza[a-zA-Z0-9_\-]{15,}|AQ\.[a-zA-Z0-9_\-]{15,})", "[redacted-secret]", sanitized)
         return sanitized[:400].strip()
 
 

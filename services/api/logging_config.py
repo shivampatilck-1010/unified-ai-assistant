@@ -8,8 +8,9 @@ SECRET_PATTERNS = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9_\-\.]{15,}", re.IGNORECASE), r"\1[REDACTED-TOKEN]"),
     # OpenAI API Keys
     (re.compile(r"sk-[A-Za-z0-9_\-]{20,}", re.IGNORECASE), "sk-[REDACTED-KEY]"),
-    # Google API Keys
+    # Google API Keys (AIza and AQ patterns)
     (re.compile(r"AIza[0-9A-Za-z-_]{35}", re.IGNORECASE), "AIza[REDACTED-KEY]"),
+    (re.compile(r"AQ\.[0-9A-Za-z-_]{25,}", re.IGNORECASE), "AQ.[REDACTED-KEY]"),
     # Anthropic API Keys
     (re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}", re.IGNORECASE), "sk-ant-[REDACTED-KEY]"),
     # Generic password / secret query params
