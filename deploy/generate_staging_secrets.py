@@ -68,9 +68,10 @@ WORKER_AUTH_TOKEN={worker_token}
 # AI Model Provider Credentials (Server-Side Only)
 GEMINI_API_KEY={gemini_key}
 DEFAULT_PROVIDER=gemini
-DEFAULT_MODEL=gemini-3.5-flash
+DEFAULT_MODEL=gemini-3.8-flash
 FALLBACK_MODEL=gemini-3.5-flash-lite
 ENABLE_SIMULATED_SENSING=true
+STORAGE_DIR=/app/services/api/data/storage
 """
 
     target_env.write_text(staging_content, encoding="utf-8")

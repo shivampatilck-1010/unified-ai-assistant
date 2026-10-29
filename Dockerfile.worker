@@ -15,12 +15,11 @@ RUN groupadd -g 10001 workergroup && \
 COPY services/api/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser dependencies and chromium only
+# Install Playwright browser dependencies and chromium
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN mkdir -p /ms-playwright && chown -R workeruser:workergroup /ms-playwright
-USER workeruser
-RUN playwright install chromium
-USER root
+RUN mkdir -p /ms-playwright && \
+    playwright install --with-deps chromium && \
+    chown -R workeruser:workergroup /ms-playwright
 
 # Copy application code
 COPY --chown=workeruser:workergroup services/api /app/services/api

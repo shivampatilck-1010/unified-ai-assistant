@@ -38,6 +38,10 @@ COPY --chown=appuser:appgroup services/api /app/services/api
 COPY --chown=appuser:appgroup services/agent-worker /app/services/agent-worker
 COPY --chown=appuser:appgroup services/wifi-sensing /app/services/wifi-sensing
 
+# Ensure persistent data directory exists and has appuser ownership
+RUN mkdir -p /app/services/api/data/storage && \
+    chown -R appuser:appgroup /app/services/api/data
+
 WORKDIR /app/services/api
 USER appuser
 

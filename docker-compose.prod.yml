@@ -97,6 +97,7 @@ services:
     volumes:
       - certbot_www:/var/www/certbot:ro
       - certbot_certs:/etc/letsencrypt:ro
+      - nginx_conf:/etc/nginx/conf.d
     networks:
       - frontend-net
     deploy:
@@ -113,6 +114,8 @@ volumes:
   certbot_www:
     driver: local
   certbot_certs:
+    driver: local
+  nginx_conf:
     driver: local
 
 networks:

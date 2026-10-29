@@ -1,0 +1,77 @@
+# ==============================================================================
+# Docker Build Context Ignore Rules
+# ==============================================================================
+
+# Version Control & Metadata
+.git/
+.gitignore
+.github/
+
+# Documentation & Tests
+docs/
+tests/
+*.md
+!packages/**/README.md
+
+# Node.js & Web Build Artifacts
+node_modules/
+apps/web/node_modules/
+apps/web/dist/
+apps/web/dist-ssr/
+apps/chrome-extension/dist/
+.eslintcache
+*.tsbuildinfo
+
+# Python Virtual Environments & Bytecode
+.venv/
+venv/
+ENV/
+env/
+services/**/.venv/
+services/**/venv/
+services/**/env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Local Databases & Runtime Storage
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+services/api/data/
+data/
+storage/
+uploads/
+backups/
+*.sql
+*.sql.gz
+
+# Secrets & Environment Files
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+secrets/
+credentials.json
+token.json
+service_account.json
+deploy/nginx-active.conf
+*.active.conf
+
+# Operating System Artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
