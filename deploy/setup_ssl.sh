@@ -18,17 +18,17 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 echo "=== Initializing SSL Certificate Issuance for: ${DOMAIN} ==="
 
 # 1. Locate Docker Compose project volume names
-WWW_VOLUME=$(docker volume ls -q | grep certbot_www | head -n 1)
-CERTS_VOLUME=$(docker volume ls -q | grep certbot_certs | head -n 1)
+WWW_VOLUME=$(docker volume ls -q --filter name=certbot_www | head -n 1)
+CERTS_VOLUME=$(docker volume ls -q --filter name=certbot_certs | head -n 1)
 
 if [ -z "$WWW_VOLUME" ] || [ -z "$CERTS_VOLUME" ]; then
-    echo "Error: Docker volumes for certbot (certbot_www and certbot_certs) not found."
-    echo "Ensure 'docker compose -f docker-compose.prod.yml up -d web' is running first."
+    echo "ERROR: Docker volumes for certbot (certbot_www and certbot_certs) not found." >&2
+    echo "Ensure 'docker compose -f docker-compose.prod.yml up -d web' is running first." >&2
     exit 1
 fi
 
 # 2. Run Certbot via official container
-echo "Running Certbot webroot verification..."
+echo "Running Certbot webroot verification for domain: ${DOMAIN}..."
 docker run --rm \
   -v "${WWW_VOLUME}:/var/www/certbot" \
   -v "${CERTS_VOLUME}:/etc/letsencrypt" \
@@ -38,11 +38,21 @@ docker run --rm \
   --email "${EMAIL}" \
   --agree-tos --no-eff-email
 
-# 3. Verify that certificate fullchain.pem and privkey.pem were generated
-echo "Verifying certificate generation..."
+# 3. Verify that certificate fullchain.pem and privkey.pem were successfully generated
+echo "Verifying certificate and private key presence..."
 docker run --rm \
   -v "${CERTS_VOLUME}:/etc/letsencrypt:ro" \
-  alpine ls -la "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
+  alpine test -s "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" || {
+    echo "ERROR: Certificate fullchain.pem was not generated." >&2
+    exit 1
+}
+
+docker run --rm \
+  -v "${CERTS_VOLUME}:/etc/letsencrypt:ro" \
+  alpine test -s "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" || {
+    echo "ERROR: Private key privkey.pem was not generated." >&2
+    exit 1
+}
 
 # 4. Generate SSL Nginx configuration from template
 echo "Applying HTTPS Nginx configuration..."

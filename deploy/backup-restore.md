@@ -124,10 +124,18 @@ All schema alterations are version-controlled using Alembic migrations in `servi
 
 ### 4.1 Applying Migrations in Production
 
-Before deploying updated API or Worker containers:
+Before applying schema migrations, a verified pre-migration backup MUST be executed. If the backup fails, the deployment aborts immediately:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -T api \
+# 1. Mandatory Pre-Migration Backup (fails closed; never use || true)
+# For initial deployment on a new empty database:
+./deploy/backup_database.sh /backups/postgresql --allow-empty
+
+# For ongoing production deployments with existing data:
+./deploy/backup_database.sh /backups/postgresql
+
+# 2. Run migrations only if backup succeeds
+docker compose -f docker-compose.prod.yml run --rm api \
   alembic -c alembic.ini upgrade head
 ```
 
