@@ -52,8 +52,8 @@ class Settings:
         self.gemini_api_key: Optional[str] = os.getenv("GEMINI_API_KEY")
 
         # Default provider / model selection
-        self.default_provider: Optional[str] = os.getenv("DEFAULT_PROVIDER")
-        self.default_model: Optional[str] = os.getenv("DEFAULT_MODEL")
+        self.default_provider: Optional[str] = os.getenv("DEFAULT_PROVIDER", os.getenv("DEFAULT_MODEL_PROVIDER"))
+        self.default_model: Optional[str] = os.getenv("DEFAULT_MODEL", os.getenv("DEFAULT_MODEL_NAME"))
 
         # Development identity boundary (for local single-user or auth mock)
         self.dev_user_id: str = os.getenv("DEV_USER_ID", "dev-user-default")

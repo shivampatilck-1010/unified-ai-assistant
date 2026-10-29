@@ -48,10 +48,11 @@ echo "Backup completed: ${FILENAME}"
 
 ### 2.2 Uploaded Documents Backup
 
-Archive the persistent uploads volume:
+Archive the persistent uploads/storage volume:
 
 ```bash
-tar -czvf /backups/uploads_$(date +"%Y%m%d").tar.gz -C services/api uploads/
+docker run --rm -v $(docker volume ls -q | grep storage_data):/storage -v /backups:/backups alpine \
+  tar -czvf /backups/uploads_$(date +"%Y%m%d").tar.gz -C /storage .
 ```
 
 ### 2.3 SQLite WAL-Mode Backup (Development & Local Staging)

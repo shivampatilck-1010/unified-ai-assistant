@@ -67,13 +67,18 @@ WORKER_AUTH_TOKEN={worker_token}
 
 # AI Model Provider Credentials (Server-Side Only)
 GEMINI_API_KEY={gemini_key}
-DEFAULT_MODEL_PROVIDER=gemini
-DEFAULT_MODEL_NAME=gemini-2.5-flash
-FALLBACK_MODEL_NAME=gemini-2.5-flash-lite
+DEFAULT_PROVIDER=gemini
+DEFAULT_MODEL=gemini-3.5-flash
+FALLBACK_MODEL=gemini-3.5-flash-lite
 ENABLE_SIMULATED_SENSING=true
 """
 
     target_env.write_text(staging_content, encoding="utf-8")
+    if os.name == "posix":
+        try:
+            target_env.chmod(0o600)
+        except OSError:
+            pass
     print(f"Successfully generated secure staging configuration at {target_env.name}")
     print("All secrets were generated using secrets.token_hex and safely written without stdout disclosure.")
 

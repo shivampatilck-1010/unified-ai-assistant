@@ -45,6 +45,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    volumes:
+      - storage_data:/app/services/api/data/storage
     networks:
       - frontend-net
       - backend-net
@@ -91,6 +93,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    volumes:
+      - certbot_www:/var/www/certbot:ro
     networks:
       - frontend-net
     deploy:
@@ -101,6 +105,10 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  storage_data:
+    driver: local
+  certbot_www:
     driver: local
 
 networks:
