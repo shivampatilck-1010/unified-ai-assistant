@@ -283,7 +283,7 @@ export const OrchestrationView: React.FC = () => {
               {/* Clarification Box if waiting for input */}
               {activeWorkflow.status === 'waiting_for_input' && (
                 <div className="orch-clarification-box">
-                  <div className="orch-clarification-header">❓ Clarification Required</div>
+                  <div className="orch-clarification-header">Clarification Required</div>
                   <div>{activeWorkflow.clarification_question}</div>
                   <div className="orch-clarification-form">
                     <input
@@ -311,7 +311,7 @@ export const OrchestrationView: React.FC = () => {
               {activeWorkflow.status === 'waiting_for_confirmation' && activeWorkflow.pending_confirmation && (
                 <div className="orch-confirmation-box">
                   <div className="orch-confirmation-header">
-                    <span>⚠️ Consequential Action Confirmation Required</span>
+                    <span>Consequential Action Confirmation Required</span>
                   </div>
                   <div className="orch-confirmation-body">
                     <strong>Step {activeWorkflow.pending_confirmation.step_number}: {activeWorkflow.pending_confirmation.title}</strong>
@@ -328,14 +328,14 @@ export const OrchestrationView: React.FC = () => {
                       onClick={() => void handleConfirmStep(activeWorkflow.pending_confirmation!.step_number, true)}
                       disabled={actionLoading}
                     >
-                      ✓ Confirm and Execute
+                      Confirm and Execute
                     </button>
                     <button
                       className="orch-btn orch-btn-danger"
                       onClick={() => void handleConfirmStep(activeWorkflow.pending_confirmation!.step_number, false)}
                       disabled={actionLoading}
                     >
-                      ✕ Reject Step
+                      Reject Step
                     </button>
                   </div>
                 </div>
@@ -401,7 +401,7 @@ export const OrchestrationView: React.FC = () => {
 
                       {step.error_message && (
                         <div style={{ color: '#fca5a5', fontSize: '12px', paddingLeft: '32px' }}>
-                          ⚠️ Error: {step.error_message}
+                          Error: {step.error_message}
                         </div>
                       )}
 
@@ -427,7 +427,7 @@ export const OrchestrationView: React.FC = () => {
               {activeWorkflow.result_summary && (
                 <div style={{ background: '#242424', padding: '16px', borderRadius: '8px', border: '1px solid #383838' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 8px 0', color: '#86efac' }}>
-                    ✓ Outcome & Synthesis
+                    Outcome & Synthesis
                   </h3>
                   <div style={{ fontSize: '13px', lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#e5e5e5' }}>
                     {activeWorkflow.result_summary}

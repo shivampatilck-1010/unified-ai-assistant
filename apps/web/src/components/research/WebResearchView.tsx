@@ -491,7 +491,7 @@ export function WebResearchView() {
 
                 {activeJob.final_report.conflicting_claims && activeJob.final_report.conflicting_claims.length > 0 && (
                   <div className="research-conflict-box">
-                    <div className="research-conflict-box__title">⚠️ Conflicting Claims Detected Across Sources</div>
+                    <div className="research-conflict-box__title">Conflicting Claims Detected Across Sources</div>
                     <ul style={{ margin: 0, paddingLeft: '20px', color: '#fca5a5', fontSize: '13px' }}>
                       {activeJob.final_report.conflicting_claims.map((c, idx) => (
                         <li key={idx}>{c}</li>
@@ -530,7 +530,7 @@ export function WebResearchView() {
                               </a>
                             ) : (
                               <span style={{ color: '#e5e5e5', fontWeight: 500 }}>
-                                📄 {cit.url_or_filename} {cit.page_number ? `(Page ${cit.page_number})` : ''}
+                                {cit.url_or_filename} {cit.page_number ? `(Page ${cit.page_number})` : ''}
                               </span>
                             )}
                           </div>

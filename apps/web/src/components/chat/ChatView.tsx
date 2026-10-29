@@ -99,7 +99,7 @@ export function ChatView({
               gap: '6px',
             }}
           >
-            <span>⚡ Orchestrate</span>
+            <span>Orchestrate</span>
             <span style={{ fontSize: '10px', fontWeight: 600 }}>{useOrchestration ? 'ON' : 'OFF'}</span>
           </button>
 
@@ -121,7 +121,7 @@ export function ChatView({
               gap: '6px',
             }}
           >
-            <span>🔬 Web Research</span>
+            <span>Web Research</span>
             <span style={{ fontSize: '10px', fontWeight: 600 }}>{useResearch ? 'ON' : 'OFF'}</span>
           </button>
 

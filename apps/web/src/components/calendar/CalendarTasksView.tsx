@@ -294,7 +294,11 @@ export function CalendarTasksView() {
       {activeAlerts.length > 0 && (
         <aside aria-label="Active Reminders" className="caltasks-alerts-banner">
           <div className="caltasks-alerts-banner__header">
-            <span className="caltasks-alerts-banner__icon">🔔</span>
+            <span className="caltasks-alerts-banner__icon">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1.5a4.5 4.5 0 00-4.5 4.5v3.25L2 11.5v1h12v-1l-1.5-2.25V6A4.5 4.5 0 008 1.5zM6.5 13.5a1.5 1.5 0 003 0h-3z" />
+              </svg>
+            </span>
             <strong>Active Reminders ({activeAlerts.length})</strong>
           </div>
           <div className="caltasks-alerts-banner__list">
@@ -354,7 +358,11 @@ export function CalendarTasksView() {
       {/* Natural Language Quick-Add Card */}
       <div className="caltasks-quickadd-card">
         <div className="caltasks-quickadd-header">
-          <span className="caltasks-quickadd-icon">⚡</span>
+          <span className="caltasks-quickadd-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M9 1L3 9h4l-1 6 6-8H8l1-6z" />
+            </svg>
+          </span>
           <div>
             <h3>Natural Language Quick-Add</h3>
             <p>Type requests in plain English (e.g. &ldquo;Team sync tomorrow at 3pm, finish slides by Friday 5pm&rdquo;)</p>
@@ -425,7 +433,7 @@ export function CalendarTasksView() {
                     <span className="caltasks-review-item__date">
                       {new Date(ev.start_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
-                    {ev.location && <span className="caltasks-review-item__loc">📍 {ev.location}</span>}
+                    {ev.location && <span className="caltasks-review-item__loc">Location: {ev.location}</span>}
                   </div>
                 ))}
               </div>
@@ -546,7 +554,7 @@ export function CalendarTasksView() {
                         </span>
                         {task.due_date && (
                           <span className="caltasks-card__due">
-                            📅 {new Date(task.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            Due: {new Date(task.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                       </div>
@@ -611,12 +619,12 @@ export function CalendarTasksView() {
                       <h4 className="caltasks-agenda-item__title">{occ.title}</h4>
                       {occ.is_recurring && (
                         <span className="caltasks-badge caltasks-badge--recurring" title={occ.recurrence_rule || ''}>
-                          🔄 Recurring
+                          Recurring
                         </span>
                       )}
                     </div>
                     {occ.description && <p className="caltasks-agenda-item__desc">{occ.description}</p>}
-                    {occ.location && <div className="caltasks-agenda-item__loc">📍 {occ.location}</div>}
+                    {occ.location && <div className="caltasks-agenda-item__loc">Location: {occ.location}</div>}
                   </div>
 
                   <div className="caltasks-agenda-item__actions">

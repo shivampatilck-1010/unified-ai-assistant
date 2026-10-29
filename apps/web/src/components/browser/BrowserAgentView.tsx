@@ -209,13 +209,13 @@ export function BrowserAgentView() {
           className={`browser-agent__tab-btn ${activeTab === 'tasks' ? 'browser-agent__tab-btn--active' : ''}`}
           onClick={() => setActiveTab('tasks')}
         >
-          🌐 Autonomous Tasks
+          Autonomous Tasks
         </button>
         <button
           className={`browser-agent__tab-btn ${activeTab === 'research' ? 'browser-agent__tab-btn--active' : ''}`}
           onClick={() => setActiveTab('research')}
         >
-          🔬 Web Research & Intelligence
+          Web Research & Intelligence
         </button>
       </div>
 
@@ -370,7 +370,11 @@ export function BrowserAgentView() {
               {activeTask.status === 'awaiting_confirmation' && activeTask.pending_confirmation && (
                 <div className="browser-agent__confirmation-card">
                   <div className="browser-agent__confirmation-header">
-                    <span className="browser-agent__warn-icon" aria-hidden="true">⚠️</span>
+                    <span className="browser-agent__warn-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 1L1 14h14L8 1zm0 3l5 9H3l5-9zm-.75 3v3h1.5V7h-1.5zm0 4v1.5h1.5V11h-1.5z" />
+                      </svg>
+                    </span>
                     <div>
                       <div className="browser-agent__confirmation-title">Human Confirmation Required</div>
                       <div className="browser-agent__confirmation-desc">

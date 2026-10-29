@@ -275,7 +275,11 @@ export const FilesKnowledgeView: React.FC = () => {
               multiple
               onChange={handleFileInputChange}
             />
-            <div className="fk-dropzone__icon">📄</div>
+            <div className="fk-dropzone__icon">
+              <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4 1.5A1.5 1.5 0 002.5 3v10A1.5 1.5 0 004 14.5h8a1.5 1.5 0 001.5-1.5V6L9 1.5H4zm5 1l3 3.5H9v-3.5zM4 3h4v4h4v6H4V3z" />
+              </svg>
+            </div>
             <p className="fk-dropzone__heading">
               {isUploading ? 'Uploading and indexing...' : 'Drop files here or click to browse'}
             </p>
