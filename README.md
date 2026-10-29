@@ -49,10 +49,18 @@ unified-ai-assistant/
 │   │   ├── config.py           # Environment settings & validation
 │   │   └── main.py             # FastAPI entrypoint & lifespan
 │   ├── agent-worker/           # Autonomous browser agent execution worker
-│   └── wifi-sensing/           # Isolated Wi-Fi CSI sensing service (simulation)
-├── deploy/                     # Deployment configurations & operational runbooks
-│   ├── nginx.conf              # Nginx reverse proxy, security headers & SSE configuration
-│   └── backup-restore.md       # PostgreSQL backup, DR restore, migrations & secret rotation
+│   └── wifi-sensing/           # Environmental sensing subsystem (simulation + physical RSSI)
+│       ├── csi_adapter.py      # Synthetic CSI simulator (deterministic RF physics)
+│       ├── real_rssi_adapter.py # Real Windows Wi-Fi adapter RSSI provider
+│       └── presence_estimator.py # Statistical presence & motion classification
+├── deploy/                     # Staging & production deployment configurations & runbooks
+│   ├── backup_database.sh      # Strict fail-closed PostgreSQL backup & integrity check
+│   ├── backup-restore.md       # PostgreSQL backup, DR restore, migrations & secret rotation
+│   ├── generate_staging_secrets.py # High-entropy staging environment secret generator
+│   ├── nginx.conf              # Bootstrap Nginx proxy (HTTP/ACME/SSE/headers)
+│   ├── nginx-ssl.conf.template # Production HTTPS Nginx proxy template with TLSv1.2/1.3 & HSTS
+│   ├── renew_ssl.sh            # Automated Certbot SSL renewal & zero-downtime Nginx reload
+│   └── setup_ssl.sh            # Two-stage Let's Encrypt certificate issuance & HTTPS activation
 ├── packages/
 │   ├── shared-schemas/         # Shared TypeScript interfaces & API contracts
 │   └── ui/                     # UI components & dark theme design system
@@ -62,16 +70,20 @@ unified-ai-assistant/
 │   └── threat-model.md         # STRIDE threat model & security controls
 ├── tests/
 │   ├── conftest.py             # Test database setup fixture
-│   ├── test_conversations_api.py # Database CRUD, pagination, search & ownership tests
-│   ├── test_model_gateway.py   # Gateway resolution, mock streaming & error tests
-│   ├── test_health.py          # Backend health-check integration test
-│   ├── test_streaming.py       # SSE streaming contract & error tests
 │   ├── test_browser_agent.py   # Autonomous browser agent integration tests
-│   ├── test_tasks_calendar_reminders.py # Tasks, calendar, recurrence, reminders & NL tests
+│   ├── test_conversations_api.py # Database CRUD, pagination, search & ownership tests
+│   ├── test_disaster_recovery.py # Database disaster recovery & SQLite WAL backups
 │   ├── test_files_and_knowledge.py # Uploads, extraction, provenance, search, RAG & injection tests
+│   ├── test_hardening_and_isolation.py # Production auth, SSRF, claiming, restart recovery & probes
+│   ├── test_health.py          # Backend health-check integration test
+│   ├── test_model_gateway.py   # Gateway resolution, mock streaming & error tests
+│   ├── test_orchestration_engine.py # Multi-domain orchestration DAG execution & gates
+│   ├── test_phase10_e2e_integration.py # End-to-end integration journeys across all subsystems
+│   ├── test_real_rssi_sensing.py # Windows Wi-Fi RSSI adapter & hardware tests
+│   ├── test_streaming.py       # SSE streaming contract & error tests
+│   ├── test_tasks_calendar_reminders.py # Tasks, calendar, recurrence, reminders & NL tests
 │   ├── test_web_research.py    # Web research, SSRF defense, synthesis & citation tests
-│   ├── test_wifi_sensing.py    # Wi-Fi sensing simulation, tenant isolation & tool tests
-│   └── test_hardening_and_isolation.py # Production auth, SSRF, claiming, restart recovery & probes
+│   └── test_wifi_sensing.py    # Wi-Fi sensing simulation, tenant isolation & tool tests
 ├── Dockerfile.api              # Non-root multi-stage Python API container
 ├── Dockerfile.worker           # Isolated non-root Playwright Chromium execution boundary
 ├── Dockerfile.web              # Multi-stage React 19 build + Nginx static asset runner
@@ -200,4 +212,18 @@ npm run build
 * **Phase 5 — Files & Knowledge Engine** *(Completed)*: Secure private document storage outside public web routes, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
 * **Phase 6 — Web Research & Browser Intelligence** *(Completed)*: Autonomous, source-grounded research investigations with provider-neutral search discovery, isolated Playwright evidence extraction, SSRF/private IP blocking with post-navigation redirect revalidation, DOM prompt injection defense, grounded synthesis with traceable citations (`[Web N: Title]` and Phase 5 document correlation `[Doc: filename, Page X]`), honest insufficient evidence reporting, Markdown report exports, and SSE chat streaming integration.
 * **Phase 7 — Wi-Fi Sensing Service** *(Completed)*: Modular, consent-based environmental awareness subsystem with deterministic synthetic CSI modeling, transparent simulation labeling, honest hardware capability reporting, baseline statistical presence estimation, tenant-isolated zone configs, retention purges, audit logging, assistant tool grounding, and interactive frontend monitor.
-* **Phase 8 — Hardening & Cloud Browser Execution**: Sandbox isolation and production deployment.
+* **Phase 8 — Production Hardening & Cloud Browser Execution** *(Completed)*: Production-ready operational boundary featuring fail-closed HMAC-SHA256 JWT authentication, Playwright network egress interception aborting subresource SSRF and cloud metadata access (`169.254.169.254`), atomic conditional SQL task claiming with worker restart recovery, defensive security headers, sliding-window rate limiting, payload bounds (15MB), structured logging with automated secret scrubbing, deep readiness probe (`/ready`), multi-stage Dockerfiles for non-root API, Worker, and Web services, and complete operational disaster recovery runbooks.
+* **Phase 9 — Unified AI Orchestration Engine** *(Completed)*: Autonomous coordination layer unifying Model Gateway, Knowledge Retrieval, Web Research, Browser Agent, Tasks/Calendar/Reminders, and Wi-Fi Sensing. Features ambiguity detection with clarification gates, rigid capability allowlisting, consequential action confirmation gates (pausing before persistent task/event creation), topological DAG dependency ordering with concurrent execution of independent safe steps via `asyncio.gather`, shared context variable interpolation (`{step_N.output.field}`), consolidated source provenance citations (`[Doc: filename, Page X]`, `[Web N: Title]`, `[Synthetic Observation: ... (Simulated)]`), optimistic plan versioning, dangling workflow recovery, real-time SSE streaming, and complete dark-mode Orchestration management workspace.
+* **Phase 10 — Physical Wi-Fi RSSI Sensing & Production Staging Preparation** *(Completed)*: Dual sensing architecture supporting real physical Wi-Fi RSSI hardware telemetry via Windows WLAN APIs alongside synthetic CSI simulation, query response caching, fail-safe database backup runbooks (`deploy/backup_database.sh` with `pipefail` and archive validation), two-stage automated Let's Encrypt HTTPS deployment (`deploy/setup_ssl.sh` and `deploy/renew_ssl.sh`), and end-to-end integration test coverage across all subsystems.
+
+---
+
+## Staging & Production Deployment
+
+The project is packaged for containerized deployment on a Linux VPS (Ubuntu 22.04 / 24.04 LTS) using Docker Compose.
+
+* **Stack Definition**: `docker-compose.prod.yml` defines `db` (PostgreSQL 16), `api` (FastAPI), `worker` (isolated Chromium runner), and `web` (Nginx + React 19).
+* **Network Isolation**: The `backend-net` bridge is marked `internal: true`. The database and background workers are inaccessible from external networks; only the Nginx reverse proxy exposes ports 80 and 443.
+* **HTTPS & Certificates**: Automated two-stage SSL issuance via `deploy/setup_ssl.sh` avoids startup chicken-and-egg crashes, followed by cron renewal via `deploy/renew_ssl.sh`.
+* **Database Safety & Backups**: Pre-migration backups are enforced before applying Alembic migrations using `deploy/backup_database.sh` (fails closed on non-zero exit codes, corrupt archives, or empty dumps).
+* **Operational Runbooks**: Full disaster recovery, restoration, migration rollbacks, and secret rotation steps are documented in [Operational Guide: Backup & Restore](file:///deploy/backup-restore.md).

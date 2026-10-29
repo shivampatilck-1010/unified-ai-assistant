@@ -42,11 +42,14 @@ packages/*/dist/
 *.pem
 *.key
 *.cert
+*.crt
 *.pfx
 secrets/
 credentials.json
 token.json
 service_account.json
+deploy/nginx-active.conf
+*.active.conf
 
 # Local Generated & Runtime Data
 *.log
@@ -56,10 +59,15 @@ logs/
 *.db
 *.db-shm
 *.db-wal
+*.sql
+*.sql.gz
+backups/
 services/api/uploads/
 uploads/
 local_data/
 storage/
+services/api/data/
+data/
 temp/
 tmp/
 .cache/
