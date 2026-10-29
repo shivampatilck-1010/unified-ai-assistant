@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from event_pipeline import SensingPipeline
 from hardware_adapter import HardwareSensorAdapter
+from real_rssi_adapter import RealRssiSensorAdapter
 from models.wifi_sensing import WifiSensingAudit, WifiSensingEvent, WifiSensorConfig
 from presence_estimator import BaselinePresenceEstimator
 from schemas.wifi_sensing import (
@@ -37,6 +38,8 @@ class WifiSensingService:
     _active_pipelines: Dict[str, SensingPipeline] = {}
     _simulators: Dict[str, SyntheticSensorSimulator] = {}
     _hardware_adapter: HardwareSensorAdapter = HardwareSensorAdapter()
+    _real_rssi_adapter: RealRssiSensorAdapter = RealRssiSensorAdapter()
+    _room_providers: Dict[str, str] = {}
 
     @classmethod
     def get_simulator(cls, room_id: str) -> SyntheticSensorSimulator:
@@ -45,14 +48,25 @@ class WifiSensingService:
         return cls._simulators[room_id]
 
     @classmethod
-    def get_pipeline(cls, room_id: str) -> SensingPipeline:
-        if room_id not in cls._active_pipelines:
-            sim = cls.get_simulator(room_id)
-            cls._active_pipelines[room_id] = SensingPipeline(
-                provider=sim,
-                estimator=BaselinePresenceEstimator(),
-                max_buffer_size=100,
-            )
+    def get_pipeline(cls, room_id: str, provider_id: Optional[str] = None) -> SensingPipeline:
+        target_provider = provider_id or cls._room_providers.get(room_id, "synthetic_csi_simulator")
+        cls._room_providers[room_id] = target_provider
+
+        # Check if pipeline already exists for this room with matching provider
+        current_pipe = cls._active_pipelines.get(room_id)
+        if current_pipe and current_pipe.provider.provider_id == target_provider:
+            return current_pipe
+
+        if target_provider == "real_wifi_rssi_hardware":
+            provider = cls._real_rssi_adapter
+        else:
+            provider = cls.get_simulator(room_id)
+
+        cls._active_pipelines[room_id] = SensingPipeline(
+            provider=provider,
+            estimator=BaselinePresenceEstimator(),
+            max_buffer_size=100,
+        )
         return cls._active_pipelines[room_id]
 
     # --- Capabilities & Health ---
@@ -62,6 +76,7 @@ class WifiSensingService:
         sim = cls.get_simulator("probe_room")
         sim_caps = sim.discover_capabilities()
         hw_caps = cls._hardware_adapter.discover_capabilities()
+        rssi_caps = cls._real_rssi_adapter.discover_capabilities()
 
         items = [
             SensorCapabilityItem(
@@ -85,6 +100,17 @@ class WifiSensingService:
                 supported_measurements=hw_caps.supported_measurements,
                 sampling_rate_hz=hw_caps.sampling_rate_hz,
                 requires_authorization=hw_caps.requires_authorization,
+            ),
+            SensorCapabilityItem(
+                provider_id=rssi_caps.provider_id,
+                name=rssi_caps.name,
+                is_hardware=rssi_caps.is_hardware,
+                is_simulated=rssi_caps.is_simulated,
+                is_available=rssi_caps.is_available,
+                unavailability_reason=rssi_caps.unavailability_reason,
+                supported_measurements=rssi_caps.supported_measurements,
+                sampling_rate_hz=rssi_caps.sampling_rate_hz,
+                requires_authorization=rssi_caps.requires_authorization,
             ),
         ]
 
@@ -246,7 +272,7 @@ class WifiSensingService:
 
     @classmethod
     async def start_simulation(
-        cls, db: AsyncSession, owner_id: str, room_id: str, speed: float = 1.0
+        cls, db: AsyncSession, owner_id: str, room_id: str, speed: float = 1.0, provider_id: Optional[str] = None
     ) -> WifiSensorConfig:
         cfg = await cls.get_config_by_room_id(db, owner_id, room_id)
         if not cfg:
@@ -263,18 +289,19 @@ class WifiSensingService:
         cfg.simulation_speed = speed
         cfg.updated_at = now
 
-        pipe = cls.get_pipeline(room_id)
+        pipe = cls.get_pipeline(room_id, provider_id=provider_id)
         await pipe.provider.start(room_id=room_id, speed=speed)
 
         # Emit initial observation tick immediately
         event_data: Optional[NormalizedSensorEvent] = await pipe.step()
+        is_sim = event_data.is_simulated if event_data else pipe.provider.is_simulated
         if event_data:
             db_event = WifiSensingEvent(
                 config_id=cfg.id,
                 owner_id=owner_id,
                 room_id=room_id,
                 timestamp=event_data.timestamp,
-                is_simulated=True,
+                is_simulated=is_sim,
                 sensor_type=event_data.sensor_type,
                 presence_state=event_data.presence_state,
                 presence_probability=event_data.presence_probability,
@@ -290,7 +317,11 @@ class WifiSensingService:
             owner_id=owner_id,
             room_id=room_id,
             action="session_started",
-            details={"simulation_speed": speed, "is_simulated": True},
+            details={
+                "simulation_speed": speed,
+                "is_simulated": is_sim,
+                "provider_id": pipe.provider.provider_id,
+            },
             created_at=now,
         )
         db.add(audit)
@@ -367,7 +398,7 @@ class WifiSensingService:
             owner_id=owner_id,
             room_id=room_id,
             timestamp=event_data.timestamp,
-            is_simulated=True,
+            is_simulated=event_data.is_simulated,
             sensor_type=event_data.sensor_type,
             presence_state=event_data.presence_state,
             presence_probability=event_data.presence_probability,
@@ -463,7 +494,7 @@ class WifiSensingService:
 
         return SensingOccupancySummary(
             room_id=room_id,
-            is_simulated=True,
+            is_simulated=latest.is_simulated if events else True,
             total_events=len(events),
             current_state=latest.presence_state,
             current_probability=latest.presence_probability,

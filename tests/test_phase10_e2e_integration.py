@@ -253,6 +253,13 @@ async def test_journey_d_web_research():
     4. Verify grounded synthesis references collected sources [Web N: Title]
     5. Verify SSRF protection blocks cloud metadata (169.254.169.254) and private subnets
     """
+    from services.research.search_providers import set_custom_search_provider
+    from services.research.web_collector import set_custom_page_fetcher
+    from tests.test_web_research import MockControlledSearchProvider, default_mock_fetcher
+
+    set_custom_search_provider(MockControlledSearchProvider())
+    set_custom_page_fetcher(default_mock_fetcher)
+
     user_id = f"user-{uuid.uuid4().hex[:8]}"
     headers = get_auth_headers(user_id)
 
