@@ -88,17 +88,26 @@ async def start_simulation(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ) -> SimulationControlResponse:
-    """Starts synthetic CSI data generation for an explicitly authorized room."""
+    """Starts synthetic simulation or real physical RSSI monitoring for an explicitly authorized room."""
     try:
         speed = payload.speed or 1.0
-        cfg = await WifiSensingService.start_simulation(db, owner_id=user_id, room_id=payload.room_id, speed=speed)
+        provider_id = payload.provider_id or "synthetic_csi_simulator"
+        cfg = await WifiSensingService.start_simulation(
+            db, owner_id=user_id, room_id=payload.room_id, speed=speed, provider_id=provider_id
+        )
+        is_real_rssi = provider_id == "real_wifi_rssi_hardware"
+        msg = (
+            f"Real Wi-Fi RSSI monitoring started for room '{cfg.room_name}'."
+            if is_real_rssi
+            else f"Synthetic CSI simulation started for room '{cfg.room_name}' at {cfg.simulation_speed}x speed."
+        )
         return SimulationControlResponse(
             room_id=cfg.room_id,
             is_active=cfg.is_active,
-            simulation_mode=True,
+            simulation_mode=not is_real_rssi,
             action="started",
             speed=cfg.simulation_speed,
-            message=f"Synthetic CSI simulation started for room '{cfg.room_name}' at {cfg.simulation_speed}x speed.",
+            message=msg,
         )
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

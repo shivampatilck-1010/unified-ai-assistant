@@ -52,15 +52,24 @@ class WifiSensingTool:
         """Executes a sensing tool action within strict tenant and privacy boundaries."""
         if action == "check_availability":
             caps = WifiSensingService.get_capabilities()
+            real_rssi_caps = next((p for p in caps.providers if p.provider_id == "real_wifi_rssi_hardware"), None)
+            rssi_available = real_rssi_caps.is_available if real_rssi_caps else False
             return {
                 "simulation_available": True,
                 "hardware_available": False,
-                "hardware_status": "No compatible physical CSI Wi-Fi network interface card detected on host operating system.",
+                "real_rssi_available": rssi_available,
+                "real_rssi_adapter": real_rssi_caps.name if real_rssi_caps else None,
+                "hardware_status": (
+                    f"Physical Wi-Fi RSSI adapter detected: {real_rssi_caps.name}. "
+                    "Real RSSI measurements are supported; raw CSI frame capture requires specialized firmware."
+                    if rssi_available
+                    else "No compatible physical CSI Wi-Fi network interface card detected on host operating system."
+                ),
                 "active_provider": caps.active_provider_id,
                 "is_simulated": True,
                 "disclaimer": (
-                    "NOTICE: Physical Wi-Fi sensing hardware is not detected. "
-                    "The system is operating exclusively in synthetic simulation mode. "
+                    "NOTICE: Physical Wi-Fi sensing hardware is not detected (raw CSI). "
+                    "The system is operating in synthetic simulation mode by default. "
                     "Observations are algorithmic proxies and do not represent real physical humans."
                 ),
             }
@@ -100,8 +109,12 @@ class WifiSensingTool:
                 return {
                     "room_id": room_id,
                     "room_name": cfg.room_name if cfg else room_id,
-                    "is_simulated": True,
-                    "simulation_notice": "ALL MEASUREMENTS ARE SYNTHETIC CSI SIMULATIONS. DO NOT USE FOR REAL SAFETY OR IDENTIFICATION.",
+                    "is_simulated": summary.is_simulated,
+                    "simulation_notice": (
+                        "ALL MEASUREMENTS ARE SYNTHETIC CSI SIMULATIONS. DO NOT USE FOR REAL SAFETY OR IDENTIFICATION."
+                        if summary.is_simulated
+                        else "REAL PHYSICAL WI-FI RSSI MEASUREMENTS. DO NOT USE FOR CRITICAL LIFE SAFETY OR PERSONAL IDENTIFICATION."
+                    ),
                     "total_samples": summary.total_events,
                     "current_state": summary.current_state,
                     "current_probability": summary.current_probability,
