@@ -25,9 +25,16 @@ class Settings:
         self.port: int = int(os.getenv("API_PORT", os.getenv("PORT", "8000")))
         self.environment: str = os.getenv("ENVIRONMENT", "development")
 
-        # CORS origins (narrowly configured for development)
-        cors_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-        self.cors_origins: List[str] = [origin.strip() for origin in cors_str.split(",") if origin.strip()]
+        # CORS origins (narrowly configured for development, JSON array or CSV supported)
+        cors_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").strip()
+        if cors_str.startswith("[") and cors_str.endswith("]"):
+            try:
+                import json
+                self.cors_origins: List[str] = json.loads(cors_str)
+            except Exception:
+                self.cors_origins: List[str] = [origin.strip().strip("'\"") for origin in cors_str.strip("[]").split(",") if origin.strip()]
+        else:
+            self.cors_origins: List[str] = [origin.strip() for origin in cors_str.split(",") if origin.strip()]
 
         # Database URL
         default_db_file = os.path.join(_BASE_DIR, "unified_ai.db").replace("\\", "/")
@@ -52,7 +59,10 @@ class Settings:
         self.dev_user_id: str = os.getenv("DEV_USER_ID", "dev-user-default")
 
         # Phase 8: Authentication & Security Hardening Settings
-        self.is_production: bool = (self.environment.lower() == "production")
+        self.is_production: bool = (
+            self.environment.lower() == "production"
+            or os.getenv("IS_PRODUCTION", "false").lower() in ("true", "1", "yes")
+        )
         self.auth_mode: str = os.getenv("AUTH_MODE", "jwt" if self.is_production else "dev_fallback")
         self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
         self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")

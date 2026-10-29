@@ -35,6 +35,7 @@ services:
       - .env.production
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-unified_ai}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-unified_ai}
+      ENVIRONMENT: "production"
       IS_PRODUCTION: "true"
       AUTH_MODE: "jwt"
       ALLOW_DEV_AUTH: "false"
@@ -68,6 +69,7 @@ services:
       - .env.production
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-unified_ai}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-unified_ai}
+      ENVIRONMENT: "production"
       IS_PRODUCTION: "true"
       BROWSER_HEADLESS: "true"
       ALLOW_LOCAL_BROWSER_TARGETS: "false"

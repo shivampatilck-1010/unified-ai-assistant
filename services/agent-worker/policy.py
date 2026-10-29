@@ -57,6 +57,7 @@ CLOUD_METADATA_TARGETS = {
 
 CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")
 LINK_LOCAL_NETWORK = ipaddress.ip_network("169.254.0.0/16")
+NAT64_PREFIX = ipaddress.ip_network("64:ff9b::/96")
 
 # Consequential action heuristics (case-insensitive regex patterns)
 CONSEQUENTIAL_PATTERNS = [
@@ -71,6 +72,13 @@ def _check_ip_address_safety(ip: ipaddress._BaseAddress) -> None:
     """Verifies that an IP address is not private, loopback, link-local, or cloud metadata."""
     if hasattr(ip, "ipv4_mapped") and ip.ipv4_mapped:
         _check_ip_address_safety(ip.ipv4_mapped)
+        return
+
+    # Handle RFC 6052 Well-Known Prefix (64:ff9b::/96) used in DNS64/NAT64 translation
+    if isinstance(ip, ipaddress.IPv6Address) and ip in NAT64_PREFIX:
+        embedded_ipv4 = ipaddress.IPv4Address(ip.packed[-4:])
+        _check_ip_address_safety(embedded_ipv4)
+        return
 
     ip_str = str(ip)
     if ip_str in CLOUD_METADATA_TARGETS:
