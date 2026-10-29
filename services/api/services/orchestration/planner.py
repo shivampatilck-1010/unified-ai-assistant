@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -46,7 +47,10 @@ class OrchestrationPlanner:
         if gateway.is_any_provider_configured():
             try:
                 adapter, model_id = gateway.resolve_provider_and_model()
-                plan, title = await cls._generate_plan_via_llm(clean_prompt, file_ids, adapter, model_id)
+                plan, title = await asyncio.wait_for(
+                    cls._generate_plan_via_llm(clean_prompt, file_ids, adapter, model_id),
+                    timeout=6.0,
+                )
                 if plan:
                     cls._validate_and_sanitize_plan(plan)
                     return plan, None, title

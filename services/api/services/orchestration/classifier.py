@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -95,7 +96,10 @@ class IntentClassifier:
                         "content": f"Request: {clean_prompt}\nAttached File IDs: {file_ids or []}",
                     },
                 ]
-                raw_response = await adapter.generate_text(messages, model=model_id)
+                raw_response = await asyncio.wait_for(
+                    adapter.generate_text(messages, model=model_id),
+                    timeout=5.0,
+                )
                 result = cls._parse_and_validate_llm_response(raw_response)
                 if result:
                     return result
