@@ -33,6 +33,7 @@ apps/chrome-extension/dist/
 packages/*/dist/
 *.tsbuildinfo
 .eslintcache
+.wrangler/
 
 # Environment Variables & Secrets
 .env

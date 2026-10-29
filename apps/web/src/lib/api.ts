@@ -59,7 +59,19 @@ import type {
   WorkflowPlan,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
+const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
+const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+
+function buildUrl(path: string): URL {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (API_BASE) {
+    return new URL(`${API_BASE}${normalizedPath}`);
+  }
+  const base = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : 'http://localhost';
+  return new URL(normalizedPath, base);
+}
 
 let currentAuthToken: string | null =
   typeof window !== 'undefined' ? localStorage.getItem('unified_ai_auth_token') : null;
@@ -423,7 +435,7 @@ export async function fetchTasks(
   },
   signal?: AbortSignal
 ): Promise<TaskListResponse> {
-  const url = new URL(`${API_BASE}/api/tasks`);
+  const url = buildUrl('/api/tasks');
   if (params?.status) url.searchParams.set('status', params.status);
   if (params?.priority) url.searchParams.set('priority', params.priority);
   if (params?.search) url.searchParams.set('search', params.search);
@@ -472,7 +484,7 @@ export async function toggleTask(
   completed?: boolean,
   signal?: AbortSignal
 ): Promise<Task> {
-  const url = new URL(`${API_BASE}/api/tasks/${encodeURIComponent(taskId)}/toggle`);
+  const url = buildUrl(`/api/tasks/${encodeURIComponent(taskId)}/toggle`);
   if (completed !== undefined) {
     url.searchParams.set('completed', String(completed));
   }
@@ -515,7 +527,7 @@ export async function fetchCalendarEvents(
   end?: string,
   signal?: AbortSignal
 ): Promise<CalendarEventsQueryResponse> {
-  const url = new URL(`${API_BASE}/api/calendar/events`);
+  const url = buildUrl('/api/calendar/events');
   if (start) url.searchParams.set('start', start);
   if (end) url.searchParams.set('end', end);
 
@@ -573,7 +585,7 @@ export async function fetchReminders(
   limit: number = 100,
   signal?: AbortSignal
 ): Promise<ReminderListResponse> {
-  const url = new URL(`${API_BASE}/api/reminders`);
+  const url = buildUrl('/api/reminders');
   if (activeOnly) url.searchParams.set('active_only', 'true');
   if (status) url.searchParams.set('status', status);
   url.searchParams.set('limit', String(limit));
@@ -657,7 +669,7 @@ export async function fetchFiles(
   search?: string,
   signal?: AbortSignal
 ): Promise<FileListResponse> {
-  const url = new URL(`${API_BASE}/api/files`);
+  const url = buildUrl('/api/files');
   if (statusFilter) url.searchParams.set('status', statusFilter);
   if (search) url.searchParams.set('search', search);
 
@@ -1138,7 +1150,7 @@ export async function listWorkflows(
   offset: number = 0,
   signal?: AbortSignal
 ): Promise<WorkflowListResponse> {
-  const url = new URL(`${API_BASE}/api/orchestration/workflows`);
+  const url = buildUrl('/api/orchestration/workflows');
   if (status) url.searchParams.set('status', status);
   url.searchParams.set('limit', String(limit));
   url.searchParams.set('offset', String(offset));

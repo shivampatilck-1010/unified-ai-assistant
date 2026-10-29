@@ -21,6 +21,7 @@ apps/web/dist-ssr/
 apps/chrome-extension/dist/
 .eslintcache
 *.tsbuildinfo
+.wrangler/
 
 # Python Virtual Environments & Bytecode
 .venv/

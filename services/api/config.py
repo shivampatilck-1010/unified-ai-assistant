@@ -25,8 +25,8 @@ class Settings:
         self.port: int = int(os.getenv("API_PORT", os.getenv("PORT", "8000")))
         self.environment: str = os.getenv("ENVIRONMENT", "development")
 
-        # CORS origins (narrowly configured for development, JSON array or CSV supported)
-        cors_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").strip()
+        # CORS origins (configured for local dev and Cloudflare Pages production frontend)
+        cors_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://unified-ai-assistant.pages.dev").strip()
         if cors_str.startswith("[") and cors_str.endswith("]"):
             try:
                 import json
