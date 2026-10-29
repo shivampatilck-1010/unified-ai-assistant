@@ -54,6 +54,22 @@ Archive the persistent uploads volume:
 tar -czvf /backups/uploads_$(date +"%Y%m%d").tar.gz -C services/api uploads/
 ```
 
+### 2.3 SQLite WAL-Mode Backup (Development & Local Staging)
+
+When running with SQLite in WAL mode (`journal_mode=WAL`), simple file copies of `.db` may miss active uncheckpointed WAL transactions in `.db-wal`. Always use SQLite's native online backup API or execute a checkpoint before backup:
+
+```python
+import sqlite3
+
+def backup_sqlite(source_path: str, backup_path: str):
+    conn_src = sqlite3.connect(source_path)
+    conn_dst = sqlite3.connect(backup_path)
+    with conn_dst:
+        conn_src.backup(conn_dst, pages=100)
+    conn_dst.close()
+    conn_src.close()
+```
+
 ---
 
 ## 3. Disaster Recovery & Restoration Runbook
