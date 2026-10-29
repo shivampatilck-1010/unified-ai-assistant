@@ -7,13 +7,22 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from schemas.calendar_event import CalendarEventCreate
-from schemas.orchestration import CapabilityType
+from schemas.orchestration import (
+    CONSEQUENTIAL_CAPABILITIES,
+    SAFE_READ_CAPABILITIES,
+    CapabilityType,
+)
 from schemas.reminder import ReminderCreate
 from schemas.research import ResearchJobCreate
 from schemas.task import TaskCreate, TaskUpdate
 from services.calendar_service import CalendarService
 from services.knowledge_service import KnowledgeService
 from services.model_gateway import get_model_gateway
+from services.orchestration.registry import (
+    CapabilityDefinition,
+    CapabilityRiskLevel,
+    get_capability_registry,
+)
 from services.reminder_service import ReminderService
 from services.research.job_service import ResearchJobService
 from services.task_service import TaskService
@@ -27,7 +36,7 @@ def utc_now() -> datetime:
 
 
 class CapabilityDispatcher:
-    """Dispatches workflow steps to verified, typed subsystem capabilities."""
+    """Dispatches workflow steps to verified, typed subsystem capabilities via CapabilityRegistry."""
 
     @classmethod
     def interpolate_parameters(
@@ -103,33 +112,15 @@ class CapabilityDispatcher:
             owner_id,
         )
 
+        registry = get_capability_registry()
         try:
-            if capability == CapabilityType.KNOWLEDGE_SEARCH.value:
-                return await cls._execute_knowledge_search(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.WEB_RESEARCH.value:
-                return await cls._execute_web_research(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.BROWSER_ACTION.value:
-                return await cls._execute_browser_action(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.TASK_CREATE.value:
-                return await cls._execute_task_create(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.TASK_UPDATE.value:
-                return await cls._execute_task_update(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.CALENDAR_EVENT_CREATE.value:
-                return await cls._execute_calendar_event_create(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.REMINDER_CREATE.value:
-                return await cls._execute_reminder_create(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.WIFI_SENSING_QUERY.value:
-                return await cls._execute_wifi_sensing(db, owner_id, interpolated_params)
-            elif capability == CapabilityType.GENERAL_SYNTHESIS.value:
-                return await cls._execute_general_synthesis(db, owner_id, interpolated_params, context)
-            else:
-                return {
-                    "success": False,
-                    "error": f"Unknown or unsupported capability: '{capability}'",
-                    "summary": f"Capability {capability} is not implemented.",
-                    "data": None,
-                    "citations": [],
-                }
+            return await registry.execute(
+                identifier=capability,
+                db=db,
+                owner_id=owner_id,
+                parameters=interpolated_params,
+                context=context,
+            )
         except Exception as exc:
             logger.error("Step %s execution failed: %s", step_number, exc, exc_info=True)
             return {
@@ -145,11 +136,12 @@ class CapabilityDispatcher:
     # --------------------------------------------------------------------------
 
     @classmethod
-    async def _execute_knowledge_search(
+    async def execute_knowledge_search(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         query = params.get("query") or params.get("question") or ""
         file_ids = params.get("file_ids")
@@ -199,11 +191,12 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_web_research(
+    async def execute_web_research(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         question = params.get("question") or params.get("query") or ""
         depth = params.get("depth", "quick")
@@ -278,17 +271,17 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_browser_action(
+    async def execute_browser_action(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         task_description = params.get("task_description") or params.get("description") or "Execute browser navigation"
-        initial_url = params.get("initial_url")
+        initial_url = params.get("url") or params.get("initial_url")
         allowed_domains = params.get("allowed_domains") or []
 
-        # Browser actions are isolated to prevent open SSRF
         from policy import validate_url
 
         if initial_url:
@@ -306,11 +299,12 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_task_create(
+    async def execute_task_create(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         title = params.get("title")
         if not title:
@@ -331,7 +325,7 @@ class CapabilityDispatcher:
 
         payload = TaskCreate(
             title=title,
-            description=params.get("description"),
+            description=params.get("description") or params.get("notes"),
             priority=params.get("priority", "medium"),
             due_date=due_date,
             timezone=params.get("timezone", "UTC"),
@@ -351,11 +345,12 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_task_update(
+    async def execute_task_update(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         task_id = params.get("task_id")
         if not task_id:
@@ -396,11 +391,12 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_calendar_event_create(
+    async def execute_calendar_event_create(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         title = params.get("title")
         start_time_raw = params.get("start_time")
@@ -451,11 +447,12 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_reminder_create(
+    async def execute_reminder_create(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         title = params.get("title")
         scheduled_raw = params.get("scheduled_time")
@@ -501,11 +498,12 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_wifi_sensing(
+    async def execute_wifi_sensing(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
         action = params.get("action", "check_availability")
         room_id = params.get("room_id")
@@ -521,7 +519,6 @@ class CapabilityDispatcher:
             "NOTICE: Observations are algorithmic simulation proxies and do not represent real physical humans."
         )
 
-        # Clear synthetic provenance label
         room_label = f"Room '{room_id}'" if room_id else "General"
         sensing_citation = {
             "source_type": "sensing",
@@ -540,21 +537,22 @@ class CapabilityDispatcher:
         }
 
     @classmethod
-    async def _execute_general_synthesis(
+    async def execute_general_synthesis(
         cls,
         db: AsyncSession,
         owner_id: str,
         params: Dict[str, Any],
-        context: Dict[int, Any],
+        context: Optional[Dict[int, Any]] = None,
     ) -> Dict[str, Any]:
-        prompt = params.get("prompt") or params.get("query") or "Synthesize final workflow outcome."
+        prompt = params.get("prompt") or params.get("instructions") or params.get("query") or "Synthesize final workflow outcome."
+        ctx = context or {}
 
         # Compile previous step outputs and citations into blackboard context
         context_blocks = []
         all_citations = []
 
-        for step_num in sorted(context.keys()):
-            res = context[step_num]
+        for step_num in sorted(ctx.keys()):
+            res = ctx[step_num]
             if isinstance(res, dict):
                 summary = res.get("summary", "")
                 data = res.get("data")
@@ -585,11 +583,11 @@ PRECEDING WORKFLOW OUTPUTS:
         gateway = get_model_gateway()
         if not gateway.is_any_provider_configured():
             fallback_answer = (
-                f"Workflow completed successfully across {len(context)} step(s).\n\n"
+                f"Workflow completed successfully across {len(ctx)} step(s).\n\n"
                 f"Summary of results:\n"
             )
-            for s_num in sorted(context.keys()):
-                fallback_answer += f"- Step {s_num}: {context[s_num].get('summary', 'Done')}\n"
+            for s_num in sorted(ctx.keys()):
+                fallback_answer += f"- Step {s_num}: {ctx[s_num].get('summary', 'Done')}\n"
             return {
                 "success": True,
                 "data": {"synthesis": fallback_answer},
@@ -614,7 +612,7 @@ PRECEDING WORKFLOW OUTPUTS:
         except Exception as exc:
             logger.warning("LLM synthesis failed, returning deterministic summary: %s", exc)
             fallback_summary = f"Workflow completed. Preceding steps summary:\n" + "\n".join(
-                f"- Step {k}: {context[k].get('summary', '')}" for k in sorted(context.keys())
+                f"- Step {k}: {ctx[k].get('summary', '')}" for k in sorted(ctx.keys())
             )
             return {
                 "success": True,
@@ -622,3 +620,291 @@ PRECEDING WORKFLOW OUTPUTS:
                 "summary": fallback_summary,
                 "citations": all_citations,
             }
+
+
+def register_default_capabilities() -> None:
+    """Registers all 9 system capabilities into the global CapabilityRegistry."""
+    registry = get_capability_registry()
+
+    # 1. Knowledge Search
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.KNOWLEDGE_SEARCH.value,
+            name="Knowledge Search (RAG)",
+            description="Searches uploaded user documents and knowledge base for grounded excerpts and citations.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search question or text query"},
+                    "file_ids": {"type": "array", "items": {"type": "string"}},
+                    "top_k": {"type": "integer", "default": 5},
+                },
+                "required": ["query"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "context_text": {"type": "string"},
+                    "chunks_found": {"type": "integer"},
+                },
+            },
+            required_permissions=["knowledge:read"],
+            risk_level=CapabilityRiskLevel.LOW,
+            requires_confirmation=False,
+        ),
+        CapabilityDispatcher.execute_knowledge_search,
+    )
+
+    # 2. Web Research
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.WEB_RESEARCH.value,
+            name="Deep Web Research",
+            description="Performs multi-source web investigation with domain allowlists, citations, and reporting.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string"},
+                    "depth": {"type": "string", "enum": ["quick", "standard", "deep"]},
+                    "allowed_domains": {"type": "array", "items": {"type": "string"}},
+                    "max_sources": {"type": "integer", "default": 3},
+                },
+                "required": ["question"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "job_id": {"type": "string"},
+                    "status": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "report": {"type": "string"},
+                    "sources_count": {"type": "integer"},
+                },
+            },
+            required_permissions=["research:execute"],
+            risk_level=CapabilityRiskLevel.LOW,
+            requires_confirmation=False,
+        ),
+        CapabilityDispatcher.execute_web_research,
+    )
+
+    # 3. Autonomous Browser Action (Consequential)
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.BROWSER_ACTION.value,
+            name="Autonomous Browser Action",
+            description="Navigates target web pages, inspects web content, or executes automation via Playwright sandbox.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "format": "uri"},
+                    "task_description": {"type": "string"},
+                    "allowed_domains": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["url"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "task_description": {"type": "string"},
+                    "initial_url": {"type": "string"},
+                    "status": {"type": "string"},
+                },
+            },
+            required_permissions=["browser:navigate"],
+            risk_level=CapabilityRiskLevel.CONSEQUENTIAL,
+            requires_confirmation=True,
+        ),
+        CapabilityDispatcher.execute_browser_action,
+    )
+
+    # 4. Task Create (Consequential)
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.TASK_CREATE.value,
+            name="Task Creation",
+            description="Creates a persistent personal task with title, priority, due date, and timezone.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"]},
+                    "due_date": {"type": "string", "format": "date-time"},
+                    "timezone": {"type": "string"},
+                },
+                "required": ["title"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "priority": {"type": "string"},
+                    "due_date": {"type": "string"},
+                },
+            },
+            required_permissions=["tasks:write"],
+            risk_level=CapabilityRiskLevel.CONSEQUENTIAL,
+            requires_confirmation=True,
+        ),
+        CapabilityDispatcher.execute_task_create,
+    )
+
+    # 5. Task Update (Consequential)
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.TASK_UPDATE.value,
+            name="Task Modification",
+            description="Modifies an existing task's status, priority, or content.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string"},
+                    "priority": {"type": "string"},
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                },
+                "required": ["task_id"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string"},
+                    "priority": {"type": "string"},
+                },
+            },
+            required_permissions=["tasks:write"],
+            risk_level=CapabilityRiskLevel.CONSEQUENTIAL,
+            requires_confirmation=True,
+        ),
+        CapabilityDispatcher.execute_task_update,
+    )
+
+    # 6. Calendar Event Create (Consequential)
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.CALENDAR_EVENT_CREATE.value,
+            name="Calendar Event Scheduling",
+            description="Schedules a calendar event with start/end timestamps and location.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "start_time": {"type": "string", "format": "date-time"},
+                    "end_time": {"type": "string", "format": "date-time"},
+                    "description": {"type": "string"},
+                    "location": {"type": "string"},
+                    "timezone": {"type": "string"},
+                },
+                "required": ["title", "start_time", "end_time"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "event_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "start_time": {"type": "string"},
+                    "end_time": {"type": "string"},
+                },
+            },
+            required_permissions=["calendar:write"],
+            risk_level=CapabilityRiskLevel.CONSEQUENTIAL,
+            requires_confirmation=True,
+        ),
+        CapabilityDispatcher.execute_calendar_event_create,
+    )
+
+    # 7. Reminder Create (Consequential)
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.REMINDER_CREATE.value,
+            name="Reminder Scheduling",
+            description="Creates a time-based in-app reminder alert linked to a task or standalone.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "scheduled_time": {"type": "string", "format": "date-time"},
+                    "task_id": {"type": "string"},
+                    "event_id": {"type": "string"},
+                },
+                "required": ["title", "scheduled_time"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "reminder_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "scheduled_time": {"type": "string"},
+                },
+            },
+            required_permissions=["reminders:write"],
+            risk_level=CapabilityRiskLevel.CONSEQUENTIAL,
+            requires_confirmation=True,
+        ),
+        CapabilityDispatcher.execute_reminder_create,
+    )
+
+    # 8. Wi-Fi Sensing Query
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.WIFI_SENSING_QUERY.value,
+            name="Wi-Fi Sensing Observation",
+            description="Queries synthetic Wi-Fi sensing activity/presence simulation for designated rooms.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["check_availability", "get_status", "list_rooms"]},
+                    "room_id": {"type": "string"},
+                },
+                "required": ["room_id"],
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "disclaimer": {"type": "string"},
+                    "room_id": {"type": "string"},
+                    "is_simulated": {"type": "boolean"},
+                },
+            },
+            required_permissions=["sensing:read"],
+            risk_level=CapabilityRiskLevel.LOW,
+            requires_confirmation=False,
+        ),
+        CapabilityDispatcher.execute_wifi_sensing,
+    )
+
+    # 9. General Synthesis
+    registry.register(
+        CapabilityDefinition(
+            identifier=CapabilityType.GENERAL_SYNTHESIS.value,
+            name="Multi-Source Grounded Synthesis",
+            description="Synthesizes multi-step findings, preserves source citations, and generates grounded conclusions.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string"},
+                    "instructions": {"type": "string"},
+                    "query": {"type": "string"},
+                },
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "synthesis": {"type": "string"},
+                },
+            },
+            required_permissions=["gateway:generate"],
+            risk_level=CapabilityRiskLevel.LOW,
+            requires_confirmation=False,
+        ),
+        CapabilityDispatcher.execute_general_synthesis,
+    )
+
+
+# Automatically register all default capabilities upon module load
+register_default_capabilities()

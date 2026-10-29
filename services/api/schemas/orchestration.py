@@ -56,6 +56,19 @@ SAFE_READ_CAPABILITIES = {
 }
 
 
+class CapabilityDefinitionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    identifier: str
+    name: str
+    description: str
+    input_schema: Dict[str, Any]
+    output_schema: Dict[str, Any]
+    required_permissions: List[str]
+    risk_level: str
+    requires_confirmation: bool
+
+
 class WorkflowStepCreate(BaseModel):
     step_number: int = Field(ge=1, description="1-based chronological step sequence number")
     title: str = Field(min_length=1, max_length=255, description="Clear description of what this step does")

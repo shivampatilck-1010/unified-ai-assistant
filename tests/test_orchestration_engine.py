@@ -541,3 +541,178 @@ def test_chat_streaming_orchestration_integration():
     event_names = [e.get("event") for e in events]
     assert "message_start" in event_names
     assert "message_complete" in event_names
+
+
+def test_get_capabilities_registry_endpoint():
+    """Verifies GET /api/orchestration/capabilities returns all 9 registered capabilities."""
+    user_id = f"test-user-{uuid.uuid4().hex[:8]}"
+    headers = get_auth_headers(user_id)
+
+    resp = client.get("/api/orchestration/capabilities", headers=headers)
+    assert resp.status_code == 200
+    caps = resp.json()
+    assert len(caps) == 9
+
+    cap_map = {c["identifier"]: c for c in caps}
+    expected_caps = [
+        "knowledge_search",
+        "web_research",
+        "browser_action",
+        "task_create",
+        "task_update",
+        "calendar_event_create",
+        "reminder_create",
+        "wifi_sensing_query",
+        "general_synthesis",
+    ]
+    for exp in expected_caps:
+        assert exp in cap_map
+        c = cap_map[exp]
+        assert "name" in c and len(c["name"]) > 0
+        assert "description" in c and len(c["description"]) > 0
+        assert "input_schema" in c and isinstance(c["input_schema"], dict)
+        assert "output_schema" in c and isinstance(c["output_schema"], dict)
+        assert "risk_level" in c
+
+    # Consequential checks
+    assert cap_map["task_create"]["risk_level"] == "consequential"
+    assert cap_map["task_create"]["requires_confirmation"] is True
+    assert cap_map["browser_action"]["risk_level"] == "consequential"
+    assert cap_map["browser_action"]["requires_confirmation"] is True
+
+    # Safe read checks
+    assert cap_map["knowledge_search"]["risk_level"] == "low"
+    assert cap_map["knowledge_search"]["requires_confirmation"] is False
+    assert cap_map["web_research"]["risk_level"] == "low"
+    assert cap_map["web_research"]["requires_confirmation"] is False
+    assert cap_map["wifi_sensing_query"]["risk_level"] == "low"
+    assert cap_map["wifi_sensing_query"]["requires_confirmation"] is False
+
+
+@pytest.mark.asyncio
+async def test_intent_classifier_direct():
+    """Unit tests IntentClassifier for multi-category and ambiguous classification."""
+    from services.orchestration.classifier import IntentClassifier, UserIntentType
+
+    # 1. Ambiguous task
+    res_ambig = await IntentClassifier.classify("create a task")
+    assert res_ambig.is_ambiguous is True
+    assert res_ambig.clarification_prompt is not None
+
+    # 2. Document analysis
+    res_doc = await IntentClassifier.classify("search my uploaded documents for revenue")
+    assert res_doc.primary_intent in (UserIntentType.DOCUMENT_ANALYZE, UserIntentType.MULTI_STEP_WORKFLOW)
+
+    # 3. Web research
+    res_res = await IntentClassifier.classify("perform web research on electric cars")
+    assert res_res.primary_intent in (UserIntentType.RESEARCH_TOPIC, UserIntentType.MULTI_STEP_WORKFLOW)
+
+    # 4. Wi-Fi sensing
+    res_sens = await IntentClassifier.classify("check wifi sensing in room conference_b")
+    assert res_sens.primary_intent in (UserIntentType.SENSING_OPERATION, UserIntentType.MULTI_STEP_WORKFLOW)
+    assert res_sens.entities.get("room_id") == "conference_b"
+
+    # 5. Multi-step request
+    res_multi = await IntentClassifier.classify("Research market trends and create a task: Review trends tomorrow")
+    assert res_multi.primary_intent == UserIntentType.MULTI_STEP_WORKFLOW
+    assert res_multi.requires_multi_step is True
+
+
+def test_cross_user_workflow_isolation():
+    """Verifies that user B cannot view, approve, confirm or cancel user A's workflow."""
+    user_a = f"user-a-{uuid.uuid4().hex[:8]}"
+    user_b = f"user-b-{uuid.uuid4().hex[:8]}"
+    headers_a = get_auth_headers(user_a)
+    headers_b = get_auth_headers(user_b)
+
+    # User A creates a workflow
+    create_resp = client.post(
+        "/api/orchestration/workflows",
+        json={"prompt": "Create a task: User A confidential task"},
+        headers=headers_a,
+    )
+    assert create_resp.status_code == 201
+    wf_id = create_resp.json()["id"]
+
+    # User B attempts to access it
+    get_resp = client.get(f"/api/orchestration/workflows/{wf_id}", headers=headers_b)
+    assert get_resp.status_code == 404
+
+    # User B attempts to approve it
+    approve_resp = client.post(
+        f"/api/orchestration/workflows/{wf_id}/approve",
+        json={"approved": True, "plan_version": 1},
+        headers=headers_b,
+    )
+    assert approve_resp.status_code == 404
+
+    # User B attempts to confirm a step
+    confirm_resp = client.post(
+        f"/api/orchestration/workflows/{wf_id}/confirm",
+        json={"step_number": 1, "approved": True},
+        headers=headers_b,
+    )
+    assert confirm_resp.status_code == 404
+
+    # User B attempts to cancel it
+    cancel_resp = client.post(
+        f"/api/orchestration/workflows/{wf_id}/cancel",
+        json={"reason": "Attacker cancelling"},
+        headers=headers_b,
+    )
+    assert cancel_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_recover_dangling_workflows_state():
+    """Verifies that recover_dangling_workflows updates interrupted workflows to failed."""
+    user_id = f"test-user-{uuid.uuid4().hex[:8]}"
+    dangling_wf_id = str(uuid.uuid4())
+
+    async with async_session_factory() as db:
+        wf = Workflow(
+            id=dangling_wf_id,
+            owner_id=user_id,
+            title="Dangling Workflow Before Restart",
+            request_prompt="Prompt before restart",
+            status="running",
+            plan_version=1,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(wf)
+        await db.commit()
+
+    # Run recovery
+    await OrchestrationEngine.recover_dangling_workflows()
+
+    async with async_session_factory() as db:
+        recovered = await db.get(Workflow, dangling_wf_id)
+        assert recovered is not None
+        assert recovered.status == "failed"
+        assert "Server restarted during execution." in (recovered.error_message or "")
+
+
+@pytest.mark.asyncio
+async def test_workflow_stream_subscription():
+    """Verifies subscribe_events yields initial connected and replay events."""
+    user_id = f"test-user-{uuid.uuid4().hex[:8]}"
+    headers = get_auth_headers(user_id)
+
+    create_resp = client.post(
+        "/api/orchestration/workflows",
+        json={"prompt": "Inspect Wi-Fi sensing in room lobby"},
+        headers=headers,
+    )
+    assert create_resp.status_code == 201
+    wf_id = create_resp.json()["id"]
+
+    chunks = []
+    async for chunk in OrchestrationEngine.subscribe_events(wf_id):
+        chunks.append(chunk)
+        if len(chunks) >= 2:
+            break
+
+    assert any("connected" in c for c in chunks)
+    assert any("workflow_created" in c or "plan_generated" in c for c in chunks)
+

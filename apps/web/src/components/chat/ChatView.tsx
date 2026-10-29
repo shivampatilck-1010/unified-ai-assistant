@@ -12,7 +12,8 @@ interface ChatViewProps {
     useKnowledge?: boolean,
     selectedFileIds?: string[],
     useResearch?: boolean,
-    researchDepth?: string
+    researchDepth?: string,
+    useOrchestration?: boolean
   ) => void;
   isStreaming: boolean;
   onCancel: () => void;
@@ -55,10 +56,11 @@ export function ChatView({
   const isEmpty = messages.length === 0;
 
   const [useResearch, setUseResearch] = useState(false);
+  const [useOrchestration, setUseOrchestration] = useState(false);
   const currentModel = availableModels.find((m) => m.id === selectedModelId) ?? availableModels[0];
 
   const handleSend = (text: string) => {
-    onSend(text, currentModel?.provider, currentModel?.id, false, undefined, useResearch, 'standard');
+    onSend(text, currentModel?.provider, currentModel?.id, false, undefined, useResearch, 'standard', useOrchestration);
   };
 
   return (
@@ -79,6 +81,28 @@ export function ChatView({
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            className={`chat-view__orchestration-toggle ${useOrchestration ? 'chat-view__orchestration-toggle--active' : ''}`}
+            onClick={() => setUseOrchestration((v) => !v)}
+            title="Coordinate multi-step planning, capabilities, and execution"
+            type="button"
+            style={{
+              background: useOrchestration ? '#3b1d5c' : '#262626',
+              border: `1px solid ${useOrchestration ? '#a855f7' : '#3d3d3d'}`,
+              color: useOrchestration ? '#e9d5ff' : '#a3a3a3',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>⚡ Orchestrate</span>
+            <span style={{ fontSize: '10px', fontWeight: 600 }}>{useOrchestration ? 'ON' : 'OFF'}</span>
+          </button>
+
           <button
             className={`chat-view__research-toggle ${useResearch ? 'chat-view__research-toggle--active' : ''}`}
             onClick={() => setUseResearch((v) => !v)}

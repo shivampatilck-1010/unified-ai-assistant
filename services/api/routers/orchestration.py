@@ -11,6 +11,7 @@ from database import get_db
 from models.workflow import Workflow, WorkflowEvent
 from routers.deps import get_current_user_id
 from schemas.orchestration import (
+    CapabilityDefinitionResponse,
     WorkflowApproveRequest,
     WorkflowCancelRequest,
     WorkflowClarifyRequest,
@@ -22,10 +23,33 @@ from schemas.orchestration import (
     WorkflowResponse,
 )
 from services.orchestration.engine import OrchestrationEngine
+from services.orchestration.registry import get_capability_registry
 
 logger = logging.getLogger("orchestration_router")
 
 router = APIRouter(prefix="/api/orchestration", tags=["Orchestration"])
+
+
+@router.get("/capabilities", response_model=List[CapabilityDefinitionResponse])
+async def list_capabilities(
+    user_id: str = Depends(get_current_user_id),
+) -> List[CapabilityDefinitionResponse]:
+    """Lists all registered subsystem capabilities, schemas, risk levels, and confirmation rules."""
+    registry = get_capability_registry()
+    caps = registry.list_all()
+    return [
+        CapabilityDefinitionResponse(
+            identifier=c.identifier,
+            name=c.name,
+            description=c.description,
+            input_schema=c.input_schema,
+            output_schema=c.output_schema,
+            required_permissions=c.required_permissions,
+            risk_level=c.risk_level.value if hasattr(c.risk_level, "value") else str(c.risk_level),
+            requires_confirmation=c.requires_confirmation,
+        )
+        for c in caps
+    ]
 
 
 @router.post("/workflows", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)

@@ -11,6 +11,11 @@ from schemas.orchestration import (
     WorkflowStepCreate,
 )
 from services.model_gateway import get_model_gateway
+from services.orchestration.classifier import (
+    IntentClassificationResult,
+    IntentClassifier,
+    UserIntentType,
+)
 
 logger = logging.getLogger("orchestration_planner")
 
@@ -30,11 +35,11 @@ class OrchestrationPlanner:
         """Interprets request and outputs (plan, clarification_question, title)."""
         clean_prompt = prompt.strip()
 
-        # 1. Ambiguity Detection & Clarification Gates
-        clarification = cls._detect_ambiguity(clean_prompt)
-        if clarification:
+        # 1. Intent Classification & Ambiguity Detection Gates
+        intent_result = await IntentClassifier.classify(clean_prompt, file_ids)
+        if intent_result.is_ambiguous and intent_result.clarification_prompt:
             title = cls._generate_title(clean_prompt)
-            return None, clarification, title
+            return None, intent_result.clarification_prompt, title
 
         # 2. Attempt LLM-based structured plan if model gateway has an active provider
         gateway = get_model_gateway()
@@ -49,32 +54,9 @@ class OrchestrationPlanner:
                 logger.warning("LLM plan generation failed, falling back to deterministic planner: %s", e)
 
         # 3. Deterministic Heuristic Planner (resilient, safe, deterministic fallback)
-        plan, title = cls._generate_plan_deterministic(clean_prompt, file_ids)
+        plan, title = cls._generate_plan_deterministic(clean_prompt, file_ids, intent_result=intent_result)
         cls._validate_and_sanitize_plan(plan)
         return plan, None, title
-
-    @classmethod
-    def _detect_ambiguity(cls, prompt: str) -> Optional[str]:
-        """Identifies vague or missing requirements before executing irreversible actions."""
-        prompt_lower = prompt.lower().strip()
-
-        # Ambiguous task/reminder request without content
-        if prompt_lower in ("create a task", "add a task", "new task", "remind me", "add to my todo"):
-            return "Please specify what task or reminder you would like to create."
-
-        # Ambiguous calendar request without event title
-        if prompt_lower in ("schedule a meeting", "add event", "create calendar event", "schedule an event"):
-            return "Please provide the title and date/time for the event you wish to schedule."
-
-        # Ambiguous research prompt
-        if prompt_lower in ("research this", "investigate", "find information", "search"):
-            return "Please provide a specific topic or question you would like me to investigate."
-
-        # Ambiguous document prompt without context
-        if prompt_lower in ("search my files", "check my documents", "look at my docs"):
-            return "What specific topic or question would you like me to look for in your files?"
-
-        return None
 
     @classmethod
     def _generate_title(cls, prompt: str) -> str:
@@ -126,7 +108,10 @@ class OrchestrationPlanner:
 
     @classmethod
     def _generate_plan_deterministic(
-        cls, prompt: str, file_ids: Optional[List[str]] = None
+        cls,
+        prompt: str,
+        file_ids: Optional[List[str]] = None,
+        intent_result: Optional[IntentClassificationResult] = None,
     ) -> Tuple[WorkflowPlan, str]:
         """Constructs a deterministic multi-step plan matching detected intents."""
         p_lower = prompt.lower()
@@ -141,6 +126,24 @@ class OrchestrationPlanner:
         wants_task = any(k in p_lower for k in ["create task", "create a task", "add task", "add a task", "todo", "to-do", "follow up task", "create a to-do", "add to my tasks", "task:"])
         wants_calendar = any(k in p_lower for k in ["calendar", "schedule", "meeting", "event on", "schedule an event", "create event", "create an event", "appointment"])
         wants_reminder = any(k in p_lower for k in ["remind me", "set reminder", "reminder at", "alert me", "create a reminder"])
+
+        # Also incorporate flags from intent classification result if available
+        if intent_result:
+            all_intents = [intent_result.primary_intent] + intent_result.secondary_intents
+            if UserIntentType.DOCUMENT_ANALYZE in all_intents:
+                wants_knowledge = True
+            if UserIntentType.RESEARCH_TOPIC in all_intents:
+                wants_research = True
+            if UserIntentType.BROWSER_ANALYZE in all_intents:
+                wants_browser = True
+            if UserIntentType.SENSING_OPERATION in all_intents:
+                wants_sensing = True
+            if UserIntentType.MANAGE_TASK in all_intents:
+                wants_task = True
+            if UserIntentType.MANAGE_CALENDAR in all_intents:
+                wants_calendar = True
+            if UserIntentType.SET_REMINDER in all_intents:
+                wants_reminder = True
 
         # If nothing specific was flagged, default to web research or knowledge search if documents are present
         if not (wants_knowledge or wants_research or wants_browser or wants_sensing or wants_task or wants_calendar or wants_reminder):
@@ -180,8 +183,11 @@ class OrchestrationPlanner:
 
         # 3. Wi-Fi Sensing Query Step
         if wants_sensing:
-            room_match = re.search(r"room\s+([a-zA-Z0-9_\-]+)", p_lower)
-            room_id = room_match.group(1) if room_match else "office_101"
+            room_id = (intent_result.entities.get("room_id") if intent_result else None)
+            if not room_id:
+                room_match = re.search(r"room\s+([a-zA-Z0-9_\-]+)", p_lower)
+                room_id = room_match.group(1) if room_match else "office_101"
+
             steps.append(
                 WorkflowStepCreate(
                     step_number=step_seq,
@@ -197,14 +203,17 @@ class OrchestrationPlanner:
 
         # 4. Autonomous Browser Step
         if wants_browser:
-            url_match = re.search(r"https?://[^\s]+", prompt)
-            target_url = url_match.group(0) if url_match else "https://example.com"
+            target_url = (intent_result.entities.get("url") if intent_result else None)
+            if not target_url:
+                url_match = re.search(r"https?://[^\s]+", prompt)
+                target_url = url_match.group(0) if url_match else "https://example.com"
+
             steps.append(
                 WorkflowStepCreate(
                     step_number=step_seq,
                     title=f"Navigate and Inspect Web Target ({target_url})",
                     capability=CapabilityType.BROWSER_ACTION,
-                    parameters={"url": target_url, "action_type": "navigate"},
+                    parameters={"url": target_url, "task_description": "Navigate and inspect web target"},
                     depends_on=list(prior_step_refs),
                     is_consequential=True,
                     consequential_reason="Launches autonomous cloud browser session",
@@ -303,7 +312,11 @@ class OrchestrationPlanner:
 
     @classmethod
     async def _generate_plan_via_llm(
-        cls, prompt: str, file_ids: Optional[List[str]], adapter: Any
+        cls,
+        prompt: str,
+        file_ids: Optional[List[str]],
+        adapter: Any,
+        model_id: Optional[str] = None,
     ) -> Tuple[Optional[WorkflowPlan], str]:
         """Leverages ModelGateway to construct a validated multi-capability plan."""
         system_prompt = (
@@ -312,7 +325,7 @@ class OrchestrationPlanner:
             "Supported capabilities:\n"
             "- 'knowledge_search': parameters: {'query': string, 'file_ids': list}\n"
             "- 'web_research': parameters: {'question': string, 'depth': 'quick' | 'standard' | 'deep'}\n"
-            "- 'browser_action': parameters: {'url': string, 'action_type': 'navigate' | 'inspect' | 'read_text'}\n"
+            "- 'browser_action': parameters: {'url': string, 'task_description': string}\n"
             "- 'task_create': parameters: {'title': string, 'notes': string}\n"
             "- 'calendar_event_create': parameters: {'title': string, 'start_time': ISO8601, 'end_time': ISO8601}\n"
             "- 'reminder_create': parameters: {'title': string, 'scheduled_time': ISO8601}\n"
@@ -325,7 +338,11 @@ class OrchestrationPlanner:
         )
 
         full_prompt = f"User Request: {prompt}\nAttached Files: {file_ids or []}"
-        response_text = await adapter.generate_text(prompt=full_prompt, system_prompt=system_prompt)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": full_prompt},
+        ]
+        response_text = await adapter.generate_text(messages, model=model_id)
 
         # Parse JSON from LLM output
         json_match = re.search(r"\{.*\}", response_text, re.DOTALL)

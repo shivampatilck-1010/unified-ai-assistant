@@ -482,11 +482,22 @@ flowchart TD
 ### 11.1. Architectural Mission & Capabilities
 Phase 9 establishes the Unified Orchestration Engine as the single coordination layer for all assistant capabilities:
 1. **Ambiguity Detection & Clarification Gates**: Automatically halts vague requests (e.g., "create a task", "schedule a meeting", "research this") into `waiting_for_input` and prompts the user for clarification before constructing a plan.
-2. **Capability Allowlisting**: Strictly validates proposed steps against internal typed capabilities (`knowledge_search`, `web_research`, `browser_action`, `task_create`, `task_update`, `calendar_event_create`, `reminder_create`, `wifi_sensing_query`, `general_synthesis`), rejecting hallucinated or unsupported tools.
-3. **Consequential Action Gates**: Consequential operations that mutate user state (`task_create`, `calendar_event_create`, `reminder_create`, mutating browser interactions) are tagged with `is_consequential=True` and mandate explicit human confirmation before DB mutation.
-4. **Topological DAG Execution & Parallelism**: Safe independent steps (e.g. concurrent document search, web research, sensing queries) execute in parallel via `asyncio.gather`, while dependent steps await parent completion.
-5. **Context Blackboard & Variable Interpolation**: Downstream steps interpolate output parameters from preceding steps via `{step_N.output.field}` placeholders.
-6. **Provenance Citations**:
+2. **Intent Classification Subsystem**: Analyzes incoming prompts using `IntentClassifier`, categorizing requests into structured `UserIntentType` classes (`ask_question`, `research_topic`, `browser_analyze`, `document_analyze`, `manage_task`, `manage_calendar`, `set_reminder`, `sensing_operation`, `multi_step_workflow`), extracting entities (`room_id`, `url`), and detecting multi-step scope.
+3. **Capability Registry & Allowlisting**: All 9 subsystem tools are formally registered in `CapabilityRegistry` with typed JSON schemas, operational risk levels (`low`, `medium`, `high`, `consequential`), required permissions, and confirmation mandates:
+   - `knowledge_search`: RAG search over indexed user documents (risk: `low`, confirmation: false).
+   - `web_research`: Multi-source web investigation with citation extraction (risk: `low`, confirmation: false).
+   - `browser_action`: Autonomous Playwright cloud/local navigation (risk: `consequential`, confirmation: true).
+   - `task_create`: Persistent personal task creation (risk: `consequential`, confirmation: true).
+   - `task_update`: Task status/priority modification (risk: `consequential`, confirmation: true).
+   - `calendar_event_create`: Calendar event scheduling (risk: `consequential`, confirmation: true).
+   - `reminder_create`: Time-based alert scheduling (risk: `consequential`, confirmation: true).
+   - `wifi_sensing_query`: Simulated Wi-Fi CSI presence query (risk: `low`, confirmation: false).
+   - `general_synthesis`: Grounded multi-step output synthesis with citation formatting (risk: `low`, confirmation: false).
+   Exposed publicly to the frontend via `GET /api/orchestration/capabilities`.
+4. **Consequential Action Gates**: Consequential operations that mutate user state (`task_create`, `task_update`, `calendar_event_create`, `reminder_create`, mutating browser interactions) are tagged with `is_consequential=True` and mandate explicit human confirmation before DB mutation.
+5. **Topological DAG Execution & Parallelism**: Safe independent steps (e.g. concurrent document search, web research, sensing queries) execute in parallel via `asyncio.gather`, while dependent steps await parent completion.
+6. **Context Blackboard & Variable Interpolation**: Downstream steps interpolate output parameters from preceding steps via `{step_N.output.field}` placeholders.
+7. **Provenance Citations**:
    - Web Research: `[Web N: Title]` with canonical publisher and URL.
    - Files & Knowledge: `[Doc: filename, Page X]` with page or chunk numbers.
    - Wi-Fi Sensing: `[Synthetic Observation: Room X (Simulated)]` with mandatory simulation disclaimer.

@@ -133,7 +133,8 @@ export function useConversations(backendConnected: boolean = true) {
       useKnowledge?: boolean,
       selectedFileIds?: string[],
       useResearch?: boolean,
-      researchDepth?: string
+      researchDepth?: string,
+      useOrchestration?: boolean
     ) => {
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -175,6 +176,7 @@ export function useConversations(backendConnected: boolean = true) {
           selected_file_ids: selectedFileIds,
           use_research: useResearch,
           research_depth: researchDepth,
+          use_orchestration: useOrchestration,
         },
         {
           onMessageStart: (conversationId: string) => {
