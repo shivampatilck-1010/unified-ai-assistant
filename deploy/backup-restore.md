@@ -71,6 +71,15 @@ def backup_sqlite(source_path: str, backup_path: str):
     conn_src.close()
 ```
 
+### 2.4 Off-Server Remote Backup Strategy
+
+Storing backups solely on the staging VPS host disk exposes data to host failure or provider incidents. Sync backups to remote secure object storage (e.g. AWS S3, Cloudflare R2, Google Cloud Storage) using `rclone`:
+
+```bash
+# Sync local backups to remote secure bucket (e.g. daily cron)
+rclone sync /backups/ s3-backups:unified-ai-backups/staging/ --checksum
+```
+
 ---
 
 ## 3. Disaster Recovery & Restoration Runbook

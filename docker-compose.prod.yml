@@ -90,11 +90,13 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       api:
         condition: service_healthy
     volumes:
       - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
     networks:
       - frontend-net
     deploy:
@@ -109,6 +111,8 @@ volumes:
   storage_data:
     driver: local
   certbot_www:
+    driver: local
+  certbot_certs:
     driver: local
 
 networks:
