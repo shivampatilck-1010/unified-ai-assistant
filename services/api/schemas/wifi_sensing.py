@@ -54,6 +54,7 @@ class SensorConfigUpdate(BaseModel):
     is_authorized: Optional[bool] = None
     simulation_speed: Optional[float] = Field(None, ge=0.1, le=10.0)
     retention_days: Optional[int] = Field(None, ge=1, le=365)
+    calibration_profile: Optional[Dict[str, Any]] = None
 
 
 class SensorConfigResponse(BaseModel):
@@ -68,8 +69,44 @@ class SensorConfigResponse(BaseModel):
     simulation_speed: float
     retention_days: int
     authorized_at: Optional[datetime] = None
+    calibration_profile: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
+
+
+class AnchorConfigSchema(BaseModel):
+    id: str
+    role: str = "transmitter"  # "transmitter" | "receiver"
+    x_m: float
+    y_m: float
+    label: str
+    channel: Optional[int] = 52
+    mac_address: Optional[str] = None
+
+
+class ObstacleConfigSchema(BaseModel):
+    id: str
+    type: str  # "desk", "chair", "sofa", "door", "window", "partition"
+    x_m: float
+    y_m: float
+    width_m: float
+    length_m: float
+    label: str
+
+
+class CalibrationProfileSchema(BaseModel):
+    room_width_m: float = 6.0
+    room_length_m: float = 4.0
+    anchors: List[AnchorConfigSchema] = Field(default_factory=list)
+    obstacles: List[ObstacleConfigSchema] = Field(default_factory=list)
+    empty_room_baseline: Optional[Dict[str, Any]] = None
+    is_hardware_calibrated: bool = False
+    calibrated_at: Optional[datetime] = None
+
+
+class BaselineCalibrationRequest(BaseModel):
+    room_id: str
+    sample_duration_seconds: int = Field(5, ge=1, le=60)
 
 
 class SimulationControlRequest(BaseModel):

@@ -548,3 +548,57 @@ def test_chat_streaming_with_sensing_grounding():
         else:
             gateway._providers.pop("openai", None)
 
+
+def test_room_calibration_profile_crud_and_baseline():
+    """Verifies room spatial calibration profile retrieval, saving, and empty-room noise baseline recording."""
+    uid = uuid.uuid4().hex[:6]
+    room_id = f"calib_{uid}"
+    user_headers = {"X-User-Id": "calib_tester"}
+
+    # 1. Create sensor room
+    create_res = client.post(
+        "/api/sensing/configs",
+        headers=user_headers,
+        json={"room_id": room_id, "room_name": "Calibration Lab", "is_authorized": True},
+    )
+    assert create_res.status_code == 201
+
+    # 2. Get default calibration
+    get_res = client.get(f"/api/sensing/calibration/{room_id}", headers=user_headers)
+    assert get_res.status_code == 200
+    calib = get_res.json()
+    assert calib["room_width_m"] == 6.0
+    assert calib["room_length_m"] == 4.0
+    assert len(calib["anchors"]) >= 2
+    assert len(calib["obstacles"]) >= 2
+
+    # 3. Save updated calibration
+    calib["room_width_m"] = 8.5
+    calib["room_length_m"] = 5.5
+    calib["anchors"].append({
+        "id": "rx_02",
+        "role": "receiver",
+        "x_m": 8.0,
+        "y_m": 5.0,
+        "label": "Secondary CSI Sniffer",
+    })
+    save_res = client.post(f"/api/sensing/calibration/{room_id}", headers=user_headers, json=calib)
+    assert save_res.status_code == 200
+    saved = save_res.json()
+    assert saved["room_width_m"] == 8.5
+    assert len(saved["anchors"]) == 3
+
+    # 4. Record baseline noise floor
+    base_res = client.post(
+        f"/api/sensing/calibration/{room_id}/record-baseline",
+        headers=user_headers,
+        json={"room_id": room_id, "sample_duration_seconds": 2},
+    )
+    assert base_res.status_code == 200
+    base_data = base_res.json()
+    assert "empty_room_baseline" in base_data
+    baseline_info = base_data["empty_room_baseline"]
+    assert "noise_floor_dbm" in baseline_info
+    assert "ambient_variance" in baseline_info
+    assert baseline_info["calibration_status"] == "calibrated"
+

@@ -12,11 +12,28 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     if (!content) return '';
 
     // Detect raw Google API / RPC resource exhausted dictionary
-    if (content.includes('RESOURCE_EXHAUSTED') || content.includes("'status': 'RESOURCE_EXHAUSTED'")) {
-      const timeMatch = content.match(/retry in\s+([0-9a-zA-Z.]+)/i);
-      const modelMatch = content.match(/model:\s*([a-zA-Z0-9.-]+)/i);
-      const modelName = modelMatch ? modelMatch[1] : 'Gemini 3.6 Flash';
-      const timeHint = timeMatch ? ` The quota resets in approximately ${timeMatch[1].replace(/([0-9]+)\.[0-9]+s/, '$1s')}.` : '';
+    if (
+      content.includes('RESOURCE_EXHAUSTED') ||
+      content.includes("'status': 'RESOURCE_EXHAUSTED'") ||
+      content.includes('Quota exceeded') ||
+      content.includes('generate_content_free_tier_requests')
+    ) {
+      const timeMatch = content.match(/retry in\s+([0-9a-zA-Z.]+)/i) || content.match(/retryDelay['":\s]+([0-9a-zA-Z.]+)/i);
+      const modelMatch = content.match(/model:\s*([a-zA-Z0-9.-]+)/i) || content.match(/['"]model['"]:\s*['"]([a-zA-Z0-9.-]+)['"]/i);
+      const modelName = modelMatch ? modelMatch[1] : 'Gemini';
+
+      let timeHint = '';
+      if (timeMatch) {
+        const rawTime = timeMatch[1].replace(/([0-9]+)\.[0-9]+s/, '$1s');
+        if (/^\d+s$/.test(rawTime)) {
+          const totalSec = parseInt(rawTime, 10);
+          const h = Math.floor(totalSec / 3600);
+          const m = Math.floor((totalSec % 3600) / 60);
+          timeHint = ` The quota resets in approximately ${h > 0 ? `${h}h ` : ''}${m}m.`;
+        } else {
+          timeHint = ` The quota resets in approximately ${rawTime}.`;
+        }
+      }
 
       return `**Daily Quota Limit Reached**\n\nThe free-tier usage limit for **${modelName}** has been reached for today.${timeHint}\n\n*Tip:* You can select another configured model from the dropdown above to continue immediately.`;
     }

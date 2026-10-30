@@ -219,11 +219,21 @@ export function ChatView({
           </div>
         ) : (
           <div className="chat-view__message-list">
-            {messages.map((msg, idx) => (
+            {messages.map((msg, idx) => {
+              const isQuotaOrRawError = Boolean(
+                msg.content && (
+                  msg.content.includes('RESOURCE_EXHAUSTED') ||
+                  msg.content.includes("'status': 'RESOURCE_EXHAUSTED'") ||
+                  msg.content.includes('Quota exceeded')
+                )
+              );
+              const isError = msg.isError || msg.status === 'error' || isQuotaOrRawError;
+
+              return (
               <div
                 key={msg.id}
                 className={`chat-message chat-message--${msg.role} ${
-                  msg.isError || msg.status === 'error' ? 'chat-message--error' : ''
+                  isError ? 'chat-message--error' : ''
                 } ${msg.isStreaming || msg.status === 'streaming' ? 'chat-message--streaming' : ''}`}
               >
                 {msg.role === 'assistant' && (
@@ -237,7 +247,7 @@ export function ChatView({
                 <div className="chat-message__content">
                   {msg.isStreaming && !msg.content ? (
                     <span className="chat-message__thinking">Thinking…</span>
-                  ) : msg.isError || msg.status === 'error' ? (
+                  ) : isError ? (
                     <div className="chat-message__error-container">
                       <div className="chat-message__error-header">
                         <svg className="chat-message__error-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -245,7 +255,7 @@ export function ChatView({
                           <path d="M8 4.5v4.5M8 11.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                         <span className="chat-message__error-title">
-                          {msg.error_category === 'daily_quota_exhausted'
+                          {msg.error_category === 'daily_quota_exhausted' || isQuotaOrRawError
                             ? 'Daily Quota Limit Reached'
                             : msg.error_code === 'RATE_LIMIT_EXCEEDED'
                             ? 'Usage Limit Reached'
@@ -298,7 +308,7 @@ export function ChatView({
                       </div>
                     </div>
                   )}
-                  {!msg.isError && msg.status !== 'error' && (
+                  {!isError && (
                     <div className="chat-message__footer">
                       {msg.model && (
                         <div className="chat-message__meta">
@@ -332,7 +342,8 @@ export function ChatView({
                   )}
                 </div>
               </div>
-            ))}
+            );
+            })}
             <div ref={messagesEndRef} />
           </div>
         )}

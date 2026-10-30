@@ -425,6 +425,7 @@ export const WifiSensingView: React.FC = () => {
               currentEvent={events.length > 0 ? events[0] : null}
               historicalEvents={events}
               roomName={activeConfig.room_name}
+              roomId={activeConfig.room_id}
               isSimulated={activeConfig.is_active ? statusData?.simulation_mode ?? true : true}
               isActive={activeConfig.is_active}
               onStepTick={() => void handleStep()}

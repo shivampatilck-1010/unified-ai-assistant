@@ -1,12 +1,14 @@
 // API client for the Unified AI Assistant backend
 
 import type {
+  BaselineCalibrationResult,
   BrowserTask,
   BrowserTaskEvent,
   CalendarEvent,
   CalendarEventCreatePayload,
   CalendarEventsQueryResponse,
   CalendarEventUpdatePayload,
+  CalibrationProfile,
   ConversationDetail,
   ConversationListResponse,
   ConversationSummary,
@@ -1124,6 +1126,57 @@ export async function fetchSensingAudits(
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing audits: ${res.status}`);
   return (await res.json()) as WifiSensingAudit[];
+}
+
+export async function fetchRoomCalibration(
+  roomId: string,
+  signal?: AbortSignal
+): Promise<CalibrationProfile> {
+  const url = buildUrl(`/api/sensing/calibration/${encodeURIComponent(roomId)}`);
+  const res = await fetch(url.toString(), {
+    signal,
+    headers: getBaseHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch room calibration: ${res.status}`);
+  return (await res.json()) as CalibrationProfile;
+}
+
+export async function saveRoomCalibration(
+  roomId: string,
+  profile: CalibrationProfile,
+  signal?: AbortSignal
+): Promise<CalibrationProfile> {
+  const url = buildUrl(`/api/sensing/calibration/${encodeURIComponent(roomId)}`);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(profile),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to save calibration: ${res.status}`);
+  }
+  return (await res.json()) as CalibrationProfile;
+}
+
+export async function recordRoomBaseline(
+  roomId: string,
+  sampleDurationSeconds = 5,
+  signal?: AbortSignal
+): Promise<BaselineCalibrationResult> {
+  const url = buildUrl(`/api/sensing/calibration/${encodeURIComponent(roomId)}/record-baseline`);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ room_id: roomId, sample_duration_seconds: sampleDurationSeconds }),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to record baseline: ${res.status}`);
+  }
+  return (await res.json()) as BaselineCalibrationResult;
 }
 
 // ---------------------------------------------------------------------------

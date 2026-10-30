@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { SensingEvent } from '../../types';
+import { recordRoomBaseline, saveRoomCalibration } from '../../lib/api';
 import './RoomPositionCanvas.css';
 
 interface RoomPositionCanvasProps {
   currentEvent: SensingEvent | null;
   historicalEvents: SensingEvent[];
   roomName: string;
+  roomId?: string;
   isSimulated: boolean;
   isActive: boolean;
   onStepTick?: () => void;
@@ -20,6 +22,7 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
   currentEvent,
   historicalEvents,
   roomName,
+  roomId,
   isSimulated,
   isActive,
   onStepTick,
@@ -31,12 +34,15 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
   const [showTrail, setShowTrail] = useState<boolean>(true);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
   const [showZones, setShowZones] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Room geometry (meters)
   const [roomDims, setRoomDims] = useState<RoomDimensions>({ widthM: 6.0, lengthM: 4.0 });
   const [showCalibrationModal, setShowCalibrationModal] = useState<boolean>(false);
   const [calibWidth, setCalibWidth] = useState<number>(6.0);
   const [calibLength, setCalibLength] = useState<number>(4.0);
+  const [isCalibratingBaseline, setIsCalibratingBaseline] = useState<boolean>(false);
+  const [baselineStatus, setBaselineStatus] = useState<string | null>(null);
 
   // Playback / Timeline scrub state
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
@@ -359,7 +365,38 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
       ctx.restore();
     }
 
-    // 8. Live Subject Marker
+    // 8. Fresnel Zone Spatial Uncertainty Ellipsoid (for Single-Link physics)
+    const fresnelData = activeDisplayEvent?.fresnel_region || (activeDisplayEvent?.raw_metrics?.fresnel_zone as any);
+    if (fresnelData && typeof fresnelData === 'object') {
+      const centerPos = fresnelData.center_pos || [3.0, 2.0];
+      const semiMajorM = fresnelData.semi_major_axis_m || 1.8;
+      const semiMinorM = fresnelData.semi_minor_axis_m || 0.65;
+      const angleRad = fresnelData.angle_rad || 0.0;
+
+      const cPxX = toPxX(centerPos[0]);
+      const cPxY = toPxY(centerPos[1]);
+      const semiMajorPx = semiMajorM * scale;
+      const semiMinorPx = semiMinorM * scale;
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.07)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.ellipse(cPxX, cPxY, semiMajorPx, semiMinorPx, angleRad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.75)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('1st Fresnel Zone (Single-Link Uncertainty)', cPxX, cPxY - semiMinorPx - 4);
+      ctx.restore();
+    }
+
+    // 9. Live Subject Marker (Oriented Human Silhouette with Directional Arrow)
     const currentCoords = getCoordinates(activeDisplayEvent);
     if (currentCoords) {
       const { x, y, uncertainty, vel } = currentCoords;
@@ -387,37 +424,82 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
       ctx.arc(px, py, 8 + pulseTime * 14, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Subject center marker
+      // Draw oriented human silhouette (Head + Shoulders/Torso)
       ctx.fillStyle = isSimulated ? '#38bdf8' : '#34d399';
       ctx.shadowColor = isSimulated ? '#0284c7' : '#059669';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 8;
+
+      // Head
       ctx.beginPath();
-      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.arc(px, py - 5, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Shoulders & torso arc
+      ctx.beginPath();
+      ctx.arc(px, py + 3, 7.5, Math.PI, 0, false);
+      ctx.lineTo(px + 7.5, py + 9);
+      ctx.lineTo(px - 7.5, py + 9);
+      ctx.closePath();
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Subject label card
+      // Heading vector arrow if in motion
+      if (vel > 0.1 && chronologicalEvents.length > 1) {
+        const prevEvt = chronologicalEvents[chronologicalEvents.length - 2];
+        const prevC = getCoordinates(prevEvt);
+        if (prevC) {
+          const dx = x - prevC.x;
+          const dy = y - prevC.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len > 0.01) {
+            const angle = Math.atan2(dy, dx);
+            const arrowLen = 22;
+            const tipX = px + Math.cos(angle) * arrowLen;
+            const tipY = py + Math.sin(angle) * arrowLen;
+
+            ctx.strokeStyle = isSimulated ? '#38bdf8' : '#34d399';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            ctx.lineTo(tipX, tipY);
+            ctx.stroke();
+
+            // Arrowhead
+            ctx.beginPath();
+            ctx.moveTo(tipX, tipY);
+            ctx.lineTo(tipX - 7 * Math.cos(angle - Math.PI / 6), tipY - 7 * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(tipX - 7 * Math.cos(angle + Math.PI / 6), tipY - 7 * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fillStyle = isSimulated ? '#38bdf8' : '#34d399';
+            ctx.fill();
+          }
+        }
+      }
+
+      // Subject label card (Anonymous Tracking ID + Kinematics)
+      const subjectTag = activeDisplayEvent?.subject_id || 'Subject #1';
       const stateLabel = activeDisplayEvent?.presence_state?.toUpperCase() || 'OCCUPIED';
-      const labelText =
+      const kinLabel =
         activeDisplayEvent?.presence_state === 'motion'
-          ? `Motion (${vel > 0 ? vel : 1.1} m/s)`
+          ? `Motion (${vel > 0 ? vel.toFixed(1) : '1.1'} m/s)`
           : activeDisplayEvent?.presence_state === 'presence'
           ? 'Stationary (Respiration)'
           : stateLabel;
+      const labelText = `${subjectTag}: ${kinLabel}`;
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
       ctx.strokeStyle = isSimulated ? '#0284c7' : '#059669';
       ctx.lineWidth = 1;
       const textW = ctx.measureText(labelText).width + 16;
       ctx.beginPath();
-      ctx.roundRect(px - textW / 2, py - 32, textW, 20, 4);
+      ctx.roundRect(px - textW / 2, py - 36, textW, 20, 4);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(labelText, px, py - 18);
+      ctx.fillText(labelText, px, py - 22);
 
       ctx.restore();
     } else {
@@ -458,16 +540,38 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
   }, [drawScene]);
 
   // Calibration submit
-  const handleSaveCalibration = () => {
+  const handleSaveCalibration = async () => {
+    const width = Math.max(2.0, Math.min(20.0, calibWidth));
+    const length = Math.max(2.0, Math.min(20.0, calibLength));
     setRoomDims({
-      widthM: Math.max(2.0, Math.min(20.0, calibWidth)),
-      lengthM: Math.max(2.0, Math.min(20.0, calibLength)),
+      widthM: width,
+      lengthM: length,
     });
+    if (roomId) {
+      try {
+        await saveRoomCalibration(roomId, {
+          room_width_m: width,
+          room_length_m: length,
+          anchors: [
+            { id: 'ap_01', role: 'transmitter', x_m: width / 2, y_m: 0.2, label: 'Wi-Fi AP Anchor' },
+            { id: 'rx_01', role: 'receiver', x_m: width / 2, y_m: length - 0.2, label: 'CSI Receiver Node' },
+          ],
+          obstacles: [
+            { id: 'desk_1', type: 'desk', x_m: width * 0.65, y_m: length * 0.55, width_m: 1.4, length_m: 0.9, label: 'Workstation' },
+            { id: 'lounge_1', type: 'sofa', x_m: width * 0.2, y_m: length * 0.6, width_m: 1.4, length_m: 1.1, label: 'Lounge' },
+          ],
+          is_hardware_calibrated: !isSimulated,
+          calibrated_at: new Date().toISOString(),
+        });
+      } catch {
+        // Fallback to local memory calibration
+      }
+    }
     setShowCalibrationModal(false);
   };
 
   return (
-    <div className="room-position-card">
+    <div className={`room-position-card ${isFullscreen ? 'room-position-card--fullscreen' : ''}`}>
       {/* Header bar with Mode Badge */}
       <div className="room-position-header">
         <div className="room-title-area">
@@ -523,6 +627,14 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
             title="Toggle Architectural Furniture Outline"
           >
             Floor Plan
+          </button>
+          <button
+            type="button"
+            className={`btn-toggle ${isFullscreen ? 'active' : ''}`}
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title="Toggle Fullscreen Immersive Mode"
+          >
+            {isFullscreen ? 'Exit Fullscreen' : '⛶ Fullscreen'}
           </button>
           <button
             type="button"
@@ -645,6 +757,42 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
                 />
               </label>
             </div>
+            {roomId && (
+              <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid #334155' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginBottom: '6px' }}>
+                  Empty Room Noise Floor Baseline
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#94a3b8', marginBottom: '10px' }}>
+                  Ensure the room is completely vacant before recording ambient multipath RF baseline.
+                </div>
+                <button
+                  type="button"
+                  className="btn-step-action"
+                  disabled={isCalibratingBaseline}
+                  onClick={async () => {
+                    try {
+                      setIsCalibratingBaseline(true);
+                      setBaselineStatus('Sampling baseline RF floor (5s)...');
+                      const res = await recordRoomBaseline(roomId, 5);
+                      setBaselineStatus(
+                        `Calibrated: noise floor ${res.noise_floor_dbm} dBm, variance ${res.ambient_variance.toFixed(4)} (${res.is_hardware_calibrated ? 'Real Hardware' : 'Simulation'})`
+                      );
+                    } catch (err: unknown) {
+                      setBaselineStatus(`Baseline calibration failed: ${err instanceof Error ? err.message : String(err)}`);
+                    } finally {
+                      setIsCalibratingBaseline(false);
+                    }
+                  }}
+                >
+                  {isCalibratingBaseline ? 'Sampling...' : 'Record Empty Room Baseline'}
+                </button>
+                {baselineStatus && (
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#38bdf8' }}>
+                    {baselineStatus}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="calibration-modal-actions">
               <button
                 type="button"

@@ -9,6 +9,26 @@
   margin-bottom: 24px;
 }
 
+.room-position-card--fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  background: #090d16 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  box-sizing: border-box !important;
+  padding: 16px !important;
+  overflow-y: auto !important;
+}
+
+.room-position-card--fullscreen .canvas-wrapper {
+  flex: 1 !important;
+  min-height: 500px !important;
+}
+
 .room-position-header {
   display: flex;
   justify-content: space-between;

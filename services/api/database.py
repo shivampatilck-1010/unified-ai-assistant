@@ -106,3 +106,20 @@ async def create_tables() -> None:
             except Exception:
                 # Table might not exist yet or dialect-specific
                 pass
+
+        # Check for calibration_profile in wifi_sensor_configs
+        try:
+            if "sqlite" in settings.database_url:
+                cols_res = await conn.execute(text("PRAGMA table_info(wifi_sensor_configs)"))
+                cfg_cols = {row[1] for row in cols_res.fetchall()}
+            else:
+                cols_res = await conn.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = 'wifi_sensor_configs'")
+                )
+                cfg_cols = {row[0].lower() for row in cols_res.fetchall()}
+            if cfg_cols and "calibration_profile" not in cfg_cols:
+                await conn.execute(
+                    text("ALTER TABLE wifi_sensor_configs ADD COLUMN calibration_profile JSON DEFAULT '{}'")
+                )
+        except Exception:
+            pass

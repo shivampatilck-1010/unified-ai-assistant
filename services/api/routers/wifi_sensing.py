@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from routers.deps import get_current_user_id
 from schemas.wifi_sensing import (
+    BaselineCalibrationRequest,
+    CalibrationProfileSchema,
     SensingCapabilitiesResponse,
     SensingEventListResponse,
     SensingEventResponse,
@@ -242,3 +244,51 @@ async def list_audit_trail(
     """Returns immutable audit logs detailing consent authorization and lifecycle events."""
     audits = await WifiSensingService.list_audit_logs(db, owner_id=user_id, limit=limit, offset=offset)
     return [WifiSensingAuditResponse.model_validate(a) for a in audits]
+
+
+@router.get("/calibration/{room_id}", response_model=CalibrationProfileSchema)
+async def get_room_calibration(
+    room_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> CalibrationProfileSchema:
+    """Returns spatial calibration profile (dimensions, anchors, obstacles, baseline noise floor) for a room."""
+    try:
+        profile = await WifiSensingService.get_calibration(db, owner_id=user_id, room_id=room_id)
+        return CalibrationProfileSchema.model_validate(profile)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.post("/calibration/{room_id}", response_model=CalibrationProfileSchema)
+async def save_room_calibration(
+    room_id: str,
+    payload: CalibrationProfileSchema,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> CalibrationProfileSchema:
+    """Saves spatial calibration profile including physical anchors, furniture obstacles, and noise baseline."""
+    try:
+        saved = await WifiSensingService.save_calibration(
+            db, owner_id=user_id, room_id=room_id, profile=payload.model_dump()
+        )
+        return CalibrationProfileSchema.model_validate(saved)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.post("/calibration/{room_id}/record-baseline", response_model=Dict[str, Any])
+async def record_room_baseline(
+    room_id: str,
+    payload: Optional[BaselineCalibrationRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> Dict[str, Any]:
+    """Records an empty-room baseline noise floor to calibrate presence detection thresholds."""
+    try:
+        duration = payload.sample_duration_seconds if payload else 5
+        return await WifiSensingService.record_baseline(
+            db, owner_id=user_id, room_id=room_id, duration_sec=duration
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

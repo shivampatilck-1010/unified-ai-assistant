@@ -290,19 +290,32 @@ class GeminiProvider(BaseProviderAdapter):
                     yield chunk.text
         except genai_errors.APIError as err:
             status_code = getattr(err, "code", None)
-            if status_code == 503 and selected_model not in ("gemini-3.5-flash-lite", "gemini-flash-latest"):
-                # Upstream demand spike on selected model: gracefully fall back to gemini-3.5-flash-lite
-                try:
-                    fallback_stream = await client.aio.models.generate_content_stream(
-                        model="gemini-3.5-flash-lite",
-                        contents=contents,  # type: ignore
+            err_str = str(err)
+            if status_code in (503, 429) or "RESOURCE_EXHAUSTED" in err_str:
+                # Upstream demand spike (503) or preview model quota exhaustion (429):
+                # Gracefully attempt fallback high-capacity flash models before surfacing error
+                fallback_candidates = [
+                    m
+                    for m in (
+                        "gemini-2.5-flash",
+                        "gemini-2.5-flash-lite",
+                        "gemini-flash-latest",
+                        "gemini-3.5-flash-lite",
                     )
-                    async for chunk in fallback_stream:
-                        if chunk.text:
-                            yield chunk.text
-                    return
-                except Exception:
-                    pass
+                    if m != selected_model and m in valid_models
+                ]
+                for fb_model in fallback_candidates:
+                    try:
+                        fallback_stream = await client.aio.models.generate_content_stream(
+                            model=fb_model,
+                            contents=contents,  # type: ignore
+                        )
+                        async for chunk in fallback_stream:
+                            if chunk.text:
+                                yield chunk.text
+                        return
+                    except Exception:
+                        continue
             raise self._parse_gemini_api_error(err, selected_model) from err
         except ProviderError:
             raise

@@ -83,6 +83,12 @@ class WifiSensorConfig(Base):
         default=utc_now,
         onupdate=utc_now,
     )
+    calibration_profile: Mapped[Dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+        comment="Room dimensions, anchor locations, obstacle layout, and baseline RF parameters",
+    )
 
     # Relationships
     events: Mapped[List["WifiSensingEvent"]] = relationship(

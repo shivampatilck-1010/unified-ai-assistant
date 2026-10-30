@@ -736,7 +736,56 @@ export interface SensingEvent {
   estimated_y?: number | null;
   velocity_mps?: number | null;
   uncertainty_radius_m?: number | null;
+  fresnel_region?: {
+    tx_pos: [number, number];
+    rx_pos: [number, number];
+    center_pos: [number, number];
+    semi_major_axis_m: number;
+    semi_minor_axis_m: number;
+    angle_rad: number;
+    uncertainty_level: string;
+  } | null;
+  subject_id?: string | null;
   raw_metrics: Record<string, unknown>;
+}
+
+export interface AnchorConfig {
+  id: string;
+  role: 'transmitter' | 'receiver';
+  x_m: number;
+  y_m: number;
+  label: string;
+}
+
+export interface ObstacleConfig {
+  id: string;
+  type: 'desk' | 'sofa' | 'door' | 'window' | 'wall' | 'plant' | string;
+  x_m: number;
+  y_m: number;
+  width_m: number;
+  length_m: number;
+  label: string;
+}
+
+export interface CalibrationProfile {
+  room_width_m: number;
+  room_length_m: number;
+  anchors: AnchorConfig[];
+  obstacles: ObstacleConfig[];
+  empty_room_baseline?: Record<string, unknown> | null;
+  is_hardware_calibrated: boolean;
+  calibrated_at?: string | null;
+}
+
+export interface BaselineCalibrationResult {
+  noise_floor_dbm: number;
+  ambient_variance: number;
+  baseline_rssi_dbm: number;
+  calibrated_at: string;
+  sample_duration_seconds: number;
+  is_hardware_calibrated: boolean;
+  calibration_status: string;
+  provider_id: string;
 }
 
 export interface SensingEventListResponse {

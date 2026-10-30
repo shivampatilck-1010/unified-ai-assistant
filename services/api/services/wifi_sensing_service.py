@@ -29,6 +29,7 @@ from schemas.wifi_sensing import (
     WifiSensingStatusResponse,
 )
 from synthetic_simulator import SyntheticSensorSimulator
+from esp32_csi_adapter import Esp32CsiHardwareAdapter
 from sensing_types import NormalizedSensorEvent, utc_now
 
 
@@ -38,6 +39,7 @@ class WifiSensingService:
     _active_pipelines: Dict[str, SensingPipeline] = {}
     _simulators: Dict[str, SyntheticSensorSimulator] = {}
     _hardware_adapter: HardwareSensorAdapter = HardwareSensorAdapter()
+    _esp32_csi_adapter: Esp32CsiHardwareAdapter = Esp32CsiHardwareAdapter()
     _real_rssi_adapter: RealRssiSensorAdapter = RealRssiSensorAdapter()
     _room_providers: Dict[str, str] = {}
 
@@ -57,8 +59,12 @@ class WifiSensingService:
         if current_pipe and current_pipe.provider.provider_id == target_provider:
             return current_pipe
 
-        if target_provider == "real_wifi_rssi_hardware":
+        if target_provider == "esp32_csi_hardware":
+            provider = cls._esp32_csi_adapter
+        elif target_provider == "real_wifi_rssi_hardware":
             provider = cls._real_rssi_adapter
+        elif target_provider == "physical_csi_hardware":
+            provider = cls._hardware_adapter
         else:
             provider = cls.get_simulator(room_id)
 
@@ -76,9 +82,21 @@ class WifiSensingService:
         sim = cls.get_simulator("probe_room")
         sim_caps = sim.discover_capabilities()
         hw_caps = cls._hardware_adapter.discover_capabilities()
+        esp_caps = cls._esp32_csi_adapter.discover_capabilities()
         rssi_caps = cls._real_rssi_adapter.discover_capabilities()
 
         items = [
+            SensorCapabilityItem(
+                provider_id=esp_caps.provider_id,
+                name=esp_caps.name,
+                is_hardware=esp_caps.is_hardware,
+                is_simulated=esp_caps.is_simulated,
+                is_available=esp_caps.is_available,
+                unavailability_reason=esp_caps.unavailability_reason,
+                supported_measurements=esp_caps.supported_measurements,
+                sampling_rate_hz=esp_caps.sampling_rate_hz,
+                requires_authorization=esp_caps.requires_authorization,
+            ),
             SensorCapabilityItem(
                 provider_id=sim_caps.provider_id,
                 name=sim_caps.name,
@@ -91,17 +109,6 @@ class WifiSensingService:
                 requires_authorization=sim_caps.requires_authorization,
             ),
             SensorCapabilityItem(
-                provider_id=hw_caps.provider_id,
-                name=hw_caps.name,
-                is_hardware=hw_caps.is_hardware,
-                is_simulated=hw_caps.is_simulated,
-                is_available=hw_caps.is_available,
-                unavailability_reason=hw_caps.unavailability_reason,
-                supported_measurements=hw_caps.supported_measurements,
-                sampling_rate_hz=hw_caps.sampling_rate_hz,
-                requires_authorization=hw_caps.requires_authorization,
-            ),
-            SensorCapabilityItem(
                 provider_id=rssi_caps.provider_id,
                 name=rssi_caps.name,
                 is_hardware=rssi_caps.is_hardware,
@@ -112,13 +119,27 @@ class WifiSensingService:
                 sampling_rate_hz=rssi_caps.sampling_rate_hz,
                 requires_authorization=rssi_caps.requires_authorization,
             ),
+            SensorCapabilityItem(
+                provider_id=hw_caps.provider_id,
+                name=hw_caps.name,
+                is_hardware=hw_caps.is_hardware,
+                is_simulated=hw_caps.is_simulated,
+                is_available=hw_caps.is_available,
+                unavailability_reason=hw_caps.unavailability_reason,
+                supported_measurements=hw_caps.supported_measurements,
+                sampling_rate_hz=hw_caps.sampling_rate_hz,
+                requires_authorization=hw_caps.requires_authorization,
+            ),
         ]
+
+        active_prov = cls._room_providers.get("default", "synthetic_csi_simulator")
+        is_hw_any = esp_caps.is_available or hw_caps.is_available
 
         return SensingCapabilitiesResponse(
             providers=items,
-            active_provider_id="synthetic_csi_simulator",
-            simulation_mode=True,
-            hardware_available=hw_caps.is_available,
+            active_provider_id=active_prov,
+            simulation_mode=(active_prov == "synthetic_csi_simulator"),
+            hardware_available=is_hw_any,
         )
 
     @classmethod
@@ -254,6 +275,10 @@ class WifiSensingService:
                     pipe = cls.get_pipeline(cfg.room_id)
                     await pipe.provider.stop()
 
+        if payload.calibration_profile is not None:
+            cfg.calibration_profile = payload.calibration_profile
+            changes["calibration_profile"] = "updated"
+
         cfg.updated_at = now
 
         audit = WifiSensingAudit(
@@ -267,6 +292,102 @@ class WifiSensingService:
         await db.commit()
         await db.refresh(cfg)
         return cfg
+
+    # --- Calibration Workflow ---
+
+    @classmethod
+    async def get_calibration(cls, db: AsyncSession, owner_id: str, room_id: str) -> Dict[str, Any]:
+        cfg = await cls.get_config_by_room_id(db, owner_id, room_id)
+        if not cfg:
+            raise KeyError(f"No configured sensor room '{room_id}' for this user.")
+        profile = dict(cfg.calibration_profile or {})
+        if not profile.get("room_width_m"):
+            profile["room_width_m"] = 6.0
+        if not profile.get("room_length_m"):
+            profile["room_length_m"] = 4.0
+        if "anchors" not in profile:
+            profile["anchors"] = [
+                {"id": "ap_01", "role": "transmitter", "x_m": 3.0, "y_m": 0.2, "label": "Wi-Fi AP Anchor"},
+                {"id": "rx_01", "role": "receiver", "x_m": 3.0, "y_m": 3.8, "label": "CSI Receiver Node"},
+            ]
+        if "obstacles" not in profile:
+            profile["obstacles"] = [
+                {"id": "desk_1", "type": "desk", "x_m": 4.0, "y_m": 2.2, "width_m": 1.4, "length_m": 0.9, "label": "Workstation"},
+                {"id": "lounge_1", "type": "sofa", "x_m": 1.1, "y_m": 2.5, "width_m": 1.4, "length_m": 1.1, "label": "Lounge Seating"},
+                {"id": "door_1", "type": "door", "x_m": 0.8, "y_m": 0.0, "width_m": 0.8, "length_m": 0.1, "label": "Door"},
+            ]
+        return profile
+
+    @classmethod
+    async def save_calibration(
+        cls, db: AsyncSession, owner_id: str, room_id: str, profile: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        cfg = await cls.get_config_by_room_id(db, owner_id, room_id)
+        if not cfg:
+            raise KeyError(f"No configured sensor room '{room_id}' for this user.")
+        now = utc_now()
+        cfg.calibration_profile = profile
+        cfg.updated_at = now
+
+        audit = WifiSensingAudit(
+            owner_id=owner_id,
+            room_id=room_id,
+            action="calibration_saved",
+            details={"anchors_count": len(profile.get("anchors", [])), "obstacles_count": len(profile.get("obstacles", []))},
+            created_at=now,
+        )
+        db.add(audit)
+        await db.commit()
+        await db.refresh(cfg)
+        return profile
+
+    @classmethod
+    async def record_baseline(
+        cls, db: AsyncSession, owner_id: str, room_id: str, duration_sec: int = 5
+    ) -> Dict[str, Any]:
+        cfg = await cls.get_config_by_room_id(db, owner_id, room_id)
+        if not cfg:
+            raise KeyError(f"No configured sensor room '{room_id}' for this user.")
+
+        now = utc_now()
+        pipe = cls.get_pipeline(room_id)
+        is_hw = not pipe.provider.is_simulated
+
+        # Sample baseline
+        sample = await pipe.provider.capture_sample()
+        noise_floor = sample.noise_floor_dbm if sample else -92.0
+        ambient_var = sample.subcarrier_variance if sample else 0.015
+        rssi = sample.rssi_dbm if sample else -55.0
+
+        baseline_data = {
+            "noise_floor_dbm": noise_floor,
+            "ambient_variance": ambient_var,
+            "baseline_rssi_dbm": rssi,
+            "calibrated_at": now.isoformat(),
+            "sample_duration_seconds": duration_sec,
+            "is_hardware_calibrated": is_hw,
+            "calibration_status": "calibrated",
+            "provider_id": pipe.provider.provider_id,
+        }
+
+        current_profile = dict(cfg.calibration_profile or {})
+        current_profile["empty_room_baseline"] = baseline_data
+        current_profile["is_hardware_calibrated"] = is_hw
+        current_profile["calibrated_at"] = now.isoformat()
+        cfg.calibration_profile = current_profile
+        cfg.updated_at = now
+
+        audit = WifiSensingAudit(
+            owner_id=owner_id,
+            room_id=room_id,
+            action="baseline_calibrated",
+            details=baseline_data,
+            created_at=now,
+        )
+        db.add(audit)
+        await db.commit()
+        await db.refresh(cfg)
+        return current_profile
 
     # --- Simulation Lifecycle ---
 
