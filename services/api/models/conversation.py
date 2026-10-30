@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import DateTime, Index, String, Text
@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def default_expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(hours=72)
 
 
 class Conversation(Base):
@@ -44,6 +48,13 @@ class Conversation(Base):
         default=utc_now,
         onupdate=utc_now,
         nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=default_expires_at,
+        nullable=False,
+        index=True,
+        comment="Automatic data deletion timestamp (72 hours after last activity)",
     )
     extra_metadata: Mapped[Optional[str]] = mapped_column(
         Text,

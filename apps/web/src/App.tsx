@@ -10,6 +10,8 @@ import { CalendarTasksView } from './components/calendar/CalendarTasksView';
 import { FilesKnowledgeView } from './components/files/FilesKnowledgeView';
 import { WifiSensingView } from './components/sensing/WifiSensingView';
 import { OrchestrationView } from './components/orchestration/OrchestrationView';
+import { SettingsView } from './components/settings/SettingsView';
+import { SearchView } from './components/search/SearchView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -31,7 +33,9 @@ export default function App() {
     renameConversation,
     deleteConversation,
     sendMessage,
+    retryMessage,
     cancelStream,
+    refreshList,
   } = useConversations();
 
   const { status: healthStatus, health, error: healthError, recheck } = useHealthCheck();
@@ -163,6 +167,7 @@ export default function App() {
             <ChatView
               messages={activeConversation?.messages ?? []}
               onSend={sendMessage}
+              onRetry={retryMessage}
               isStreaming={isStreaming}
               onCancel={cancelStream}
               onNewChat={handleNewChat}
@@ -180,6 +185,20 @@ export default function App() {
             <WifiSensingView />
           ) : activeSection === 'orchestration' ? (
             <OrchestrationView />
+          ) : activeSection === 'settings' ? (
+            <SettingsView
+              providerStatus={effectiveProviderStatus}
+              onRefreshConversations={() => void refreshList()}
+            />
+          ) : activeSection === 'search' ? (
+            <SearchView
+              conversations={conversations}
+              onSelectConversation={(id) => {
+                handleSelectConversation(id);
+                setActiveSection('chat');
+              }}
+              onNewChat={handleNewChat}
+            />
           ) : (
             <SectionPlaceholder
               section={activeSection}

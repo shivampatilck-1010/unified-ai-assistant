@@ -56,6 +56,10 @@ class BaselinePresenceEstimator(BasePresenceEstimator):
                 quality_score=sample.quality_score,
                 inference_note="RF metrics match ambient noise baseline; no occupancy detected.",
                 is_simulated=sample.is_simulated,
+                estimated_x=None,
+                estimated_y=None,
+                velocity_mps=0.0,
+                uncertainty_radius_m=None,
             )
         elif rf_perturbation < 0.50:
             # Stationary / breathing perturbation
@@ -67,6 +71,10 @@ class BaselinePresenceEstimator(BasePresenceEstimator):
                 quality_score=sample.quality_score,
                 inference_note="Low-frequency periodic perturbation detected; stationary presence inferred.",
                 is_simulated=sample.is_simulated,
+                estimated_x=sample.estimated_x,
+                estimated_y=sample.estimated_y,
+                velocity_mps=sample.velocity_mps or 0.0,
+                uncertainty_radius_m=sample.uncertainty_radius_m or 0.30,
             )
         else:
             # Dynamic movement
@@ -79,4 +87,8 @@ class BaselinePresenceEstimator(BasePresenceEstimator):
                 quality_score=sample.quality_score,
                 inference_note="Broadband Doppler shift and high subcarrier variance detected; active motion inferred.",
                 is_simulated=sample.is_simulated,
+                estimated_x=sample.estimated_x,
+                estimated_y=sample.estimated_y,
+                velocity_mps=sample.velocity_mps,
+                uncertainty_radius_m=sample.uncertainty_radius_m or 0.45,
             )

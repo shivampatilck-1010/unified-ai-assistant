@@ -107,20 +107,37 @@ class StreamingService:
             )
         except ProviderError as err:
             # Update assistant message in DB with error status
+            error_meta = {
+                "error_code": err.code,
+                "error_message": err.message,
+                "category": getattr(err, "category", "general"),
+                "retry_after": getattr(err, "retry_after", None),
+                "routed_model": getattr(err, "routed_model", None),
+                "retryable": getattr(err, "retryable", False),
+                "provider": request.provider,
+            }
             await ConversationService.update_message(
                 db=db,
                 message_id=assistant_msg_id,
                 content=err.message,
                 status="error",
-                extra_metadata=json.dumps({"error_code": err.code}),
+                extra_metadata=json.dumps(error_meta),
             )
 
-            # Emit error SSE
+            # Emit error SSE with structured resilience metadata
             err_payload = SSEEventPayload(
                 event=SSEEventType.ERROR,
                 conversation_id=conversation_id,
                 message_id=assistant_msg_id,
-                data={"code": err.code, "message": err.message},
+                data={
+                    "code": err.code,
+                    "message": err.message,
+                    "category": getattr(err, "category", "general"),
+                    "retry_after": getattr(err, "retry_after", None),
+                    "routed_model": getattr(err, "routed_model", None),
+                    "retryable": getattr(err, "retryable", False),
+                    "provider": request.provider,
+                },
             )
             yield format_sse(SSEEventType.ERROR, err_payload)
 
@@ -510,19 +527,36 @@ STRICT SENSING SAFETY & PRIVACY RULES:
             # Partial or total error during stream
             partial_content = "".join(accumulated_chunks)
             final_status = "interrupted" if partial_content else "error"
+            error_meta = {
+                "error_code": err.code,
+                "error_message": err.message,
+                "category": getattr(err, "category", "general"),
+                "retry_after": getattr(err, "retry_after", None),
+                "routed_model": getattr(err, "routed_model", None),
+                "retryable": getattr(err, "retryable", False),
+                "provider": getattr(adapter, "provider_id", request.provider),
+            }
             await ConversationService.update_message(
                 db=db,
                 message_id=assistant_msg_id,
                 content=partial_content or err.message,
                 status=final_status,
-                extra_metadata=json.dumps({"error_code": err.code, "error_message": err.message}),
+                extra_metadata=json.dumps(error_meta),
             )
 
             err_payload = SSEEventPayload(
                 event=SSEEventType.ERROR,
                 conversation_id=conversation_id,
                 message_id=assistant_msg_id,
-                data={"code": err.code, "message": err.message},
+                data={
+                    "code": err.code,
+                    "message": err.message,
+                    "category": getattr(err, "category", "general"),
+                    "retry_after": getattr(err, "retry_after", None),
+                    "routed_model": getattr(err, "routed_model", None),
+                    "retryable": getattr(err, "retryable", False),
+                    "provider": getattr(adapter, "provider_id", request.provider),
+                },
             )
             yield format_sse(SSEEventType.ERROR, err_payload)
 
@@ -538,20 +572,31 @@ STRICT SENSING SAFETY & PRIVACY RULES:
             # Unexpected exception
             partial_content = "".join(accumulated_chunks)
             final_status = "interrupted" if partial_content else "error"
-            error_msg = "An unexpected error occurred during model response generation."
+            error_msg = "An unexpected error occurred during model response generation. Please try again."
+            error_meta = {
+                "error_code": "INTERNAL_STREAM_ERROR",
+                "error_message": error_msg,
+                "category": "internal_error",
+                "retryable": True,
+            }
             await ConversationService.update_message(
                 db=db,
                 message_id=assistant_msg_id,
                 content=partial_content or error_msg,
                 status=final_status,
-                extra_metadata=json.dumps({"error": str(err)}),
+                extra_metadata=json.dumps(error_meta),
             )
 
             err_payload = SSEEventPayload(
                 event=SSEEventType.ERROR,
                 conversation_id=conversation_id,
                 message_id=assistant_msg_id,
-                data={"code": "INTERNAL_STREAM_ERROR", "message": error_msg},
+                data={
+                    "code": "INTERNAL_STREAM_ERROR",
+                    "message": error_msg,
+                    "category": "internal_error",
+                    "retryable": True,
+                },
             )
             yield format_sse(SSEEventType.ERROR, err_payload)
 

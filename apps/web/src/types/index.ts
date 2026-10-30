@@ -26,6 +26,11 @@ export interface MessageCompleteData {
 export interface ErrorData {
   code: string;
   message: string;
+  category?: string;
+  retry_after?: number | null;
+  routed_model?: string | null;
+  retryable?: boolean;
+  provider?: string | null;
 }
 
 export interface ChatRequest {
@@ -80,6 +85,11 @@ export interface ChatMessage {
   created_at?: string;
   isStreaming?: boolean;
   isError?: boolean;
+  error_code?: string;
+  error_category?: string;
+  retry_after?: number | null;
+  retryable?: boolean;
+  routed_model?: string | null;
   citations?: ChunkCitation[];
 }
 
@@ -722,6 +732,10 @@ export interface SensingEvent {
   signal_strength_dbm: number;
   sample_count: number;
   quality_score: number;
+  estimated_x?: number | null;
+  estimated_y?: number | null;
+  velocity_mps?: number | null;
+  uncertainty_radius_m?: number | null;
   raw_metrics: Record<string, unknown>;
 }
 
@@ -910,4 +924,42 @@ export interface WorkflowConfirmStepRequest {
 
 export interface WorkflowCancelRequest {
   reason?: string;
+}
+
+export interface RetentionStatusResponse {
+  policy: string;
+  retention_period_hours: number;
+  active_conversations_count: number;
+  active_files_count: number;
+  storage_bytes_used: number;
+  sensing_events_count: number;
+  earliest_data_expiry: string | null;
+  current_time_utc: string;
+  auto_cleanup_active: boolean;
+}
+
+export interface RetentionCleanupResponse {
+  message: string;
+  results: {
+    expired_conversations: number;
+    expired_files: number;
+    physical_files_deleted: number;
+    expired_sensing_events: number;
+    expired_browser_tasks: number;
+    expired_research_jobs: number;
+    expired_workflows: number;
+  };
+}
+
+export interface RetentionPurgeResponse {
+  message: string;
+  results: {
+    purged_conversations: number;
+    purged_files: number;
+    physical_files_deleted: number;
+    purged_sensing_events: number;
+    purged_browser_tasks: number;
+    purged_research_jobs: number;
+    purged_workflows: number;
+  };
 }

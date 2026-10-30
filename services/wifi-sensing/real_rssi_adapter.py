@@ -16,6 +16,7 @@ import asyncio
 from collections import deque
 import hashlib
 import logging
+import math
 import platform
 import re
 import subprocess
@@ -347,6 +348,21 @@ class RealRssiSensorAdapter(BaseSensorProvider):
         is_estimated = bool(info.get("rssi_is_estimated", False))
         measurement_type = "estimated_rssi_from_signal_pct" if is_estimated else "direct_hardware_rssi"
 
+        # Log-distance path loss proximity estimation (indoor path loss n=2.4, ref A=-42 dBm at 1m)
+        path_loss_exponent = 2.4
+        ref_rssi_1m = -42.0
+        clamped_rssi = max(-95.0, min(-20.0, rssi_val))
+        est_distance_m = round(10.0 ** ((ref_rssi_1m - clamped_rssi) / (10.0 * path_loss_exponent)), 2)
+        est_distance_m = min(5.0, max(0.6, est_distance_m))
+
+        # Project radial proximity coordinate from sensor anchor at (3.0, 0.2)
+        anchor_x = 3.0
+        anchor_y = 0.2
+        angle_rad = 1.05 + min(0.5, variance_val * 2.0)
+        est_x = round(max(0.5, min(5.5, anchor_x + est_distance_m * math.cos(angle_rad))), 2)
+        est_y = round(max(0.5, min(3.8, anchor_y + est_distance_m * math.sin(angle_rad))), 2)
+        uncertainty_m = round(max(0.6, min(2.5, est_distance_m * 0.4)), 2)
+
         return RawSensorSample(
             timestamp=self._last_sample_time,
             room_id=self._room_id,
@@ -358,6 +374,10 @@ class RealRssiSensorAdapter(BaseSensorProvider):
             doppler_energy=doppler_proxy,
             noise_floor_dbm=-95.0,
             quality_score=quality_score,
+            estimated_x=est_x,
+            estimated_y=est_y,
+            velocity_mps=0.0,
+            uncertainty_radius_m=uncertainty_m,
             metadata={
                 "adapter_name": info.get("description", "Wi-Fi"),
                 "channel": info.get("channel"),
@@ -371,6 +391,13 @@ class RealRssiSensorAdapter(BaseSensorProvider):
                 "measurement_source": info.get("measurement_source", "direct_driver_rssi"),
                 "rssi_is_estimated": is_estimated,
                 "direct_dbm_available": not is_estimated,
+                "kinematics_mode": "hardware_rssi_proximity_centroid",
+                "estimated_distance_m": est_distance_m,
+                "position_x": est_x,
+                "position_y": est_y,
+                "uncertainty_radius_m": uncertainty_m,
+                "room_dimensions": {"width_m": 6.0, "length_m": 4.0},
+                "sensor_anchor": {"x": anchor_x, "y": anchor_y, "label": "Host Wi-Fi NIC Anchor"},
                 "variance_source": "rssi_temporal_variance",
                 "is_subcarrier_variance": False,
                 "variance_note": (

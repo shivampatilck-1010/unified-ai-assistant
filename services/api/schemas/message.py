@@ -23,3 +23,4 @@ class MessageResponse(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     created_at: datetime
+    extra_metadata: Optional[str] = None

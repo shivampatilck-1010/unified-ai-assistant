@@ -104,6 +104,10 @@ class SensingEventResponse(BaseModel):
     signal_strength_dbm: float
     sample_count: int
     quality_score: float
+    estimated_x: Optional[float] = None
+    estimated_y: Optional[float] = None
+    velocity_mps: Optional[float] = None
+    uncertainty_radius_m: Optional[float] = None
     raw_metrics: Dict[str, Any] = Field(default_factory=dict)
 
 

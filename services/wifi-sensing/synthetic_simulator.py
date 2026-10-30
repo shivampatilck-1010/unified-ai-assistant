@@ -23,6 +23,20 @@ class SyntheticSensorSimulator(BaseSensorProvider):
         self._packets_captured: int = 0
         self._last_sample_time = None
         self._forced_state: Optional[str] = None  # For testing: "vacant", "stationary", "motion", "invalid"
+        # 2D Kinematics tracking state
+        self._room_width_m: float = 6.0
+        self._room_length_m: float = 4.0
+        self._pos_x: float = 1.2
+        self._pos_y: float = 1.0
+        self._waypoint_idx: int = 0
+        self._waypoints: List[tuple[float, float]] = [
+            (1.2, 1.0),  # Doorway zone
+            (3.0, 1.8),  # Room center
+            (4.5, 2.8),  # Workstation / desk
+            (3.8, 3.2),  # Reading corner / shelf
+            (1.8, 3.0),  # Lounge seating
+            (2.2, 1.5),  # Meeting area
+        ]
 
     @property
     def provider_id(self) -> str:
@@ -85,6 +99,9 @@ class SyntheticSensorSimulator(BaseSensorProvider):
         self._packets_captured = 0
         self._forced_state = None
         self._last_sample_time = None
+        self._waypoint_idx = 0
+        self._pos_x = 1.2
+        self._pos_y = 1.0
         self._rng = random.Random(self._initial_seed)
 
     async def capture_sample(self) -> Optional[RawSensorSample]:
@@ -127,6 +144,11 @@ class SyntheticSensorSimulator(BaseSensorProvider):
                 metadata={"synthetic_state": "corrupted", "simulation_tick": self._tick},
             )
 
+        pos_x: Optional[float] = None
+        pos_y: Optional[float] = None
+        velocity_mps: Optional[float] = None
+        uncertainty_radius_m: Optional[float] = None
+
         if state == "vacant":
             # Ambient thermal noise: very low variance, low doppler
             variance = 0.01 + self._rng.uniform(0.0, 0.02)
@@ -134,6 +156,11 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             rssi = -64.0 + self._rng.uniform(-1.0, 1.0)
             noise_floor = -92.0 + self._rng.uniform(-0.5, 0.5)
             quality = 0.98
+            # Room is unoccupied
+            pos_x = None
+            pos_y = None
+            velocity_mps = 0.0
+            uncertainty_radius_m = None
 
         elif state == "stationary":
             # Breathing modulation: subtle sinusoidal fluctuation (0.25 Hz approx)
@@ -143,6 +170,13 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             rssi = -58.0 + self._rng.uniform(-1.5, 1.5)
             noise_floor = -91.0
             quality = 0.99
+            # Person seated at desk (4.5, 2.8) with tiny respiratory chest displacement
+            micro_x = 0.03 * math.sin(self._tick * 0.3 * self._speed)
+            micro_y = 0.02 * math.cos(self._tick * 0.3 * self._speed)
+            pos_x = round(4.5 + micro_x, 2)
+            pos_y = round(2.8 + micro_y, 2)
+            velocity_mps = 0.0
+            uncertainty_radius_m = 0.30
 
         else:  # "motion"
             # High variance and dynamic doppler energy
@@ -152,6 +186,43 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             rssi = -52.0 + self._rng.uniform(-3.0, 3.0)
             noise_floor = -90.0
             quality = 0.96
+
+            # Advance kinematics along waypoints
+            target_x, target_y = self._waypoints[self._waypoint_idx]
+            dx = target_x - self._pos_x
+            dy = target_y - self._pos_y
+            dist = math.hypot(dx, dy)
+            step_size = min(dist, 0.45 * self._speed)
+
+            if dist > 0.15:
+                self._pos_x += (dx / dist) * step_size
+                self._pos_y += (dy / dist) * step_size
+            else:
+                # Reached waypoint, advance to next
+                self._waypoint_idx = (self._waypoint_idx + 1) % len(self._waypoints)
+
+            # Keep inside room bounds
+            self._pos_x = max(0.4, min(self._room_width_m - 0.4, self._pos_x))
+            self._pos_y = max(0.4, min(self._room_length_m - 0.4, self._pos_y))
+
+            pos_x = round(self._pos_x, 2)
+            pos_y = round(self._pos_y, 2)
+            velocity_mps = round(min(1.8, 0.9 * self._speed), 2)
+            uncertainty_radius_m = 0.45
+
+        metadata = {
+            "synthetic_state": state,
+            "simulation_tick": self._tick,
+            "speed_factor": self._speed,
+            "kinematics_mode": "2D_synthetic_trajectory",
+            "room_dimensions": {"width_m": self._room_width_m, "length_m": self._room_length_m},
+            "sensor_anchor": {"x": 3.0, "y": 0.2, "label": "Wi-Fi AP Anchor"},
+        }
+        if pos_x is not None:
+            metadata["position_x"] = pos_x
+            metadata["position_y"] = pos_y
+            metadata["velocity_mps"] = velocity_mps
+            metadata["uncertainty_radius_m"] = uncertainty_radius_m
 
         return RawSensorSample(
             timestamp=now,
@@ -164,9 +235,9 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             doppler_energy=round(doppler, 4),
             noise_floor_dbm=round(noise_floor, 2),
             quality_score=round(quality, 2),
-            metadata={
-                "synthetic_state": state,
-                "simulation_tick": self._tick,
-                "speed_factor": self._speed,
-            },
+            estimated_x=pos_x,
+            estimated_y=pos_y,
+            velocity_mps=velocity_mps,
+            uncertainty_radius_m=uncertainty_radius_m,
+            metadata=metadata,
         )

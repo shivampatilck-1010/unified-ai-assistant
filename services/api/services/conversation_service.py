@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import delete, func, select, update
@@ -29,12 +29,14 @@ class ConversationService:
         owner_id: str,
         title: str = "New conversation",
     ) -> ConversationSummary:
+        now = utc_now()
         conv = Conversation(
             id=str(uuid.uuid4()),
             owner_id=owner_id,
             title=title.strip() or "New conversation",
-            created_at=utc_now(),
-            updated_at=utc_now(),
+            created_at=now,
+            updated_at=now,
+            expires_at=now + timedelta(hours=72),
         )
         db.add(conv)
         await db.commit()
@@ -123,6 +125,7 @@ class ConversationService:
                 provider=m.provider,
                 model=m.model,
                 created_at=m.created_at,
+                extra_metadata=m.extra_metadata,
             )
             for m in conv.messages
         ]
@@ -143,13 +146,18 @@ class ConversationService:
         owner_id: str,
         title: str,
     ) -> Optional[ConversationSummary]:
+        now = utc_now()
         stmt = (
             update(Conversation)
             .where(
                 Conversation.id == conversation_id,
                 Conversation.owner_id == owner_id,
             )
-            .values(title=title.strip(), updated_at=utc_now())
+            .values(
+                title=title.strip(),
+                updated_at=now,
+                expires_at=now + timedelta(hours=72),
+            )
             .returning(Conversation)
         )
         result = await db.execute(stmt)
@@ -257,6 +265,7 @@ class ConversationService:
         message_id: Optional[str] = None,
         extra_metadata: Optional[str] = None,
     ) -> Message:
+        now = utc_now()
         msg = Message(
             id=message_id or str(uuid.uuid4()),
             conversation_id=conversation_id,
@@ -266,14 +275,14 @@ class ConversationService:
             provider=provider,
             model=model,
             extra_metadata=extra_metadata,
-            created_at=utc_now(),
+            created_at=now,
         )
         db.add(msg)
-        # Touch conversation updated_at
+        # Touch conversation updated_at and extend 72h inactivity expiry
         await db.execute(
             update(Conversation)
             .where(Conversation.id == conversation_id)
-            .values(updated_at=utc_now())
+            .values(updated_at=now, expires_at=now + timedelta(hours=72))
         )
         await db.commit()
         await db.refresh(msg)

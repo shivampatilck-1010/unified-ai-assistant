@@ -1,13 +1,13 @@
 // SSE streaming client for the chat endpoint
 
-import type { SSEEvent, SSEEventType, ChatRequest, ChunkCitation } from '../types';
+import type { SSEEvent, SSEEventType, ChatRequest, ChunkCitation, ErrorData } from '../types';
 import { getStreamUrl } from './api';
 
 export interface StreamCallbacks {
   onMessageStart: (conversationId: string, messageId: string) => void;
   onTextDelta: (text: string) => void;
   onMessageComplete: (finishReason: string, citations?: ChunkCitation[]) => void;
-  onError: (code: string, message: string) => void;
+  onError: (errorData: ErrorData) => void;
   onStreamError: (error: Error) => void;
 }
 
@@ -120,12 +120,19 @@ export async function streamChat(
               );
               break;
             }
-            case 'error':
-              callbacks.onError(
-                (event.data as { code?: string }).code ?? 'UNKNOWN',
-                (event.data as { message?: string }).message ?? 'An unknown error occurred'
-              );
+            case 'error': {
+              const errData = (event.data as unknown as ErrorData) || {};
+              callbacks.onError({
+                code: errData.code ?? 'UNKNOWN',
+                message: errData.message ?? 'An unknown error occurred',
+                category: errData.category,
+                retry_after: errData.retry_after,
+                routed_model: errData.routed_model,
+                retryable: errData.retryable,
+                provider: errData.provider,
+              });
               break;
+            }
           }
         }
       }
@@ -150,12 +157,19 @@ export async function streamChat(
             );
             break;
           }
-          case 'error':
-            callbacks.onError(
-              (event.data as { code?: string }).code ?? 'UNKNOWN',
-              (event.data as { message?: string }).message ?? 'An unknown error occurred'
-            );
+          case 'error': {
+            const errData = (event.data as unknown as ErrorData) || {};
+            callbacks.onError({
+              code: errData.code ?? 'UNKNOWN',
+              message: errData.message ?? 'An unknown error occurred',
+              category: errData.category,
+              retry_after: errData.retry_after,
+              routed_model: errData.routed_model,
+              retryable: errData.retryable,
+              provider: errData.provider,
+            });
             break;
+          }
         }
       }
     }

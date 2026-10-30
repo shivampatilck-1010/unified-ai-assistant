@@ -93,13 +93,27 @@ class AnthropicProvider(BaseProviderAdapter):
                 async for text in stream.text_stream:
                     yield text
         except anthropic.AuthenticationError as err:
-            raise AuthenticationError(str(err)) from err
+            raise AuthenticationError(
+                message="Anthropic authentication failed. Please verify that your ANTHROPIC_API_KEY is valid on the server.",
+                routed_model=selected_model,
+            ) from err
         except anthropic.RateLimitError as err:
-            raise RateLimitError(str(err)) from err
+            clean_message = f"Anthropic rate limit exceeded for {selected_model}. Please try again shortly."
+            raise RateLimitError(
+                message=clean_message,
+                category="rate_limit_rpm",
+                retry_after=None,
+                routed_model=selected_model,
+                retryable=True,
+            ) from err
         except anthropic.APITimeoutError as err:
-            raise TimeoutError(str(err)) from err
+            raise TimeoutError(
+                message=f"Anthropic request timed out for {selected_model}. Please try again.",
+                routed_model=selected_model,
+            ) from err
         except anthropic.APIError as err:
-            raise ProviderError("ANTHROPIC_ERROR", str(err)) from err
+            clean_message = f"Anthropic service encountered an error while processing with {selected_model}. Please try again."
+            raise ProviderError("ANTHROPIC_ERROR", clean_message, category="service_error", routed_model=selected_model, retryable=True) from err
 
     async def generate_text(
         self,

@@ -33,6 +33,10 @@ class SensingPipeline:
             "doppler_energy": sample.doppler_energy,
             "noise_floor_dbm": sample.noise_floor_dbm,
             "inference_note": estimate.inference_note,
+            "position_x": estimate.estimated_x or sample.estimated_x,
+            "position_y": estimate.estimated_y or sample.estimated_y,
+            "velocity_mps": estimate.velocity_mps or sample.velocity_mps,
+            "uncertainty_radius_m": estimate.uncertainty_radius_m or sample.uncertainty_radius_m,
             **sample.metadata,
         }
 
@@ -47,6 +51,10 @@ class SensingPipeline:
             signal_strength_dbm=sample.rssi_dbm,
             sample_count=sample.sample_count,
             quality_score=estimate.quality_score,
+            estimated_x=estimate.estimated_x or sample.estimated_x,
+            estimated_y=estimate.estimated_y or sample.estimated_y,
+            velocity_mps=estimate.velocity_mps or sample.velocity_mps,
+            uncertainty_radius_m=estimate.uncertainty_radius_m or sample.uncertainty_radius_m,
             raw_metrics=raw_metrics,
         )
 

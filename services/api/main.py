@@ -43,10 +43,12 @@ from routers import (
     research_router,
     tasks_router,
     wifi_sensing_router,
+    retention_router,
 )
 from services.model_gateway import get_model_gateway
 from services.orchestration.engine import OrchestrationEngine
 from services.reminder_scheduler import scheduler_instance
+from services.retention_scheduler import retention_scheduler_instance
 from services.research.job_service import ResearchJobService
 from worker import get_worker_runner
 
@@ -71,11 +73,14 @@ async def lifespan(app: FastAPI):
     await worker_runner.recover_dangling_tasks()
     # Start background reminder scheduler
     scheduler_instance.start()
+    # Start background 72-hour data retention scheduler
+    retention_scheduler_instance.start()
     try:
         yield
     finally:
-        # Graceful shutdown of scheduler
+        # Graceful shutdown of schedulers
         await scheduler_instance.stop()
+        await retention_scheduler_instance.stop()
 
 
 app = FastAPI(
@@ -120,6 +125,7 @@ app.include_router(knowledge_router)
 app.include_router(research_router)
 app.include_router(wifi_sensing_router)
 app.include_router(orchestration_router)
+app.include_router(retention_router)
 
 
 class HealthResponse(BaseModel):

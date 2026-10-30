@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON
@@ -10,6 +10,10 @@ from models.base import Base
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def default_expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(hours=72)
 
 
 class WifiSensorConfig(Base):
@@ -127,6 +131,13 @@ class WifiSensingEvent(Base):
         index=True,
         comment="Timestamp of observation in UTC",
     )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=default_expires_at,
+        index=True,
+        comment="Automatic data deletion timestamp (72 hours after sensing event)",
+    )
     is_simulated: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -186,6 +197,34 @@ class WifiSensingEvent(Base):
         "WifiSensorConfig",
         back_populates="events",
     )
+
+    @property
+    def estimated_x(self) -> Optional[float]:
+        if isinstance(self.raw_metrics, dict):
+            val = self.raw_metrics.get("position_x")
+            return float(val) if val is not None else None
+        return None
+
+    @property
+    def estimated_y(self) -> Optional[float]:
+        if isinstance(self.raw_metrics, dict):
+            val = self.raw_metrics.get("position_y")
+            return float(val) if val is not None else None
+        return None
+
+    @property
+    def velocity_mps(self) -> Optional[float]:
+        if isinstance(self.raw_metrics, dict):
+            val = self.raw_metrics.get("velocity_mps")
+            return float(val) if val is not None else None
+        return None
+
+    @property
+    def uncertainty_radius_m(self) -> Optional[float]:
+        if isinstance(self.raw_metrics, dict):
+            val = self.raw_metrics.get("uncertainty_radius_m")
+            return float(val) if val is not None else None
+        return None
 
     __table_args__ = (
         Index("ix_wifi_sensing_events_owner_room_ts", "owner_id", "room_id", "timestamp"),

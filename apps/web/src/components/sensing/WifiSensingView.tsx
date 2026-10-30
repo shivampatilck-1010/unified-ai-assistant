@@ -22,6 +22,7 @@ import type {
   WifiSensingAudit,
   WifiSensingStatusResponse,
 } from '../../types';
+import { RoomPositionCanvas } from './RoomPositionCanvas';
 import './WifiSensingView.css';
 
 export const WifiSensingView: React.FC = () => {
@@ -418,8 +419,28 @@ export const WifiSensingView: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Metrics Row */}
-          <div className="metrics-row">
+          {/* Primary Interactive 2D Room Position Canvas */}
+          {activeConfig && (
+            <RoomPositionCanvas
+              currentEvent={events.length > 0 ? events[0] : null}
+              historicalEvents={events}
+              roomName={activeConfig.room_name}
+              isSimulated={activeConfig.is_active ? statusData?.simulation_mode ?? true : true}
+              isActive={activeConfig.is_active}
+              onStepTick={() => void handleStep()}
+            />
+          )}
+
+          {/* Collapsible Technical Diagnostics Drawer */}
+          <details className="diagnostics-drawer">
+            <summary className="diagnostics-summary">
+              <span className="diagnostics-summary-title">Technical Diagnostics & Raw RF Telemetry</span>
+              <span className="diagnostics-summary-hint">Click to inspect numerical RSSI tables, state breakdowns, and hardware logs</span>
+            </summary>
+
+            <div className="diagnostics-content">
+              {/* Metrics Row */}
+              <div className="metrics-row">
             <div className="metric-tile">
               <div className="metric-tile-title">Simulated Occupancy State</div>
               <div
@@ -611,8 +632,10 @@ export const WifiSensingView: React.FC = () => {
               </div>
             )}
           </div>
-        </>
-      )}
+        </div>
+      </details>
+    </>
+  )}
 
       {/* Create Zone Modal */}
       {showCreateModal && (

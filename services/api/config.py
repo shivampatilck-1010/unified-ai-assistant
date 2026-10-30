@@ -54,6 +54,7 @@ class Settings:
         # Default provider / model selection
         self.default_provider: Optional[str] = os.getenv("DEFAULT_PROVIDER", os.getenv("DEFAULT_MODEL_PROVIDER"))
         self.default_model: Optional[str] = os.getenv("DEFAULT_MODEL", os.getenv("DEFAULT_MODEL_NAME"))
+        self.allow_provider_fallback: bool = os.getenv("ALLOW_PROVIDER_FALLBACK", "false").lower() in ("true", "1", "yes")
 
         # Development identity boundary (for local single-user or auth mock)
         self.dev_user_id: str = os.getenv("DEV_USER_ID", "dev-user-default")

@@ -48,6 +48,10 @@ class RawSensorSample:
     doppler_energy: float
     noise_floor_dbm: float
     quality_score: float
+    estimated_x: Optional[float] = None
+    estimated_y: Optional[float] = None
+    velocity_mps: Optional[float] = None
+    uncertainty_radius_m: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -61,6 +65,10 @@ class PresenceEstimate:
     quality_score: float  # 0.0 - 1.0
     inference_note: str
     is_simulated: bool = True
+    estimated_x: Optional[float] = None
+    estimated_y: Optional[float] = None
+    velocity_mps: Optional[float] = None
+    uncertainty_radius_m: Optional[float] = None
 
 
 @dataclass
@@ -77,4 +85,8 @@ class NormalizedSensorEvent:
     signal_strength_dbm: float
     sample_count: int
     quality_score: float
+    estimated_x: Optional[float] = None
+    estimated_y: Optional[float] = None
+    velocity_mps: Optional[float] = None
+    uncertainty_radius_m: Optional[float] = None
     raw_metrics: Dict[str, Any] = field(default_factory=dict)

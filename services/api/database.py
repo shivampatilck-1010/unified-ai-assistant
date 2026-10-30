@@ -63,6 +63,46 @@ async def check_db_readiness() -> bool:
 
 
 async def create_tables() -> None:
-    """Creates database schema if not already managed by migrations (e.g. for sqlite test fallback)."""
+    """Creates database schema if not already managed by migrations and ensures 72h data retention columns exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Ensure 'expires_at' column exists for existing tables without breaking data
+        retention_tables = [
+            "conversations",
+            "files",
+            "wifi_sensing_events",
+            "browser_tasks",
+            "research_jobs",
+            "workflows",
+        ]
+
+        for tbl in retention_tables:
+            try:
+                # Check for SQLite pragma or standard SQL
+                if "sqlite" in settings.database_url:
+                    cols_res = await conn.execute(text(f"PRAGMA table_info({tbl})"))
+                    existing_cols = {row[1] for row in cols_res.fetchall()}
+                else:
+                    cols_res = await conn.execute(
+                        text("SELECT column_name FROM information_schema.columns WHERE table_name = :t"),
+                        {"t": tbl},
+                    )
+                    existing_cols = {row[0].lower() for row in cols_res.fetchall()}
+
+                if existing_cols and "expires_at" not in existing_cols:
+                    await conn.execute(
+                        text(f"ALTER TABLE {tbl} ADD COLUMN expires_at TIMESTAMP")
+                    )
+                    # Backfill existing rows with 72h expiry from updated_at / created_at / now
+                    if "sqlite" in settings.database_url:
+                        await conn.execute(
+                            text(f"UPDATE {tbl} SET expires_at = datetime('now', '+72 hours') WHERE expires_at IS NULL")
+                        )
+                    else:
+                        await conn.execute(
+                            text(f"UPDATE {tbl} SET expires_at = NOW() + INTERVAL '72 hours' WHERE expires_at IS NULL")
+                        )
+            except Exception:
+                # Table might not exist yet or dialect-specific
+                pass

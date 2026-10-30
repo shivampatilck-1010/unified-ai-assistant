@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ConversationSummary, ConversationDetail, ChatMessage, ChunkCitation } from '../types';
+import type { ConversationSummary, ConversationDetail, ChatMessage, ChunkCitation, ErrorData } from '../types';
 import {
   fetchConversations,
   fetchConversation,
@@ -134,32 +134,59 @@ export function useConversations(backendConnected: boolean = true) {
       selectedFileIds?: string[],
       useResearch?: boolean,
       researchDepth?: string,
-      useOrchestration?: boolean
+      useOrchestration?: boolean,
+      targetAssistantId?: string
     ) => {
-      const userMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'user',
-        content,
-        created_at: new Date().toISOString(),
-      };
+      const assistantMsgId = targetAssistantId || crypto.randomUUID();
 
-      const assistantMsgId = crypto.randomUUID();
-      const assistantMsg: ChatMessage = {
-        id: assistantMsgId,
-        role: 'assistant',
-        content: '',
-        created_at: new Date().toISOString(),
-        isStreaming: true,
-      };
-
-      // Optimistic update to current view
-      setActiveConversation((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          messages: [...prev.messages, userMsg, assistantMsg],
+      if (targetAssistantId) {
+        // Retrying into an existing assistant message bubble without duplicating messages
+        setActiveConversation((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === targetAssistantId
+                ? {
+                    ...m,
+                    content: '',
+                    isStreaming: true,
+                    isError: false,
+                    error_code: undefined,
+                    error_category: undefined,
+                    retry_after: undefined,
+                    retryable: undefined,
+                    routed_model: undefined,
+                  }
+                : m
+            ),
+          };
+        });
+      } else {
+        const userMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content,
+          created_at: new Date().toISOString(),
         };
-      });
+
+        const assistantMsg: ChatMessage = {
+          id: assistantMsgId,
+          role: 'assistant',
+          content: '',
+          created_at: new Date().toISOString(),
+          isStreaming: true,
+        };
+
+        // Optimistic update to current view
+        setActiveConversation((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            messages: [...prev.messages, userMsg, assistantMsg],
+          };
+        });
+      }
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -208,18 +235,29 @@ export function useConversations(backendConnected: boolean = true) {
             setIsStreaming(false);
             void refreshList();
           },
-          onError: (_code: string, message: string) => {
+          onError: (errData: ErrorData) => {
             setActiveConversation((prev) => {
               if (!prev) return null;
               return {
                 ...prev,
                 messages: prev.messages.map((m) =>
                   m.id === assistantMsgId
-                    ? { ...m, content: message, isStreaming: false, isError: true }
+                    ? {
+                        ...m,
+                        content: errData.message,
+                        isStreaming: false,
+                        isError: true,
+                        error_code: errData.code,
+                        error_category: errData.category,
+                        retry_after: errData.retry_after,
+                        retryable: errData.retryable,
+                        routed_model: errData.routed_model,
+                      }
                     : m
                 ),
               };
             });
+            setIsStreaming(false);
           },
           onStreamError: (streamErr: Error) => {
             setActiveConversation((prev) => {
@@ -245,6 +283,29 @@ export function useConversations(backendConnected: boolean = true) {
       );
     },
     [activeId, refreshList]
+  );
+
+  const retryMessage = useCallback(
+    async (failedMsgId: string, provider?: string | null, model?: string | null) => {
+      if (!activeConversation) return;
+      const idx = activeConversation.messages.findIndex((m) => m.id === failedMsgId);
+      if (idx <= 0) return;
+      const userMsg = activeConversation.messages[idx - 1];
+      if (userMsg.role !== 'user') return;
+
+      await sendMessage(
+        userMsg.content,
+        provider,
+        model,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        failedMsgId
+      );
+    },
+    [activeConversation, sendMessage]
   );
 
   const cancelStream = useCallback(() => {
@@ -274,6 +335,7 @@ export function useConversations(backendConnected: boolean = true) {
     renameConversation: rename,
     deleteConversation: deleteConv,
     sendMessage,
+    retryMessage,
     cancelStream,
   };
 }

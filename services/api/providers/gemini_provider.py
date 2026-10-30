@@ -1,4 +1,5 @@
 import os
+import re
 from typing import AsyncGenerator, Dict, List, Optional
 from google import genai
 from google.genai import errors as genai_errors
@@ -19,11 +20,18 @@ class GeminiProvider(BaseProviderAdapter):
 
     MODELS = [
         ModelInfo(
-            id="gemini-3.5-flash",
-            name="Gemini 3.5 Flash",
+            id="gemini-3.6-flash",
+            name="Gemini 3.6 Flash",
             provider="gemini",
             context_window=1048576,
             is_default=True,
+        ),
+        ModelInfo(
+            id="gemini-3.5-flash",
+            name="Gemini 3.5 Flash (Legacy)",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
         ),
         ModelInfo(
             id="gemini-3.5-flash-lite",
@@ -105,12 +113,159 @@ class GeminiProvider(BaseProviderAdapter):
             raise AuthenticationError("Gemini API key is not configured on the server.")
         return genai.Client(api_key=self._api_key)
 
+    @classmethod
+    def _parse_gemini_api_error(cls, err: Exception, requested_model: str) -> ProviderError:
+        """Parses Google GenAI API errors into clean, structured ProviderErrors without leaking raw RPC payloads."""
+        status_code = getattr(err, "code", None)
+        status = getattr(err, "status", None)
+        details = getattr(err, "details", None)
+        raw_message = getattr(err, "message", None) or str(err)
+
+        # 1. Extract details array
+        details_list = []
+        if isinstance(details, dict):
+            error_dict = details.get("error", details)
+            if isinstance(error_dict, dict):
+                details_list = error_dict.get("details", [])
+        elif isinstance(details, list):
+            details_list = details
+
+        # 2. Extract routed_model, quota_id, violation description, retry_after
+        routed_model: Optional[str] = None
+        quota_id: Optional[str] = None
+        violation_desc: Optional[str] = None
+        retry_after: Optional[float] = None
+
+        for item in details_list:
+            if not isinstance(item, dict):
+                continue
+            item_type = str(item.get("@type", ""))
+            if "QuotaFailure" in item_type:
+                violations = item.get("violations", [])
+                if isinstance(violations, list) and violations:
+                    v = violations[0]
+                    if isinstance(v, dict):
+                        quota_id = v.get("quotaId")
+                        violation_desc = v.get("description")
+                        dims = v.get("quotaDimensions", {})
+                        if isinstance(dims, dict) and "model" in dims:
+                            routed_model = dims["model"]
+            elif "RetryInfo" in item_type:
+                delay = item.get("retryDelay")
+                if delay:
+                    delay_match = re.search(r"([0-9]+(?:\.[0-9]+)?)s", str(delay))
+                    if delay_match:
+                        try:
+                            retry_after = float(delay_match.group(1))
+                        except ValueError:
+                            pass
+
+        # Fallback routed_model from text if not extracted from details
+        if not routed_model:
+            model_match = re.search(r"model:\s*([a-zA-Z0-9.-]+)", raw_message)
+            if model_match:
+                routed_model = model_match.group(1)
+
+        # Fallback retry_after from text if not extracted (e.g. "retry in 11h43m7.89s" or "retry in 42187s")
+        if retry_after is None:
+            time_match = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", raw_message)
+            if time_match:
+                hours = float(time_match.group(1) or 0)
+                minutes = float(time_match.group(2) or 0)
+                seconds = float(time_match.group(3) or 0)
+                total_sec = hours * 3600 + minutes * 60 + seconds
+                if total_sec > 0:
+                    retry_after = total_sec
+
+        effective_model = routed_model or requested_model
+
+        # 3. Categorize and build user-friendly messages
+        err_str = str(err)
+        if status_code in (401, 403) or "API_KEY_INVALID" in err_str or "PERMISSION_DENIED" in err_str:
+            return AuthenticationError(
+                message="Gemini authentication failed. Please verify that your GEMINI_API_KEY is valid on the server.",
+                routed_model=effective_model,
+            )
+
+        if status_code == 429 or status == "RESOURCE_EXHAUSTED" or "RESOURCE_EXHAUSTED" in err_str:
+            is_daily = False
+            if quota_id and "PerDay" in quota_id:
+                is_daily = True
+            elif violation_desc and ("per day" in violation_desc.lower() or "free tier" in violation_desc.lower()):
+                is_daily = True
+            elif "per day limit exceeded" in raw_message.lower():
+                is_daily = True
+            elif retry_after and retry_after > 300:
+                is_daily = True
+
+            if is_daily:
+                category = "daily_quota_exhausted"
+                time_hint = ""
+                if retry_after:
+                    h = int(retry_after // 3600)
+                    m = int((retry_after % 3600) // 60)
+                    if h > 0 and m > 0:
+                        time_hint = f" The quota resets in approximately {h}h {m}m."
+                    elif h > 0:
+                        time_hint = f" The quota resets in approximately {h} hour{'s' if h > 1 else ''}."
+                    elif m > 0:
+                        time_hint = f" The quota resets in approximately {m} minute{'s' if m > 1 else ''}."
+                    else:
+                        time_hint = f" The quota resets in approximately {int(retry_after)} seconds."
+
+                clean_msg = (
+                    f"Gemini has reached its daily free-tier usage limit for {effective_model}.{time_hint} "
+                    "You can wait for the quota to reset or select another configured model or provider."
+                )
+                return RateLimitError(
+                    message=clean_msg,
+                    category=category,
+                    retry_after=retry_after,
+                    routed_model=effective_model,
+                    retryable=False,
+                )
+            else:
+                category = "rate_limit_rpm"
+                if retry_after and retry_after <= 120:
+                    clean_msg = (
+                        f"Gemini is receiving high traffic for {effective_model}. "
+                        f"Please wait {int(retry_after)} seconds before trying again."
+                    )
+                else:
+                    clean_msg = (
+                        f"Gemini rate limit exceeded for {effective_model}. "
+                        "Please wait a moment before trying again."
+                    )
+                return RateLimitError(
+                    message=clean_msg,
+                    category=category,
+                    retry_after=retry_after,
+                    routed_model=effective_model,
+                    retryable=True,
+                )
+
+        if status_code == 408 or "DEADLINE_EXCEEDED" in err_str:
+            return TimeoutError(
+                message=f"Gemini request timed out for {effective_model}. Please try again.",
+                routed_model=effective_model,
+            )
+
+        # Generic safe error without dumping raw JSON RPC payload
+        return ProviderError(
+            code="GEMINI_ERROR",
+            message=f"Gemini service encountered an error while processing with {effective_model}. Please try again shortly.",
+            category="service_error",
+            retry_after=retry_after,
+            routed_model=effective_model,
+            retryable=True,
+        )
+
     async def generate_stream(
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
-        selected_model = model or "gemini-3.5-flash"
+        selected_model = model or "gemini-3.6-flash"
         valid_models = {m.id for m in self.MODELS}
         if selected_model not in valid_models:
             raise InvalidModelError(selected_model, self.provider_id)
@@ -135,14 +290,7 @@ class GeminiProvider(BaseProviderAdapter):
                     yield chunk.text
         except genai_errors.APIError as err:
             status_code = getattr(err, "code", None)
-            message = str(err)
-            if status_code in (401, 403) or "API_KEY_INVALID" in message:
-                raise AuthenticationError(message) from err
-            elif status_code == 429 or "RESOURCE_EXHAUSTED" in message:
-                raise RateLimitError(message) from err
-            elif status_code == 408 or "DEADLINE_EXCEEDED" in message:
-                raise TimeoutError(message) from err
-            elif status_code == 503 and selected_model != "gemini-3.5-flash-lite":
+            if status_code == 503 and selected_model not in ("gemini-3.5-flash-lite", "gemini-flash-latest"):
                 # Upstream demand spike on selected model: gracefully fall back to gemini-3.5-flash-lite
                 try:
                     fallback_stream = await client.aio.models.generate_content_stream(
@@ -155,11 +303,11 @@ class GeminiProvider(BaseProviderAdapter):
                     return
                 except Exception:
                     pass
-                raise ProviderError("GEMINI_ERROR", message) from err
-            else:
-                raise ProviderError("GEMINI_ERROR", message) from err
+            raise self._parse_gemini_api_error(err, selected_model) from err
+        except ProviderError:
+            raise
         except Exception as err:
-            raise ProviderError("GEMINI_ERROR", str(err)) from err
+            raise self._parse_gemini_api_error(err, selected_model) from err
 
     async def generate_text(
         self,

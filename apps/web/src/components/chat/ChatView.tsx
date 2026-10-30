@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import type { ChatMessage, ModelInfo } from '../../types';
 import { Composer } from '../composer/Composer';
+import { MarkdownContent } from './MarkdownContent';
 import './ChatView.css';
 
 interface ChatViewProps {
@@ -15,6 +16,7 @@ interface ChatViewProps {
     researchDepth?: string,
     useOrchestration?: boolean
   ) => void;
+  onRetry?: (messageId: string, provider?: string | null, model?: string | null) => void;
   isStreaming: boolean;
   onCancel: () => void;
   onNewChat: () => void;
@@ -26,6 +28,7 @@ interface ChatViewProps {
 export function ChatView({
   messages,
   onSend,
+  onRetry,
   isStreaming,
   onCancel,
   onNewChat,
@@ -216,7 +219,7 @@ export function ChatView({
           </div>
         ) : (
           <div className="chat-view__message-list">
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <div
                 key={msg.id}
                 className={`chat-message chat-message--${msg.role} ${
@@ -234,6 +237,49 @@ export function ChatView({
                 <div className="chat-message__content">
                   {msg.isStreaming && !msg.content ? (
                     <span className="chat-message__thinking">Thinking…</span>
+                  ) : msg.isError || msg.status === 'error' ? (
+                    <div className="chat-message__error-container">
+                      <div className="chat-message__error-header">
+                        <svg className="chat-message__error-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                          <path d="M8 4.5v4.5M8 11.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                        <span className="chat-message__error-title">
+                          {msg.error_category === 'daily_quota_exhausted'
+                            ? 'Daily Quota Limit Reached'
+                            : msg.error_code === 'RATE_LIMIT_EXCEEDED'
+                            ? 'Usage Limit Reached'
+                            : msg.error_code === 'AUTHENTICATION_FAILED'
+                            ? 'Authentication Error'
+                            : 'Generation Error'}
+                        </span>
+                      </div>
+                      <div className="chat-message__error-text">
+                        <MarkdownContent content={msg.content} isError />
+                      </div>
+                      <div className="chat-message__error-actions">
+                        {onRetry && (
+                          <button
+                            type="button"
+                            className="chat-message__retry-btn"
+                            disabled={isStreaming}
+                            onClick={() => onRetry(msg.id, currentModel?.provider, selectedModelId)}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <path d="M2.5 8a5.5 5.5 0 109.9-3.3M12.5 2.5v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Retry
+                          </button>
+                        )}
+                        {availableModels.length > 1 && (
+                          <span className="chat-message__switch-hint">
+                            Switch models in the dropdown above to continue.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : msg.role === 'assistant' ? (
+                    <MarkdownContent content={msg.content} />
                   ) : (
                     <span>{msg.content}</span>
                   )}
@@ -252,9 +298,36 @@ export function ChatView({
                       </div>
                     </div>
                   )}
-                  {msg.model && (
-                    <div className="chat-message__meta">
-                      Generated via {msg.model}
+                  {!msg.isError && msg.status !== 'error' && (
+                    <div className="chat-message__footer">
+                      {msg.model && (
+                        <div className="chat-message__meta">
+                          Generated via {msg.model}
+                        </div>
+                      )}
+                      {msg.role === 'assistant' && !msg.isStreaming && (
+                        <div className="chat-message__actions">
+                          <button
+                            type="button"
+                            className="chat-message__action-btn"
+                            title="Copy response to clipboard"
+                            onClick={() => void navigator.clipboard.writeText(msg.content)}
+                          >
+                            Copy
+                          </button>
+                          {onRetry && idx === messages.length - 1 && (
+                            <button
+                              type="button"
+                              className="chat-message__action-btn"
+                              title="Regenerate this response"
+                              disabled={isStreaming}
+                              onClick={() => onRetry(msg.id, currentModel?.provider, selectedModelId)}
+                            >
+                              Regenerate
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

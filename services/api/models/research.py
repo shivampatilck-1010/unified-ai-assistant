@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, JSON
@@ -10,6 +10,10 @@ from models.base import Base
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def default_expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(hours=72)
 
 
 class ResearchJob(Base):
@@ -120,6 +124,13 @@ class ResearchJob(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=default_expires_at,
+        nullable=False,
+        index=True,
+        comment="Automatic data deletion timestamp (72 hours after creation)",
     )
 
     sources: Mapped[List["ResearchSource"]] = relationship(

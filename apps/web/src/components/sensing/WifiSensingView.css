@@ -431,3 +431,73 @@
   gap: 10px;
   margin-top: 24px;
 }
+
+/* Collapsible Diagnostics Drawer */
+.diagnostics-drawer {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  margin-top: 16px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.diagnostics-drawer[open] {
+  border-color: #334155;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.diagnostics-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  background: #1e293b;
+  user-select: none;
+  list-style: none;
+  transition: background 0.15s ease;
+}
+
+.diagnostics-summary::-webkit-details-marker {
+  display: none;
+}
+
+.diagnostics-summary:hover {
+  background: #273549;
+}
+
+.diagnostics-summary-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagnostics-summary-title::before {
+  content: '▶';
+  font-size: 10px;
+  color: #94a3b8;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.diagnostics-drawer[open] .diagnostics-summary-title::before {
+  transform: rotate(90deg);
+  color: #38bdf8;
+}
+
+.diagnostics-summary-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.diagnostics-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #0b1120;
+}

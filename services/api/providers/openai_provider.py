@@ -85,13 +85,27 @@ class OpenAIProvider(BaseProviderAdapter):
                 if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except openai.AuthenticationError as err:
-            raise AuthenticationError(str(err)) from err
+            raise AuthenticationError(
+                message="OpenAI authentication failed. Please verify that your OPENAI_API_KEY is valid on the server.",
+                routed_model=selected_model,
+            ) from err
         except openai.RateLimitError as err:
-            raise RateLimitError(str(err)) from err
+            clean_message = f"OpenAI rate limit exceeded for {selected_model}. Please try again shortly."
+            raise RateLimitError(
+                message=clean_message,
+                category="rate_limit_rpm",
+                retry_after=None,
+                routed_model=selected_model,
+                retryable=True,
+            ) from err
         except openai.APITimeoutError as err:
-            raise TimeoutError(str(err)) from err
+            raise TimeoutError(
+                message=f"OpenAI request timed out for {selected_model}. Please try again.",
+                routed_model=selected_model,
+            ) from err
         except openai.APIError as err:
-            raise ProviderError("OPENAI_ERROR", str(err)) from err
+            clean_message = f"OpenAI service encountered an error while processing with {selected_model}. Please try again."
+            raise ProviderError("OPENAI_ERROR", clean_message, category="service_error", routed_model=selected_model, retryable=True) from err
 
     async def generate_text(
         self,

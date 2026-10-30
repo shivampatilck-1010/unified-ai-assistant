@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -9,6 +9,10 @@ from models.base import Base
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def default_expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(hours=72)
 
 
 class Workflow(Base):
@@ -33,6 +37,13 @@ class Workflow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=default_expires_at,
+        nullable=False,
+        index=True,
+        comment="Automatic data deletion timestamp (72 hours after creation)",
+    )
 
     steps: Mapped[List["WorkflowStep"]] = relationship(
         "WorkflowStep",

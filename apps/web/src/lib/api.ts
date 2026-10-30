@@ -24,6 +24,9 @@ import type {
   Reminder,
   ReminderCreatePayload,
   ReminderListResponse,
+  RetentionStatusResponse,
+  RetentionCleanupResponse,
+  RetentionPurgeResponse,
   ResearchJob,
   ResearchJobCreate,
   ResearchJobDetailResponse,
@@ -1269,6 +1272,37 @@ export async function listWorkflowEvents(
   });
   if (!res.ok) throw new Error(`Failed to list workflow events: ${res.status}`);
   return (await res.json()) as WorkflowEvent[];
+}
+
+// Data Retention & Privacy APIs (72-Hour Automatic Purge)
+export async function fetchRetentionStatus(signal?: AbortSignal): Promise<RetentionStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/retention/status`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to fetch retention status: ${res.status}`);
+  return (await res.json()) as RetentionStatusResponse;
+}
+
+export async function triggerRetentionCleanup(signal?: AbortSignal): Promise<RetentionCleanupResponse> {
+  const res = await fetch(`${API_BASE}/api/retention/cleanup`, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Failed to trigger retention cleanup: ${res.status}`);
+  return (await res.json()) as RetentionCleanupResponse;
+}
+
+export async function purgeAllUserData(confirmPurge: boolean = true, signal?: AbortSignal): Promise<RetentionPurgeResponse> {
+  const res = await fetch(`${API_BASE}/api/retention/purge-my-data`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ confirm_purge: confirmPurge }),
+  });
+  if (!res.ok) throw new Error(`Failed to purge user data: ${res.status}`);
+  return (await res.json()) as RetentionPurgeResponse;
 }
 
 export { API_BASE };
