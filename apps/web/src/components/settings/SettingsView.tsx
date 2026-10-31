@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchRetentionStatus, purgeAllUserData, triggerRetentionCleanup } from '../../lib/api';
+import { fetchHealth, fetchRetentionStatus, getApiBase, purgeAllUserData, setApiBase, triggerRetentionCleanup } from '../../lib/api';
 import type { UnifiedProviderStatusResponse, RetentionStatusResponse, ModelInfo } from '../../types';
 import './SettingsView.css';
 
@@ -15,6 +15,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
   const [purgeActionLoading, setPurgeActionLoading] = useState<boolean>(false);
   const [showPurgeModal, setShowPurgeModal] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Backend Ingress & Endpoint Configuration
+  const [backendUrl, setBackendUrl] = useState<string>(getApiBase());
+  const [testingBackend, setTestingBackend] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSaveBackendUrl = () => {
+    setApiBase(backendUrl);
+    setNotification({
+      type: 'success',
+      message: `Backend API endpoint updated to: ${backendUrl || 'relative default'}`,
+    });
+  };
+
+  const handleTestBackend = async () => {
+    try {
+      setTestingBackend(true);
+      setTestResult(null);
+      const start = performance.now();
+      const res = await fetchHealth();
+      const duration = Math.round(performance.now() - start);
+      setTestResult({
+        success: true,
+        message: `Connected successfully (v${res.version || '0.1.0'}) - ${duration}ms latency`,
+      });
+    } catch (err: unknown) {
+      setTestResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Connection test failed',
+      });
+    } finally {
+      setTestingBackend(false);
+    }
+  };
+
+  const handleResetBackend = () => {
+    setApiBase(null);
+    setBackendUrl(getApiBase());
+    setNotification({
+      type: 'success',
+      message: 'Backend API endpoint reset to default.',
+    });
+  };
 
   const loadRetention = async () => {
     try {
@@ -106,6 +149,107 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
             </button>
           </div>
         )}
+
+        {/* Backend Ingress & Endpoint Configuration */}
+        <section className="settings-section">
+          <div className="settings-section__header">
+            <div className="settings-section__title-group">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="settings-icon">
+                <circle cx="10" cy="10" r="7" stroke="#3b82f6" strokeWidth="1.6" />
+                <path d="M10 6v4l2.5 2.5" stroke="#3b82f6" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              <div>
+                <h3 className="settings-section__title">Backend API Endpoint</h3>
+                <span className="privacy-active-badge" style={{ background: '#1e3a5f', color: '#93c5fd' }}>Ingress</span>
+              </div>
+            </div>
+            <p className="settings-section__desc">
+              Configure your backend server URL (e.g. Cloudflare Tunnel, staging domain, or local development port).
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                value={backendUrl}
+                onChange={(e) => setBackendUrl(e.target.value)}
+                placeholder="http://127.0.0.1:8000 or https://your-tunnel.trycloudflare.com"
+                style={{
+                  flex: 1,
+                  minWidth: '260px',
+                  background: '#1a1a1a',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  color: '#fff',
+                  fontSize: '13px',
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleSaveBackendUrl}
+                style={{
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Save Endpoint
+              </button>
+              <button
+                type="button"
+                onClick={handleTestBackend}
+                disabled={testingBackend}
+                style={{
+                  background: '#262626',
+                  color: '#e5e5e5',
+                  border: '1px solid #3d3d3d',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontSize: '13px',
+                  cursor: testingBackend ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {testingBackend ? 'Testing…' : 'Test Connection'}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetBackend}
+                style={{
+                  background: 'transparent',
+                  color: '#a3a3a3',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Reset
+              </button>
+            </div>
+            {testResult && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: testResult.success ? '#064e3b' : '#7f1d1d',
+                  color: testResult.success ? '#6ee7b7' : '#fca5a5',
+                  border: `1px solid ${testResult.success ? '#059669' : '#b91c1c'}`,
+                }}
+              >
+                {testResult.success ? '✓ ' : '✗ '} {testResult.message}
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* 1. Mandatory 72-Hour Data Retention & Privacy Section */}
         <section className="settings-section">

@@ -64,18 +64,41 @@ import type {
   WorkflowPlan,
 } from '../types';
 
-const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
-const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+export function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('unified_ai_api_base');
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+  }
+  const raw = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
+  return raw.replace(/\/+$/, '');
+}
+
+export function setApiBase(url: string | null): void {
+  if (typeof window !== 'undefined') {
+    if (url && url.trim()) {
+      localStorage.setItem('unified_ai_api_base', url.trim().replace(/\/+$/, ''));
+    } else {
+      localStorage.removeItem('unified_ai_api_base');
+    }
+  }
+}
+
+const API_BASE = {
+  toString: () => getApiBase(),
+};
 
 function buildUrl(path: string): URL {
+  const base = getApiBase();
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  if (API_BASE) {
-    return new URL(`${API_BASE}${normalizedPath}`);
+  if (base) {
+    return new URL(`${base}${normalizedPath}`);
   }
-  const base = typeof window !== 'undefined' && window.location?.origin
+  const fallback = typeof window !== 'undefined' && window.location?.origin
     ? window.location.origin
     : 'http://localhost';
-  return new URL(normalizedPath, base);
+  return new URL(normalizedPath, fallback);
 }
 
 let currentAuthToken: string | null =
