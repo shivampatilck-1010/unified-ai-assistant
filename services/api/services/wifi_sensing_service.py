@@ -750,7 +750,7 @@ class WifiSensingService:
             estimated_x=state.estimated_x if state else 3.0,
             estimated_y=state.estimated_y if state else 2.0,
             velocity_mps=state.velocity_mps if state else 0.0,
-            occupant_count=state.occupant_count if state else 4,
+            occupant_count=state.occupant_count if state else 0,
             occupants=state.occupants if state else [],
         )
 

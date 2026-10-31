@@ -216,7 +216,7 @@ class Esp32HardwareStatusResponse(BaseModel):
     estimated_x: Optional[float] = 3.0
     estimated_y: Optional[float] = 2.0
     velocity_mps: Optional[float] = 0.0
-    occupant_count: Optional[int] = 4
+    occupant_count: Optional[int] = 0
     occupants: List[Dict[str, Any]] = Field(default_factory=list)
 
 

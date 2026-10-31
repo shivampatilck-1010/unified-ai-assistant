@@ -252,11 +252,11 @@ class Esp32CsiHardwareAdapter(BaseSensorProvider):
             ),
         }
 
-        # Human silhouette item for canvas rendering
+        # Detected target silhouette items for spatial rendering
         if state.presence_state in ("movement_detected", "possible_presence"):
             metadata["tracked_subjects"] = [
                 {
-                    "subject_id": "Detected Occupant (RF Perturbation)",
+                    "subject_id": "Target #1 [Dynamic RF Centroid]",
                     "x": est_x,
                     "y": est_y,
                     "presence_state": "motion" if state.presence_state == "movement_detected" else "presence",
@@ -264,7 +264,7 @@ class Esp32CsiHardwareAdapter(BaseSensorProvider):
                     "uncertainty_radius_m": uncertainty_m,
                 }
             ]
-            metadata["occupancy_count"] = 1
+            metadata["occupancy_count"] = state.occupant_count if state.occupant_count > 0 else 1
         else:
             metadata["tracked_subjects"] = []
             metadata["occupancy_count"] = 0

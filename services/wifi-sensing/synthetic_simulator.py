@@ -149,7 +149,7 @@ class SyntheticSensorSimulator(BaseSensorProvider):
         velocity_mps: Optional[float] = None
         uncertainty_radius_m: Optional[float] = None
 
-        # Multi-occupant modeling (4 occupants in room: User + 3 Roommates)
+        # Multi-target spatial RF cluster modeling
         tracked_subjects = []
         occupancy_count = 0
 
@@ -160,7 +160,7 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             rssi = -64.0 + self._rng.uniform(-1.0, 1.0)
             noise_floor = -92.0 + self._rng.uniform(-0.5, 0.5)
             quality = 0.98
-            # Room is unoccupied
+            # Space is unoccupied
             pos_x = None
             pos_y = None
             velocity_mps = 0.0
@@ -169,14 +169,14 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             tracked_subjects = []
 
         elif state == "stationary":
-            # Breathing modulation: subtle sinusoidal fluctuation (0.25 Hz approx)
+            # Subtle physiological micro-motion / breathing modulation
             breath_wave = 0.05 * math.sin(self._tick * 0.4 * self._speed)
             variance = 0.12 + breath_wave + self._rng.uniform(0.0, 0.03)
             doppler = 0.10 + 0.03 * math.sin(self._tick * 0.4 * self._speed)
             rssi = -58.0 + self._rng.uniform(-1.5, 1.5)
             noise_floor = -91.0
             quality = 0.99
-            # Subject 1 (User) seated at desk workstation (4.5, 2.8)
+            # Primary target seated / stationary
             micro_x = 0.03 * math.sin(self._tick * 0.3 * self._speed)
             micro_y = 0.02 * math.cos(self._tick * 0.3 * self._speed)
             pos_x = round(4.5 + micro_x, 2)
@@ -184,28 +184,13 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             velocity_mps = 0.0
             uncertainty_radius_m = 0.30
 
-            # Subject 2 (Roommate 1) at center meeting table (3.0, 1.8)
-            p2_x = round(3.0 + 0.02 * math.cos(self._tick * 0.25 * self._speed), 2)
-            p2_y = round(1.8 + 0.02 * math.sin(self._tick * 0.25 * self._speed), 2)
-
-            # Subject 3 (Roommate 2) on lounge sofa (1.6, 3.2)
-            p3_x = round(1.6 + 0.015 * math.sin(self._tick * 0.2 * self._speed), 2)
-            p3_y = round(3.2 + 0.015 * math.cos(self._tick * 0.2 * self._speed), 2)
-
-            # Subject 4 (Roommate 3) at reading area (4.0, 1.2)
-            p4_x = round(4.0 + 0.02 * math.sin(self._tick * 0.35 * self._speed), 2)
-            p4_y = round(1.2 + 0.02 * math.cos(self._tick * 0.35 * self._speed), 2)
-
-            occupancy_count = 4
+            occupancy_count = 1
             tracked_subjects = [
-                {"subject_id": "Subject #1 (You)", "x": pos_x, "y": pos_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.30},
-                {"subject_id": "Subject #2", "x": p2_x, "y": p2_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.25},
-                {"subject_id": "Subject #3", "x": p3_x, "y": p3_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
-                {"subject_id": "Subject #4", "x": p4_x, "y": p4_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
+                {"subject_id": "Target #1 [Stationary Target]", "x": pos_x, "y": pos_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.30},
             ]
 
         else:  # "motion"
-            # High variance and dynamic doppler energy
+            # Dynamic Doppler energy and subcarrier variance
             motion_burst = self._rng.uniform(0.4, 0.8)
             variance = 0.45 + motion_burst
             doppler = 0.60 + self._rng.uniform(0.0, 0.3)
@@ -213,7 +198,7 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             noise_floor = -90.0
             quality = 0.96
 
-            # Subject 1 (User): Advance kinematics along waypoints
+            # Target 1: Advance kinematics along waypoints
             target_x, target_y = self._waypoints[self._waypoint_idx]
             dx = target_x - self._pos_x
             dy = target_y - self._pos_y
@@ -234,25 +219,9 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             velocity_mps = round(min(1.8, 0.9 * self._speed), 2)
             uncertainty_radius_m = 0.45
 
-            # Subject 2 (Roommate 1) seated at workstation (4.6, 2.8)
-            p2_x = round(4.6 + 0.02 * math.cos(self._tick * 0.25 * self._speed), 2)
-            p2_y = round(2.8 + 0.02 * math.sin(self._tick * 0.25 * self._speed), 2)
-
-            # Subject 3 (Roommate 2) seated on sofa (1.6, 3.2)
-            p3_x = round(1.6 + 0.015 * math.sin(self._tick * 0.2 * self._speed), 2)
-            p3_y = round(3.2 + 0.015 * math.cos(self._tick * 0.2 * self._speed), 2)
-
-            # Subject 4 (Roommate 3) moving in reading / entry area
-            p4_x = round(3.8 + 0.6 * math.sin(self._tick * 0.22 * self._speed), 2)
-            p4_y = round(1.4 + 0.4 * math.cos(self._tick * 0.22 * self._speed), 2)
-            p4_vel = round(0.45 * self._speed, 2)
-
-            occupancy_count = 4
+            occupancy_count = 1
             tracked_subjects = [
-                {"subject_id": "Subject #1 (You)", "x": pos_x, "y": pos_y, "presence_state": "motion", "velocity_mps": velocity_mps, "uncertainty_radius_m": uncertainty_radius_m},
-                {"subject_id": "Subject #2", "x": p2_x, "y": p2_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.25},
-                {"subject_id": "Subject #3", "x": p3_x, "y": p3_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
-                {"subject_id": "Subject #4", "x": p4_x, "y": p4_y, "presence_state": "motion", "velocity_mps": p4_vel, "uncertainty_radius_m": 0.38},
+                {"subject_id": "Target #1 [Dynamic Mover]", "x": pos_x, "y": pos_y, "presence_state": "motion", "velocity_mps": velocity_mps, "uncertainty_radius_m": uncertainty_radius_m},
             ]
 
         metadata = {
