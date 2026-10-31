@@ -38,19 +38,20 @@ def clean_gateway(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_gemini_models_list_default_is_3_6_flash():
-    """Verify Gemini default model is updated to gemini-3.6-flash while preserving backwards compatibility."""
+def test_gemini_models_list_default_is_2_5_flash():
+    """Verify Gemini default model is gemini-2.5-flash for high quota (1,500 RPD) resilience while preserving all models."""
     provider = GeminiProvider()
     models = provider.list_models()
     model_ids = [m.id for m in models]
 
+    assert "gemini-2.5-flash" in model_ids
     assert "gemini-3.6-flash" in model_ids
     assert "gemini-3.5-flash" in model_ids
 
     default_model = next((m for m in models if m.is_default), None)
     assert default_model is not None
-    assert default_model.id == "gemini-3.6-flash"
-    assert default_model.name == "Gemini 3.6 Flash"
+    assert default_model.id == "gemini-2.5-flash"
+    assert default_model.name == "Gemini 2.5 Flash"
 
 
 def test_gemini_parse_daily_quota_exhaustion():

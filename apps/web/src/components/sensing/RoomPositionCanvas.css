@@ -137,6 +137,22 @@
   border-color: #0284c7;
 }
 
+.view-mode-toggle-group {
+  display: flex;
+  gap: 4px;
+  background: #090d16;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.btn-mode-primary.active {
+  background: rgba(0, 255, 204, 0.2) !important;
+  color: #00ffcc !important;
+  border-color: #00ffcc !important;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
+}
+
 .btn-step-action {
   background: #2563eb;
   color: #ffffff;

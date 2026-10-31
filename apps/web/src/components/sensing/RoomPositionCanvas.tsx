@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { SensingEvent } from '../../types';
 import { recordRoomBaseline, saveRoomCalibration } from '../../lib/api';
+import { ThreeRoomView } from './ThreeRoomView';
 import './RoomPositionCanvas.css';
 
 interface RoomPositionCanvasProps {
@@ -35,6 +36,7 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
   const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
   const [showZones, setShowZones] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
 
   // Room geometry (meters)
   const [roomDims, setRoomDims] = useState<RoomDimensions>({ widthM: 6.0, lengthM: 4.0 });
@@ -577,7 +579,12 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
         <div className="room-title-area">
           <h3 className="room-name">{roomName} — Real-Time Spatial Positioning</h3>
           <div className="mode-badge-container">
-            {isSimulated ? (
+            {activeDisplayEvent?.raw_metrics?.engine === 'wifi-3d-fusion' ? (
+              <span className="mode-pill mode-pill-simulated" title="Open-Source WiFi-3D-Fusion Engine">
+                <span className="mode-dot" />
+                WIFI-3D-FUSION (25-Joint Skeletal Mesh)
+              </span>
+            ) : isSimulated ? (
               <span className="mode-pill mode-pill-simulated" title="Synthetic 2D CSI Kinematic Trajectory">
                 <span className="mode-dot" />
                 SIMULATION MODE (2D Synthetic Kinematics)
@@ -596,38 +603,62 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
 
         {/* Action controls */}
         <div className="room-controls-bar">
-          <button
-            type="button"
-            className={`btn-toggle ${showGrid ? 'active' : ''}`}
-            onClick={() => setShowGrid(!showGrid)}
-            title="Toggle 1-Meter Measurement Grid"
-          >
-            Grid
-          </button>
-          <button
-            type="button"
-            className={`btn-toggle ${showTrail ? 'active' : ''}`}
-            onClick={() => setShowTrail(!showTrail)}
-            title="Toggle Movement Trail"
-          >
-            Trail
-          </button>
-          <button
-            type="button"
-            className={`btn-toggle ${showHeatmap ? 'active' : ''}`}
-            onClick={() => setShowHeatmap(!showHeatmap)}
-            title="Toggle Presence Heatmap"
-          >
-            Heatmap
-          </button>
-          <button
-            type="button"
-            className={`btn-toggle ${showZones ? 'active' : ''}`}
-            onClick={() => setShowZones(!showZones)}
-            title="Toggle Architectural Furniture Outline"
-          >
-            Floor Plan
-          </button>
+          <div className="view-mode-toggle-group">
+            <button
+              type="button"
+              className={`btn-toggle ${viewMode === '3d' ? 'active' : ''}`}
+              onClick={() => setViewMode('3d')}
+              title="3D Skeletal Mesh View (WiFi-3D-Fusion)"
+            >
+              🧊 3D Skeletal Mesh
+            </button>
+            <button
+              type="button"
+              className={`btn-toggle ${viewMode === '2d' ? 'active' : ''}`}
+              onClick={() => setViewMode('2d')}
+              title="2D Tactical Plan View (Fresnel & Heatmap)"
+            >
+              🗺️ 2D Tactical Plan
+            </button>
+          </div>
+
+          {viewMode === '2d' && (
+            <>
+              <button
+                type="button"
+                className={`btn-toggle ${showGrid ? 'active' : ''}`}
+                onClick={() => setShowGrid(!showGrid)}
+                title="Toggle 1-Meter Measurement Grid"
+              >
+                Grid
+              </button>
+              <button
+                type="button"
+                className={`btn-toggle ${showTrail ? 'active' : ''}`}
+                onClick={() => setShowTrail(!showTrail)}
+                title="Toggle Movement Trail"
+              >
+                Trail
+              </button>
+              <button
+                type="button"
+                className={`btn-toggle ${showHeatmap ? 'active' : ''}`}
+                onClick={() => setShowHeatmap(!showHeatmap)}
+                title="Toggle Presence Heatmap"
+              >
+                Heatmap
+              </button>
+              <button
+                type="button"
+                className={`btn-toggle ${showZones ? 'active' : ''}`}
+                onClick={() => setShowZones(!showZones)}
+                title="Toggle Architectural Furniture Outline"
+              >
+                Floor Plan
+              </button>
+            </>
+          )}
+
           <button
             type="button"
             className={`btn-toggle ${isFullscreen ? 'active' : ''}`}
@@ -661,10 +692,23 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
         </div>
       </div>
 
-      {/* Primary 2D Canvas */}
-      <div className="canvas-wrapper">
-        <canvas ref={canvasRef} className="room-canvas" />
-      </div>
+      {/* Main Room View: 3D Three.js or 2D Canvas */}
+      {viewMode === '3d' ? (
+        <ThreeRoomView
+          currentEvent={activeDisplayEvent}
+          historicalEvents={historicalEvents}
+          roomWidthM={roomDims.widthM}
+          roomLengthM={roomDims.lengthM}
+          isSimulated={isSimulated}
+          isActive={isActive}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+        />
+      ) : (
+        <div className="canvas-wrapper">
+          <canvas ref={canvasRef} className="room-canvas" />
+        </div>
+      )}
 
       {/* Scrub / Playback Timeline Bar */}
       <div className="timeline-scrub-bar">

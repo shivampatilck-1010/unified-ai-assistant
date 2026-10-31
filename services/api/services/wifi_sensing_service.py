@@ -30,6 +30,7 @@ from schemas.wifi_sensing import (
 )
 from synthetic_simulator import SyntheticSensorSimulator
 from esp32_csi_adapter import Esp32CsiHardwareAdapter
+from wifi_3d_fusion_adapter import Wifi3DFusionAdapter
 from sensing_types import NormalizedSensorEvent, utc_now
 
 
@@ -40,6 +41,7 @@ class WifiSensingService:
     _simulators: Dict[str, SyntheticSensorSimulator] = {}
     _hardware_adapter: HardwareSensorAdapter = HardwareSensorAdapter()
     _esp32_csi_adapter: Esp32CsiHardwareAdapter = Esp32CsiHardwareAdapter()
+    _wifi_3d_fusion_adapter: Wifi3DFusionAdapter = Wifi3DFusionAdapter()
     _real_rssi_adapter: RealRssiSensorAdapter = RealRssiSensorAdapter()
     _room_providers: Dict[str, str] = {}
 
@@ -59,7 +61,9 @@ class WifiSensingService:
         if current_pipe and current_pipe.provider.provider_id == target_provider:
             return current_pipe
 
-        if target_provider == "esp32_csi_hardware":
+        if target_provider == "wifi_3d_fusion_engine":
+            provider = cls._wifi_3d_fusion_adapter
+        elif target_provider == "esp32_csi_hardware":
             provider = cls._esp32_csi_adapter
         elif target_provider == "real_wifi_rssi_hardware":
             provider = cls._real_rssi_adapter
@@ -83,9 +87,21 @@ class WifiSensingService:
         sim_caps = sim.discover_capabilities()
         hw_caps = cls._hardware_adapter.discover_capabilities()
         esp_caps = cls._esp32_csi_adapter.discover_capabilities()
+        fusion_caps = cls._wifi_3d_fusion_adapter.discover_capabilities()
         rssi_caps = cls._real_rssi_adapter.discover_capabilities()
 
         items = [
+            SensorCapabilityItem(
+                provider_id=fusion_caps.provider_id,
+                name=fusion_caps.name,
+                is_hardware=fusion_caps.is_hardware,
+                is_simulated=fusion_caps.is_simulated,
+                is_available=fusion_caps.is_available,
+                unavailability_reason=fusion_caps.unavailability_reason,
+                supported_measurements=fusion_caps.supported_measurements,
+                sampling_rate_hz=fusion_caps.sampling_rate_hz,
+                requires_authorization=fusion_caps.requires_authorization,
+            ),
             SensorCapabilityItem(
                 provider_id=esp_caps.provider_id,
                 name=esp_caps.name,

@@ -3,6 +3,7 @@ from hardware_adapter import HardwareSensorAdapter
 from presence_estimator import BasePresenceEstimator, BaselinePresenceEstimator
 from provider_base import BaseSensorProvider
 from synthetic_simulator import SyntheticSensorSimulator
+from wifi_3d_fusion_adapter import Wifi3DFusionAdapter
 from sensing_types import (
     NormalizedSensorEvent,
     PresenceEstimate,
@@ -16,6 +17,7 @@ __all__ = [
     "BaseSensorProvider",
     "HardwareSensorAdapter",
     "SyntheticSensorSimulator",
+    "Wifi3DFusionAdapter",
     "BasePresenceEstimator",
     "BaselinePresenceEstimator",
     "SensingPipeline",

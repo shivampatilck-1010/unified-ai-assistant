@@ -20,11 +20,32 @@ class GeminiProvider(BaseProviderAdapter):
 
     MODELS = [
         ModelInfo(
-            id="gemini-3.6-flash",
-            name="Gemini 3.6 Flash",
+            id="gemini-2.5-flash",
+            name="Gemini 2.5 Flash",
             provider="gemini",
             context_window=1048576,
             is_default=True,
+        ),
+        ModelInfo(
+            id="gemini-2.5-flash-lite",
+            name="Gemini 2.5 Flash Lite",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-flash-latest",
+            name="Gemini Flash Latest",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-3.6-flash",
+            name="Gemini 3.6 Flash (Preview)",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
         ),
         ModelInfo(
             id="gemini-3.5-flash",
@@ -43,20 +64,6 @@ class GeminiProvider(BaseProviderAdapter):
         ModelInfo(
             id="gemini-3.8-flash",
             name="Gemini 3.8 Flash",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-flash-latest",
-            name="Gemini Flash Latest",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-2.5-flash",
-            name="Gemini 2.5 Flash",
             provider="gemini",
             context_window=1048576,
             is_default=False,
@@ -265,7 +272,7 @@ class GeminiProvider(BaseProviderAdapter):
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
-        selected_model = model or "gemini-3.6-flash"
+        selected_model = model or "gemini-2.5-flash"
         valid_models = {m.id for m in self.MODELS}
         if selected_model not in valid_models:
             raise InvalidModelError(selected_model, self.provider_id)
