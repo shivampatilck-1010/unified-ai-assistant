@@ -72,7 +72,9 @@ export function getApiBase(): string {
       return custom.trim().replace(/\/+$/, '');
     }
   }
-  const raw = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
+  const raw =
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.PROD ? 'https://ranger-settle-requested-francis.trycloudflare.com' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 

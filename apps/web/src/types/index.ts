@@ -740,9 +740,11 @@ export interface Esp32HardwareStatus {
   last_error?: string | null;
   device_description?: string | null;
   detected_ports: Esp32DetectedPort[];
-  calibration_status: string;
+  calibration_status?: string;
+  is_calibrated?: boolean;
   baseline_variance?: number | null;
   presence_state?: string | null;
+  current_state?: string | null;
   motion_intensity?: number | null;
   subcarrier_count?: number | null;
   subcarrier_amplitudes?: number[] | null;

@@ -43,6 +43,7 @@ export const WifiSensingView: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showAuditDrawer, setShowAuditDrawer] = useState<boolean>(false);
   const [showPurgeConfirm, setShowPurgeConfirm] = useState<boolean>(false);
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(false);
 
   // New room form state
   const [newRoomId, setNewRoomId] = useState<string>('');
@@ -271,15 +272,64 @@ export const WifiSensingView: React.FC = () => {
           </div>
         </div>
 
-        {/* Prominent Simulation Banner */}
-        <div className="simulation-banner">
-          <span className="simulation-badge">SIMULATION MODE ACTIVE</span>
-          <div className="simulation-banner-text">
-            <strong>SYNTHETIC SENSOR TELEMETRY ONLY:</strong> This workspace operates exclusively using
-            mathematically simulated Channel State Information (CSI). No physical Wi-Fi sensing hardware is
-            detected or connected. Observations do not represent real people, biological presence, or physical rooms.
+        {/* Simulation / Hardware Awareness Banner */}
+        {!bannerDismissed && (
+          <div
+            className="simulation-banner"
+            style={
+              statusData?.hardware_detected
+                ? {
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                  }
+                : undefined
+            }
+          >
+            <span
+              className="simulation-badge"
+              style={
+                statusData?.hardware_detected
+                  ? { backgroundColor: '#10b981', color: '#090d16' }
+                  : undefined
+              }
+            >
+              {statusData?.hardware_detected ? 'PHYSICAL HARDWARE ACTIVE' : 'SIMULATION MODE ACTIVE'}
+            </span>
+            <div
+              className="simulation-banner-text"
+              style={statusData?.hardware_detected ? { color: '#a7f3d0' } : undefined}
+            >
+              {statusData?.hardware_detected ? (
+                <>
+                  <strong>ESP32 CSI HARDWARE DETECTED:</strong> Physical ESP32 DevKit V1 receiver is connected,
+                  capturing real 802.11 subcarrier perturbations. Kinematics zone below can run concurrently for multi-modal validation.
+                </>
+              ) : (
+                <>
+                  <strong>SYNTHETIC SENSOR TELEMETRY:</strong> This workspace operates using simulated Channel
+                  State Information (CSI) for kinematic reference until physical hardware connects.
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: statusData?.hardware_detected ? '#6ee7b7' : '#fef08a',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: '0 4px',
+                lineHeight: 1,
+              }}
+              title="Dismiss notice"
+              aria-label="Dismiss notice"
+            >
+              ✕
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {errorMessage && (

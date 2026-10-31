@@ -503,9 +503,23 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    cameraAngleRef.current.radius += e.deltaY * 0.005;
-    cameraAngleRef.current.radius = Math.max(3.0, Math.min(20.0, cameraAngleRef.current.radius));
+    // Only intercept wheel zoom if Ctrl key is held or in Fullscreen mode.
+    // This allows natural page scrolling when moving the mouse wheel over the 3D room.
+    if (e.ctrlKey || isFullscreen) {
+      e.preventDefault();
+      cameraAngleRef.current.radius += e.deltaY * 0.005;
+      cameraAngleRef.current.radius = Math.max(3.0, Math.min(20.0, cameraAngleRef.current.radius));
+      updateCameraPosition();
+    }
+  };
+
+  const zoomIn = () => {
+    cameraAngleRef.current.radius = Math.max(3.0, cameraAngleRef.current.radius - 1.5);
+    updateCameraPosition();
+  };
+
+  const zoomOut = () => {
+    cameraAngleRef.current.radius = Math.min(20.0, cameraAngleRef.current.radius + 1.5);
     updateCameraPosition();
   };
 
@@ -541,6 +555,12 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
         </div>
 
         <div className="hud-actions">
+          <button className="hud-btn" onClick={zoomIn} title="Zoom 3D Camera In">
+            +
+          </button>
+          <button className="hud-btn" onClick={zoomOut} title="Zoom 3D Camera Out">
+            −
+          </button>
           <button className="hud-btn" onClick={resetCamera} title="Reset 3D Camera">
             ⟲ Orbit
           </button>
