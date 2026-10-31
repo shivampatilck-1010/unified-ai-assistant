@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: unified-ai-assistant-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: APP_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: "https://unified-ai-assistant.pages.dev,http://localhost:5173"
+      - key: DATA_DIR
+        value: /app/services/api/data
