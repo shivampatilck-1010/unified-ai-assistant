@@ -724,6 +724,7 @@ class WifiSensingService:
 
         return Esp32HardwareStatusResponse(
             is_connected=health.is_connected,
+            is_streaming=health.is_streaming,
             port=health.port,
             baud_rate=health.baud_rate,
             status=health.status,
@@ -733,6 +734,8 @@ class WifiSensingService:
             malformed_packets=health.malformed_packets,
             last_packet_time=health.last_packet_time,
             last_error=health.last_error,
+            wifi_status=health.wifi_status,
+            last_firmware_log=health.last_firmware_log,
             device_description=health.device_description or adapter._detected_device,
             detected_ports=health.detected_ports,
             is_calibrated=cal.is_calibrated,

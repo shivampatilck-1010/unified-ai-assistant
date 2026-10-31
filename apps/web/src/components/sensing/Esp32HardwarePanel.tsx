@@ -9,7 +9,11 @@ import {
   getApiBase,
 } from '../../lib/api';
 
-export const Esp32HardwarePanel: React.FC = () => {
+interface Esp32HardwarePanelProps {
+  onStatusUpdate?: (status: Esp32HardwareStatus) => void;
+}
+
+export const Esp32HardwarePanel: React.FC<Esp32HardwarePanelProps> = ({ onStatusUpdate }) => {
   const [status, setStatus] = useState<Esp32HardwareStatus | null>(null);
   const [selectedPort, setSelectedPort] = useState<string>('COM7');
   const [selectedBaud, setSelectedBaud] = useState<number>(921600);
@@ -25,12 +29,13 @@ export const Esp32HardwarePanel: React.FC = () => {
     try {
       const res = await fetchEsp32Status();
       setStatus(res);
+      if (onStatusUpdate) onStatusUpdate(res);
       if (res.port) setSelectedPort(res.port);
       if (res.baud_rate) setSelectedBaud(res.baud_rate);
     } catch {
       // Non-critical poll failure
     }
-  }, []);
+  }, [onStatusUpdate]);
 
   useEffect(() => {
     void refreshStatus();
@@ -46,16 +51,59 @@ export const Esp32HardwarePanel: React.FC = () => {
       const es = new EventSource(sseUrl);
       eventSourceRef.current = es;
 
-      es.onmessage = (event) => {
+      es.addEventListener('csi_frame', (event) => {
         try {
-          const payload = JSON.parse(event.data);
-          if (payload.status) {
-            setStatus(payload.status);
-          }
+          const frame = JSON.parse(event.data);
+          setStatus((prev) => {
+            if (!prev) return prev;
+            const updated: Esp32HardwareStatus = {
+              ...prev,
+              is_connected: true,
+              is_streaming: true,
+              status: 'receiving_csi',
+              status_message: `Receiving live CSI packets from ${frame.mac_address || 'device'} (${frame.rssi_dbm} dBm)`,
+              packets_captured: frame.packets_captured ?? prev.packets_captured + 1,
+              subcarrier_amplitudes: frame.subcarrier_amplitudes,
+              rssi_dbm: frame.rssi_dbm,
+              motion_intensity: frame.motion_intensity,
+              presence_probability: frame.presence_probability,
+              current_state: frame.presence_state,
+              calibration_status: frame.calibration_status,
+              last_packet_time: frame.timestamp,
+            };
+            if (onStatusUpdate) onStatusUpdate(updated);
+            return updated;
+          });
         } catch {
           // ignore parse errors
         }
-      };
+      });
+
+      es.addEventListener('heartbeat', (event) => {
+        try {
+          const hb = JSON.parse(event.data);
+          setStatus((prev) => {
+            if (!prev) return prev;
+            const updated: Esp32HardwareStatus = {
+              ...prev,
+              status: hb.status,
+              status_message: hb.status_message,
+              packets_per_second: hb.packets_per_second,
+              packets_captured: hb.packets_captured,
+              current_state: hb.current_state,
+              rssi_dbm: hb.rssi_dbm,
+              subcarrier_amplitudes: hb.subcarrier_amplitudes?.length
+                ? hb.subcarrier_amplitudes
+                : prev.subcarrier_amplitudes,
+              calibration_status: hb.calibration_status,
+            };
+            if (onStatusUpdate) onStatusUpdate(updated);
+            return updated;
+          });
+        } catch {
+          // ignore parse errors
+        }
+      });
 
       es.onerror = () => {
         es.close();
@@ -66,7 +114,7 @@ export const Esp32HardwarePanel: React.FC = () => {
         eventSourceRef.current = null;
       };
     }
-  }, [status?.is_connected]);
+  }, [status?.is_connected, onStatusUpdate]);
 
   // Render 64-subcarrier spectrum canvas
   useEffect(() => {
@@ -98,13 +146,15 @@ export const Esp32HardwarePanel: React.FC = () => {
       ctx.fillStyle = '#64748b';
       ctx.font = '11px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(
-        status?.is_connected
-          ? `Listening for CSI packets on ${status.port}...`
-          : 'ESP32 CSI Receiver Disconnected — Connect to view spectrum',
-        width / 2,
-        height / 2
-      );
+      let msg = 'ESP32 CSI Receiver Disconnected — Click Connect to view spectrum';
+      if (status?.is_connected) {
+        if (status?.wifi_status === 'no_ap_found') {
+          msg = `Connected to ${status.port} — Waiting for Wi-Fi Hotspot: SHIVAM_1010 7313 (Error 201)`;
+        } else {
+          msg = `Listening for CSI packets on ${status.port || 'COM7'}...`;
+        }
+      }
+      ctx.fillText(msg, width / 2, height / 2);
       return;
     }
 
@@ -196,16 +246,24 @@ export const Esp32HardwarePanel: React.FC = () => {
 
   const isConnected = status?.is_connected ?? false;
   const isPortBusy = status?.status === 'port_busy';
-  const rawState = (status?.current_state || status?.presence_state || (isConnected ? 'monitoring' : 'disconnected')).toLowerCase();
-  const displayState = rawState.replace(/_/g, ' ').toUpperCase();
-  const isCalibrated = status?.is_calibrated || status?.calibration_status === 'calibrated';
+  const isActuallyStreaming = isConnected && (status?.is_streaming ?? false) && (status?.packets_captured ?? 0) > 0;
+  const isWifiMissing = status?.wifi_status === 'no_ap_found' || (status?.last_firmware_log || '').includes('201');
 
-  const getStateColor = (st: string) => {
-    if (st.includes('movement')) return '#34d399';
-    if (st.includes('presence')) return '#fbbf24';
-    if (st.includes('monitoring') || st.includes('no movement')) return '#60a5fa';
-    return '#94a3b8';
+  const getDisplayState = (): { label: string; color: string } => {
+    if (!isConnected) return { label: 'DISCONNECTED', color: '#94a3b8' };
+    if (isPortBusy) return { label: 'PORT BUSY', color: '#f59e0b' };
+    if (isWifiMissing) return { label: 'AP NOT FOUND (SSID: SHIVAM_1010 7313)', color: '#f59e0b' };
+    if (status?.wifi_status === 'connecting') return { label: 'CONNECTING TO WI-FI', color: '#38bdf8' };
+    if (isActuallyStreaming) {
+      const raw = (status?.presence_state || status?.current_state || 'RECEIVING CSI').toUpperCase().replace(/_/g, ' ');
+      return { label: raw, color: raw.includes('MOVEMENT') ? '#34d399' : '#38bdf8' };
+    }
+    if (status?.status === 'waiting_for_packets') return { label: 'AWAITING CSI FRAMES', color: '#38bdf8' };
+    return { label: (status?.status || 'CONNECTED').toUpperCase().replace(/_/g, ' '), color: '#60a5fa' };
   };
+
+  const { label: displayState, color: displayColor } = getDisplayState();
+  const isCalibrated = status?.is_calibrated || status?.calibration_status === 'calibrated';
 
   return (
     <div
@@ -234,8 +292,18 @@ export const Esp32HardwarePanel: React.FC = () => {
               width: '10px',
               height: '10px',
               borderRadius: '50%',
-              backgroundColor: isConnected ? '#10b981' : isPortBusy ? '#f59e0b' : '#ef4444',
-              boxShadow: isConnected ? '0 0 8px #10b981' : 'none',
+              backgroundColor: isActuallyStreaming
+                ? '#10b981'
+                : isConnected
+                ? '#38bdf8'
+                : isPortBusy || isWifiMissing
+                ? '#f59e0b'
+                : '#ef4444',
+              boxShadow: isActuallyStreaming
+                ? '0 0 8px #10b981'
+                : isConnected
+                ? '0 0 6px #38bdf8'
+                : 'none',
               flexShrink: 0,
             }}
           />
@@ -244,7 +312,7 @@ export const Esp32HardwarePanel: React.FC = () => {
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
                 ESP32 DevKit V1 Hardware CSI Receiver
               </h3>
-              {isConnected && (
+              {isActuallyStreaming ? (
                 <span
                   style={{
                     fontSize: '11px',
@@ -256,7 +324,49 @@ export const Esp32HardwarePanel: React.FC = () => {
                     border: '1px solid rgba(16, 185, 129, 0.4)',
                   }}
                 >
-                  LIVE CSI STREAMING
+                  ● LIVE CSI STREAMING
+                </span>
+              ) : isConnected && isWifiMissing ? (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                    color: '#fbbf24',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                  }}
+                >
+                  ⚠️ AP NOT FOUND (SSID: SHIVAM_1010 7313)
+                </span>
+              ) : isConnected ? (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38bdf8',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                  }}
+                >
+                  ○ PORT OPEN (AWAITING CSI PACKETS)
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(148, 163, 184, 0.15)',
+                    color: '#94a3b8',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                  }}
+                >
+                  ○ DISCONNECTED
                 </span>
               )}
             </div>
@@ -358,6 +468,33 @@ export const Esp32HardwarePanel: React.FC = () => {
         </div>
       )}
 
+      {/* Wi-Fi AP Missing Alert */}
+      {isConnected && isWifiMissing && (
+        <div
+          style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: '6px',
+            padding: '10px 14px',
+            marginTop: '10px',
+            fontSize: '12px',
+            color: '#fbbf24',
+          }}
+        >
+          <div style={{ fontWeight: 700, color: '#fef08a', marginBottom: '4px' }}>
+            ⚠️ ESP32 Wi-Fi Connection Pending (Hotspot Required):
+          </div>
+          <div>
+            The ESP32 firmware <code>csi_recv_router</code> is connected to COM7, but Wi-Fi AP is not reachable
+            (Status: <strong>Error 201: WIFI_REASON_NO_AP_FOUND</strong>).
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '11px', color: '#fde68a' }}>
+            Please turn ON your Mobile Hotspot or Wi-Fi router with SSID: <strong>SHIVAM_1010 7313</strong> (Password: <code>1234567890</code>).
+            As soon as the board connects, it will start sending ping packets to the router and live CSI frames will immediately begin streaming into the spectrum and 3D room below!
+          </div>
+        </div>
+      )}
+
       {/* ESP-IDF switching instruction drawer */}
       {showIdfHelp && (
         <div
@@ -404,12 +541,12 @@ export const Esp32HardwarePanel: React.FC = () => {
         >
           <div>
             State:{' '}
-            <strong style={{ color: getStateColor(rawState) }}>
+            <strong style={{ color: displayColor }}>
               {displayState}
             </strong>
           </div>
-          <div>Rate: <strong style={{ color: '#f8fafc' }}>{(status?.packets_per_second ?? 0).toFixed(1)} pkts/s</strong></div>
-          <div>Total Packets: <strong style={{ color: '#f8fafc' }}>{(status?.packets_captured ?? 0).toLocaleString()}</strong></div>
+          <div>Rate: <strong style={{ color: '#f8fafc' }}>{isConnected && isActuallyStreaming ? `${(status?.packets_per_second ?? 0).toFixed(1)} pkts/s` : '0.0 pkts/s'}</strong></div>
+          <div>Total Packets: <strong style={{ color: '#f8fafc' }}>{isConnected ? (status?.packets_captured ?? 0).toLocaleString() : '0'}</strong></div>
           <div>Calibration: <strong style={{ color: isCalibrated ? '#34d399' : '#a78bfa' }}>{isCalibrated ? 'CALIBRATED' : 'UNCALIBRATED'}</strong></div>
         </div>
       ) : (
@@ -431,7 +568,7 @@ export const Esp32HardwarePanel: React.FC = () => {
                   fontSize: '12px',
                   fontWeight: 700,
                   marginTop: '2px',
-                  color: getStateColor(rawState),
+                  color: displayColor,
                 }}
               >
                 {displayState}
@@ -441,14 +578,14 @@ export const Esp32HardwarePanel: React.FC = () => {
             <div style={{ backgroundColor: '#1e293b', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Packet Rate</div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginTop: '2px' }}>
-                {status?.packets_per_second ? `${status.packets_per_second.toFixed(1)} pkts/s` : '0.0 pkts/s'}
+                {isConnected && isActuallyStreaming && status?.packets_per_second ? `${status.packets_per_second.toFixed(1)} pkts/s` : '0.0 pkts/s'}
               </div>
             </div>
 
             <div style={{ backgroundColor: '#1e293b', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Packets</div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', marginTop: '2px' }}>
-                {(status?.packets_captured ?? 0).toLocaleString()}
+                {isConnected ? (status?.packets_captured ?? 0).toLocaleString() : '0'}
               </div>
             </div>
 

@@ -729,15 +729,28 @@ export interface Esp32DetectedPort {
 
 export interface Esp32HardwareStatus {
   is_connected: boolean;
+  is_streaming?: boolean;
   port: string;
   baud_rate: number;
-  status: 'connected' | 'disconnected' | 'port_busy' | 'connecting' | 'error' | string;
+  status:
+    | 'disconnected'
+    | 'port_available'
+    | 'port_busy'
+    | 'serial_connected'
+    | 'waiting_for_packets'
+    | 'receiving_csi'
+    | 'processing_csi'
+    | 'connecting'
+    | 'error'
+    | string;
   status_message: string;
   packets_captured: number;
   packets_per_second: number;
   malformed_packets: number;
   last_packet_time?: string | null;
   last_error?: string | null;
+  wifi_status?: string | null;
+  last_firmware_log?: string | null;
   device_description?: string | null;
   detected_ports: Esp32DetectedPort[];
   calibration_status?: string;
@@ -745,7 +758,9 @@ export interface Esp32HardwareStatus {
   baseline_variance?: number | null;
   presence_state?: string | null;
   current_state?: string | null;
+  presence_probability?: number | null;
   motion_intensity?: number | null;
+  rssi_dbm?: number | null;
   subcarrier_count?: number | null;
   subcarrier_amplitudes?: number[] | null;
 }

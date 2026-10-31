@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  calibrateEsp32,
+  clearEsp32Calibration,
   createSensorConfig,
   fetchSensingAudits,
   fetchSensingCapabilities,
@@ -15,6 +17,7 @@ import {
   updateSensorConfig,
 } from '../../lib/api';
 import type {
+  Esp32HardwareStatus,
   SensingCapabilitiesResponse,
   SensingEvent,
   SensingOccupancySummary,
@@ -24,9 +27,14 @@ import type {
 } from '../../types';
 import { RoomPositionCanvas } from './RoomPositionCanvas';
 import { Esp32HardwarePanel } from './Esp32HardwarePanel';
+import { PhysicalSensingWorkspace } from './PhysicalSensingWorkspace';
 import './WifiSensingView.css';
 
 export const WifiSensingView: React.FC = () => {
+  // Mode selection: default to physical hardware sensing
+  const [activeMode, setActiveMode] = useState<'physical' | 'simulation'>('physical');
+  const [hardwareStatus, setHardwareStatus] = useState<Esp32HardwareStatus | null>(null);
+
   // State
   const [statusData, setStatusData] = useState<WifiSensingStatusResponse | null>(null);
   const [capabilities, setCapabilities] = useState<SensingCapabilitiesResponse | null>(null);
@@ -348,143 +356,210 @@ export const WifiSensingView: React.FC = () => {
         </div>
       )}
 
-      {/* ESP32 Physical Hardware Controller & Spectrum Monitor */}
-      <Esp32HardwarePanel />
+      {/* Mode A / Mode B Tab Switcher */}
+      <div className="sensing-mode-tabs">
+        <button
+          type="button"
+          className={`sensing-mode-tab ${activeMode === 'physical' ? 'sensing-mode-tab--active-physical' : ''}`}
+          onClick={() => setActiveMode('physical')}
+        >
+          <span
+            className="mode-tab-dot"
+            style={{
+              backgroundColor: hardwareStatus?.is_streaming
+                ? '#10b981'
+                : hardwareStatus?.is_connected
+                ? '#38bdf8'
+                : '#94a3b8',
+            }}
+          />
+          <span>MODE A: Physical ESP32 Hardware CSI Sensing</span>
+          <span className="mode-tab-tag">ESP32 DevKit V1 (COM7)</span>
+        </button>
 
-      {/* Toolbar / Room Controls */}
-      <div className="room-toolbar">
-        <div className="room-selector-group">
-          <label className="room-label" htmlFor="sensing-room-select">Active Zone:</label>
-          <select
-            id="sensing-room-select"
-            className="room-select"
-            value={selectedRoomId}
-            onChange={(e) => setSelectedRoomId(e.target.value)}
-            disabled={configs.length === 0}
-          >
-            {configs.length === 0 ? (
-              <option value="">No zones configured</option>
-            ) : (
-              configs.map((c) => (
-                <option key={c.id} value={c.room_id}>
-                  {c.room_name} ({c.room_id}) {c.is_active ? '[Running]' : '[Stopped]'}
-                </option>
-              ))
-            )}
-          </select>
-
-          {activeConfig && (
-            <span
-              style={{
-                fontSize: '11px',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                backgroundColor: activeConfig.is_active ? 'rgba(34, 197, 94, 0.15)' : '#2b2b2b',
-                color: activeConfig.is_active ? '#4ade80' : '#a3a3a3',
-                border: activeConfig.is_active ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid #444',
-                fontWeight: 600,
-              }}
-            >
-              {activeConfig.is_active ? 'ACTIVE SIMULATION' : 'SIMULATION IDLE'}
-            </span>
-          )}
-        </div>
-
-        {activeConfig && (
-          <div className="control-buttons-group">
-            <button
-              className="btn-sensing"
-              onClick={() => void handleToggleConsent()}
-              disabled={actionLoading}
-              title="Explicit consent is mandatory before starting sensing in any zone."
-            >
-              Consent: {activeConfig.is_authorized ? 'Authorized' : 'Unauthorized'}
-            </button>
-
-            <select
-              className="room-select"
-              value={activeConfig.simulation_speed}
-              onChange={(e) => void handleSpeedChange(parseFloat(e.target.value))}
-              disabled={actionLoading}
-              title="Simulation speed multiplier"
-            >
-              <option value={1.0}>1.0x Speed</option>
-              <option value={2.0}>2.0x Speed</option>
-              <option value={5.0}>5.0x Speed</option>
-            </select>
-
-            {activeConfig.is_active ? (
-              <button
-                className="btn-sensing btn-sensing-danger"
-                onClick={() => void handleStop()}
-                disabled={actionLoading}
-              >
-                Stop Simulation
-              </button>
-            ) : (
-              <button
-                className="btn-sensing btn-sensing-primary"
-                onClick={() => void handleStart()}
-                disabled={actionLoading || !activeConfig.is_authorized}
-              >
-                Start Simulation
-              </button>
-            )}
-
-            <button
-              className="btn-sensing"
-              onClick={() => void handleStep()}
-              disabled={actionLoading || !activeConfig.is_authorized}
-              title="Generate single deterministic observation step"
-            >
-              Step Tick
-            </button>
-
-            <button
-              className="btn-sensing"
-              onClick={() => void handleReset()}
-              disabled={actionLoading}
-            >
-              Reset
-            </button>
-
-            <button
-              className="btn-sensing btn-sensing-danger"
-              onClick={() => setShowPurgeConfirm(true)}
-              disabled={actionLoading}
-              title="Purge retained events for this room"
-            >
-              Purge History
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          className={`sensing-mode-tab ${activeMode === 'simulation' ? 'sensing-mode-tab--active-sim' : ''}`}
+          onClick={() => setActiveMode('simulation')}
+        >
+          <span className="mode-tab-dot" style={{ backgroundColor: '#f59e0b' }} />
+          <span>MODE B: Synthetic Simulation & Kinematic Lab</span>
+          <span className="mode-tab-tag">25-Joint Skeletal Mesh</span>
+        </button>
       </div>
 
-      {loading ? (
-        <div className="sensing-empty-state">
-          <span className="sensing-loading-spinner" /> Loading sensor telemetry...
+      {/* Mode A: Physical ESP32 CSI Hardware Pipeline */}
+      {activeMode === 'physical' && (
+        <div className="mode-physical-container">
+          <div className="mode-info-banner mode-info-banner--physical">
+            <span style={{ fontSize: '18px' }}>📡</span>
+            <div>
+              <strong>MODE A — GENUINE HARDWARE CSI SENSING:</strong> Exclusively connected to physical ESP32 DevKit V1 (ESP32-D0WD-V3, COM7, 921,600 baud). Evaluates 64-subcarrier OFDM amplitude perturbations across the 1st Fresnel zone.
+              <div style={{ fontSize: '11px', color: '#6ee7b7', marginTop: '3px' }}>
+                Note: Single-link CSI measures physical multipath variance and presence; full 3D skeletal joint kinematics require multi-antenna receiver arrays (testable in Mode B Simulation).
+              </div>
+            </div>
+          </div>
+
+          <Esp32HardwarePanel onStatusUpdate={setHardwareStatus} />
+
+          <PhysicalSensingWorkspace
+            hardwareStatus={hardwareStatus}
+            onCalibrate={async (dur) => {
+              await calibrateEsp32(dur);
+            }}
+            onClearCalibration={async () => {
+              await clearEsp32Calibration();
+            }}
+          />
         </div>
-      ) : configs.length === 0 ? (
-        <div className="sensing-empty-state">
-          <p>No sensing zones configured.</p>
-          <button className="btn-sensing btn-sensing-primary" onClick={() => setShowCreateModal(true)}>
-            Register First Sensing Zone
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Primary Interactive 2D Room Position Canvas */}
-          {activeConfig && (
-            <RoomPositionCanvas
-              currentEvent={events.length > 0 ? events[0] : null}
-              historicalEvents={events}
-              roomName={activeConfig.room_name}
-              roomId={activeConfig.room_id}
-              isSimulated={activeConfig.is_active ? statusData?.simulation_mode ?? true : true}
-              isActive={activeConfig.is_active}
-              onStepTick={() => void handleStep()}
-            />
+      )}
+
+      {/* Mode B: Synthetic Kinematic Simulation & Benchmarking */}
+      {activeMode === 'simulation' && (
+        <div className="mode-simulation-container">
+          <div className="mode-info-banner mode-info-banner--simulation">
+            <span style={{ fontSize: '18px' }}>⚡</span>
+            <div>
+              <strong>MODE B — SYNTHETIC KINEMATICS & BENCHMARK LAB:</strong> Simulates multi-occupant kinematic trajectories and 25-joint 3D skeletal mesh for algorithm benchmarking without requiring physical RF transceivers.
+            </div>
+          </div>
+
+          {/* Simulation Toolbar / Room Controls */}
+          <div className="room-toolbar">
+            <div className="room-selector-group">
+              <label className="room-label" htmlFor="sensing-room-select">Active Zone:</label>
+              <select
+                id="sensing-room-select"
+                className="room-select"
+                value={selectedRoomId}
+                onChange={(e) => setSelectedRoomId(e.target.value)}
+                disabled={configs.length === 0}
+              >
+                {configs.length === 0 ? (
+                  <option value="">No zones configured</option>
+                ) : (
+                  configs.map((c) => (
+                    <option key={c.id} value={c.room_id}>
+                      {c.room_name} ({c.room_id}) {c.is_active ? '[Running]' : '[Stopped]'}
+                    </option>
+                  ))
+                )}
+              </select>
+
+              {activeConfig && (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: activeConfig.is_active ? 'rgba(34, 197, 94, 0.15)' : '#2b2b2b',
+                    color: activeConfig.is_active ? '#4ade80' : '#a3a3a3',
+                    border: activeConfig.is_active ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid #444',
+                    fontWeight: 600,
+                  }}
+                >
+                  {activeConfig.is_active ? 'ACTIVE SIMULATION' : 'SIMULATION IDLE'}
+                </span>
+              )}
+            </div>
+
+            {activeConfig && (
+              <div className="control-buttons-group">
+                <button
+                  className="btn-sensing"
+                  onClick={() => void handleToggleConsent()}
+                  disabled={actionLoading}
+                  title="Explicit consent is mandatory before starting sensing in any zone."
+                >
+                  Consent: {activeConfig.is_authorized ? 'Authorized' : 'Unauthorized'}
+                </button>
+
+                <select
+                  className="room-select"
+                  value={activeConfig.simulation_speed}
+                  onChange={(e) => void handleSpeedChange(parseFloat(e.target.value))}
+                  disabled={actionLoading}
+                  title="Simulation speed multiplier"
+                >
+                  <option value={1.0}>1.0x Speed</option>
+                  <option value={2.0}>2.0x Speed</option>
+                  <option value={5.0}>5.0x Speed</option>
+                </select>
+
+                {activeConfig.is_active ? (
+                  <button
+                    className="btn-sensing btn-sensing-danger"
+                    onClick={() => void handleStop()}
+                    disabled={actionLoading}
+                  >
+                    Stop Simulation
+                  </button>
+                ) : (
+                  <button
+                    className="btn-sensing btn-sensing-primary"
+                    onClick={() => void handleStart()}
+                    disabled={actionLoading || !activeConfig.is_authorized}
+                  >
+                    Start Simulation
+                  </button>
+                )}
+
+                <button
+                  className="btn-sensing"
+                  onClick={() => void handleStep()}
+                  disabled={actionLoading || !activeConfig.is_authorized}
+                  title="Generate single deterministic observation step"
+                >
+                  Step Tick
+                </button>
+
+                <button
+                  className="btn-sensing"
+                  onClick={() => void handleReset()}
+                  disabled={actionLoading}
+                >
+                  Reset
+                </button>
+
+                <button
+                  className="btn-sensing btn-sensing-danger"
+                  onClick={() => setShowPurgeConfirm(true)}
+                  disabled={actionLoading}
+                  title="Purge retained events for this room"
+                >
+                  Purge History
+                </button>
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="sensing-empty-state">
+              <span className="sensing-loading-spinner" /> Loading simulation telemetry...
+            </div>
+          ) : configs.length === 0 ? (
+            <div className="sensing-empty-state">
+              <p>No sensing zones configured.</p>
+              <button className="btn-sensing btn-sensing-primary" onClick={() => setShowCreateModal(true)}>
+                Register First Sensing Zone
+              </button>
+            </div>
+          ) : (
+            activeConfig && (
+              <RoomPositionCanvas
+                currentEvent={events.length > 0 ? events[0] : null}
+                historicalEvents={events}
+                roomName={activeConfig.room_name}
+                roomId={activeConfig.room_id}
+                isSimulated={true}
+                isActive={activeConfig.is_active}
+                onStepTick={() => void handleStep()}
+              />
+            )
           )}
+        </div>
+      )}
 
           {/* Collapsible Technical Diagnostics Drawer */}
           <details className="diagnostics-drawer">
@@ -689,8 +764,6 @@ export const WifiSensingView: React.FC = () => {
           </div>
         </div>
       </details>
-    </>
-  )}
 
       {/* Create Zone Modal */}
       {showCreateModal && (

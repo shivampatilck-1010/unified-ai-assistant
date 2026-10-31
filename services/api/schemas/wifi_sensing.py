@@ -190,15 +190,18 @@ class WifiSensingAuditResponse(BaseModel):
 
 class Esp32HardwareStatusResponse(BaseModel):
     is_connected: bool
+    is_streaming: bool = False
     port: str = "COM7"
     baud_rate: int = 921600
-    status: str = "disconnected"  # "connected", "disconnected", "port_busy", "connecting", "error"
+    status: str = "disconnected"  # "disconnected", "port_available", "port_busy", "serial_connected", "waiting_for_packets", "receiving_csi", "processing_csi", "error"
     status_message: str = ""
     packets_captured: int = 0
     packets_per_second: float = 0.0
     malformed_packets: int = 0
     last_packet_time: Optional[datetime] = None
     last_error: Optional[str] = None
+    wifi_status: Optional[str] = None
+    last_firmware_log: Optional[str] = None
     device_description: Optional[str] = None
     detected_ports: List[Dict[str, Any]] = Field(default_factory=list)
     is_calibrated: bool = False

@@ -52,15 +52,18 @@ class Esp32CsiPacket:
 class CollectorHealth:
     """Runtime health and diagnostics for the serial collector."""
     is_connected: bool
+    is_streaming: bool
     port: str
     baud_rate: int
-    status: str  # "connected", "disconnected", "port_busy", "connecting", "error"
+    status: str  # "disconnected", "port_available", "port_busy", "serial_connected", "waiting_for_packets", "receiving_csi", "processing_csi", "error"
     status_message: str
     packets_captured: int
     packets_per_second: float
     malformed_packets: int
     last_packet_time: Optional[datetime]
     last_error: Optional[str]
+    wifi_status: Optional[str] = None
+    last_firmware_log: Optional[str] = None
     device_description: Optional[str] = None
     detected_ports: List[Dict[str, str]] = field(default_factory=list)
 
@@ -93,6 +96,8 @@ class Esp32SerialCollector:
         self._last_error: Optional[str] = None
         self._status = "disconnected"
         self._status_message = "Collector stopped."
+        self._wifi_status: str = "disconnected"
+        self._last_firmware_log: str = ""
 
         # Rate tracking
         self._recent_timestamps: Deque[float] = deque(maxlen=100)
@@ -170,25 +175,45 @@ class Esp32SerialCollector:
     def get_health(self) -> CollectorHealth:
         """Returns comprehensive health snapshot."""
         with self._lock:
-            # Calculate instant packets per second
             now_ts = time.time()
             valid_ts = [t for t in self._recent_timestamps if now_ts - t <= 2.0]
             pps = len(valid_ts) / 2.0 if valid_ts else 0.0
 
             ports = self.list_available_ports()
             dev_desc = next((p["description"] for p in ports if p["port"].upper() == self.port.upper()), None)
+            is_open = bool(self._serial_handle and self._serial_handle.is_open)
+            
+            # Streaming is strictly defined as packets arriving within the last 3 seconds
+            is_streaming = False
+            if self._packets_captured > 0 and self._last_packet_time:
+                is_streaming = (now_ts - self._last_packet_time.timestamp() < 3.0)
+
+            # Determine granular state
+            if not self._is_running or not is_open:
+                computed_status = self._status if self._status in ["port_busy", "error"] else "disconnected"
+            elif is_streaming:
+                computed_status = "receiving_csi"
+            elif self._packets_captured > 0:
+                computed_status = "processing_csi"
+            elif self._status == "connecting":
+                computed_status = "connecting"
+            else:
+                computed_status = "waiting_for_packets"
 
             return CollectorHealth(
-                is_connected=(self._status == "connected"),
+                is_connected=is_open,
+                is_streaming=is_streaming,
                 port=self.port,
                 baud_rate=self.baud_rate,
-                status=self._status,
+                status=computed_status,
                 status_message=self._status_message,
                 packets_captured=self._packets_captured,
                 packets_per_second=round(pps, 1),
                 malformed_packets=self._malformed_packets,
                 last_packet_time=self._last_packet_time,
                 last_error=self._last_error,
+                wifi_status=self._wifi_status,
+                last_firmware_log=self._last_firmware_log,
                 device_description=dev_desc,
                 detected_ports=ports,
             )
@@ -213,19 +238,24 @@ class Esp32SerialCollector:
                     self._status = "connecting"
                     self._status_message = f"Opening {self.port} at {self.baud_rate} baud..."
 
-                self._serial_handle = serial.Serial(
-                    port=self.port,
-                    baudrate=self.baud_rate,
-                    timeout=1.0,
-                    write_timeout=1.0,
-                )
+                # Explicitly construct and configure without asserting DTR/RTS
+                # to prevent ESP32 from being held in reset by auto-download circuitry.
+                ser = serial.Serial()
+                ser.port = self.port
+                ser.baudrate = self.baud_rate
+                ser.timeout = 1.0
+                ser.write_timeout = 1.0
+                ser.dtr = False
+                ser.rts = False
+                ser.open()
+                self._serial_handle = ser
 
                 # Reset hardware input buffer
                 self._serial_handle.reset_input_buffer()
 
                 with self._lock:
-                    self._status = "connected"
-                    self._status_message = f"Connected to {self.port} at {self.baud_rate} baud."
+                    self._status = "waiting_for_packets"
+                    self._status_message = f"Connected to {self.port} at {self.baud_rate} baud. Waiting for ESP32 Wi-Fi & CSI stream..."
                     self._last_error = None
                 logger.info("Serial port %s opened successfully.", self.port)
 
@@ -240,27 +270,46 @@ class Esp32SerialCollector:
                     except Exception:
                         continue
 
-                    if not line.startswith("CSI_DATA"):
-                        continue
+                    if line.startswith("CSI_DATA"):
+                        packet = self.parse_csi_line(line)
+                        if packet:
+                            now_ts = time.time()
+                            with self._lock:
+                                self._packet_buffer.append(packet)
+                                self._packets_captured += 1
+                                self._last_packet_time = packet.timestamp
+                                self._recent_timestamps.append(now_ts)
+                                self._status = "receiving_csi"
+                                self._status_message = f"Receiving live CSI packets from {packet.mac_address} ({packet.rssi_dbm} dBm)."
 
-                    packet = self.parse_csi_line(line)
-                    if packet:
-                        now_ts = time.time()
-                        with self._lock:
-                            self._packet_buffer.append(packet)
-                            self._packets_captured += 1
-                            self._last_packet_time = packet.timestamp
-                            self._recent_timestamps.append(now_ts)
-
-                        # Notify subscribers outside lock
-                        for sub in list(self._subscribers):
-                            try:
-                                sub(packet)
-                            except Exception as sub_err:
-                                logger.debug("Subscriber error: %s", sub_err)
+                            # Notify subscribers outside lock
+                            for sub in list(self._subscribers):
+                                try:
+                                    sub(packet)
+                                except Exception as sub_err:
+                                    logger.debug("Subscriber error: %s", sub_err)
+                        else:
+                            with self._lock:
+                                self._malformed_packets += 1
                     else:
+                        # Inspect non-CSI firmware output (Wi-Fi connection states, boot logs)
                         with self._lock:
-                            self._malformed_packets += 1
+                            self._last_firmware_log = line[:120]
+                            if "example_connect: Connecting to" in line:
+                                self._wifi_status = "connecting"
+                                ssid = line.split("Connecting to")[-1].strip().rstrip(".")
+                                self._status_message = f"ESP32 connecting to Wi-Fi SSID '{ssid}'..."
+                            elif "Wi-Fi disconnected 201" in line or "NO_AP_FOUND" in line:
+                                self._wifi_status = "no_ap_found"
+                                self._status_message = "Wi-Fi AP 'SHIVAM_1010 7313' not found (Error 201). Turn on your mobile hotspot 'SHIVAM_1010 7313' to begin streaming."
+                            elif "Waiting for IP" in line:
+                                self._wifi_status = "waiting_ip"
+                                self._status_message = "Wi-Fi authenticated. Waiting for IP lease..."
+                            elif "got ip:" in line:
+                                self._wifi_status = "connected"
+                                self._status_message = f"Wi-Fi connected ({line}). Initializing CSI ping..."
+                            elif "================ CSI RECV ================" in line:
+                                self._status_message = "CSI subsystem initialized. Awaiting first frame..."
 
             except serial.SerialException as s_err:
                 err_str = str(s_err)

@@ -318,20 +318,35 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
     };
     animate();
 
-    // Window Resize Handler
-    const handleResize = () => {
-      if (!container || !rendererRef.current || !cameraRef.current) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
+    // Dynamic Container Resize Observer & Window Resize Handler
+    const updateDimensions = (w: number, h: number) => {
+      if (!rendererRef.current || !cameraRef.current || w <= 0 || h <= 0) return;
       cameraRef.current.aspect = w / h;
       cameraRef.current.updateProjectionMatrix();
       rendererRef.current.setSize(w, h);
     };
-    window.addEventListener('resize', handleResize);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          updateDimensions(width, height);
+        }
+      }
+    });
+    resizeObserver.observe(container);
+
+    const onWinResize = () => {
+      if (container) {
+        updateDimensions(container.clientWidth, container.clientHeight);
+      }
+    };
+    window.addEventListener('resize', onWinResize);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', onWinResize);
       renderer.dispose();
       container.innerHTML = '';
     };
