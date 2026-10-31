@@ -130,6 +130,20 @@ export function getBaseHeaders(extra: Record<string, string> = {}): Record<strin
   return headers;
 }
 
+export async function safeParseJson<T = unknown>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('Error 1033')) {
+      throw new Error(
+        'Backend tunnel unreachable or returned HTML. Please check the backend tunnel or update the endpoint in Settings.'
+      );
+    }
+    throw new Error(`Expected JSON response, but received "${contentType || 'unknown'}".`);
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
   const response = await fetch(`${API_BASE}/health`, {
     signal,
@@ -140,7 +154,7 @@ export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse>
     throw new Error(`Health check failed: ${response.status} ${response.statusText}`);
   }
 
-  const data: unknown = await response.json();
+  const data: unknown = await safeParseJson(response);
 
   if (
     typeof data !== 'object' ||
@@ -182,7 +196,7 @@ export async function fetchReadiness(signal?: AbortSignal): Promise<ReadinessRes
     throw new Error(`Readiness check failed with status: ${response.status}`);
   }
 
-  return (await response.json()) as ReadinessResponse;
+  return safeParseJson<ReadinessResponse>(response);
 }
 
 export async function fetchProviderStatus(signal?: AbortSignal): Promise<UnifiedProviderStatusResponse> {
@@ -199,7 +213,7 @@ export async function fetchProviderStatus(signal?: AbortSignal): Promise<Unified
     throw new Error(`Provider status check failed: ${response.status}`);
   }
 
-  return (await response.json()) as UnifiedProviderStatusResponse;
+  return safeParseJson<UnifiedProviderStatusResponse>(response);
 }
 
 // Conversation Endpoints
@@ -218,8 +232,7 @@ export async function fetchConversations(
     throw new Error(`Failed to load conversations: ${response.status}`);
   }
 
-  const data = (await response.json()) as ConversationListResponse;
-  return data;
+  return safeParseJson<ConversationListResponse>(response);
 }
 
 export async function createConversation(
