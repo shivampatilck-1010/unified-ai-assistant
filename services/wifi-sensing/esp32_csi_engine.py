@@ -337,7 +337,8 @@ class Esp32CsiEngine:
             target_y = max(0.6, min(3.4, 2.0 + math.sin(self._step_phase) * lateral_dist))
 
             # Multi-Target Clustering: Split 64 subcarriers into 4 spatial sub-bands
-            # Band 0: [0..15], Band 1: [16..31], Band 2: [32..47], Band 3: [48..63]
+            # Band 0: [0..15] (TX proximity), Band 1: [16..31] (Mid-left Fresnel),
+            # Band 2: [32..47] (Mid-right Fresnel), Band 3: [48..63] (RX proximity)
             band_vars: List[float] = []
             for b in range(4):
                 b_start = b * 16
@@ -345,22 +346,28 @@ class Esp32CsiEngine:
                 b_v = [subcarrier_vars[k] for k in range(b_start, min(b_end, len(subcarrier_vars)))]
                 band_vars.append(statistics.mean(b_v) if b_v else 0.01)
 
-            total_band_var = sum(band_vars) + 1e-6
-            # Shannon spectral entropy of subcarrier variance distribution
-            entropy = -sum((bv / total_band_var) * math.log2(bv / total_band_var) for bv in band_vars if bv > 0)
-            active_band_count = sum(1 for bv in band_vars if bv > presence_thresh * 1.05)
+            # Excess variance above calibrated baseline floor
+            excess_vars = [max(0.0, bv - self.calibration.baseline_variance) for bv in band_vars]
+            active_clusters = sum(1 for ev in excess_vars if ev > presence_thresh * 1.5)
 
-            # Data-driven target count determination (no hardcoded counts)
-            if avg_var < presence_thresh * 0.95:
+            # Spatial bi-modal energy distribution: Low subcarriers (0..31) vs High subcarriers (32..63)
+            low_excess = sum(excess_vars[:2])
+            high_excess = sum(excess_vars[2:])
+
+            # Accurate physical target count determination
+            if avg_var < presence_thresh * 0.95 or self._current_state == "no_movement":
                 detected_count = 0
-            elif active_band_count <= 1 or entropy < 1.35 or avg_var < motion_thresh * 0.8:
+            elif motion_intensity < 0.40 or active_clusters <= 1:
+                # Single localized occupant in Fresnel zone
                 detected_count = 1
-            elif active_band_count == 2 or (entropy < 1.75 and active_band_count >= 2):
+            elif (low_excess > presence_thresh * 2.0 and high_excess > presence_thresh * 2.0) or active_clusters == 2:
+                # Two distinct spatial disturbance peaks (e.g. 2 active occupants)
                 detected_count = 2
-            elif active_band_count == 3 or (entropy < 1.94 and active_band_count >= 3):
-                detected_count = 3
+            elif active_clusters >= 3 and motion_intensity > 0.85 and avg_var > motion_thresh * 2.5:
+                # High multi-path dispersion from 3 occupants
+                detected_count = min(3, active_clusters)
             else:
-                detected_count = 4
+                detected_count = 1
         else:
             target_x = 3.0
             target_y = 2.0
