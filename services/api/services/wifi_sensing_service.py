@@ -752,6 +752,12 @@ class WifiSensingService:
             velocity_mps=state.velocity_mps if state else 0.0,
             occupant_count=state.occupant_count if state else 0,
             occupants=state.occupants if state else [],
+            respiration_rate=state.respiration_rate if state else None,
+            respiration_confidence=state.respiration_confidence if state else 0.0,
+            respiration_status=state.respiration_status if state else "unavailable",
+            heart_rate_bpm=state.heart_rate_bpm if state else None,
+            heart_rate_confidence=state.heart_rate_confidence if state else 0.0,
+            heart_rate_status=state.heart_rate_status if state else "unavailable",
         )
 
     @classmethod
@@ -812,6 +818,12 @@ class WifiSensingService:
                     "velocity_mps": state.velocity_mps,
                     "occupant_count": state.occupant_count,
                     "occupants": state.occupants,
+                    "respiration_rate": state.respiration_rate,
+                    "respiration_confidence": state.respiration_confidence,
+                    "respiration_status": state.respiration_status,
+                    "heart_rate_bpm": state.heart_rate_bpm,
+                    "heart_rate_confidence": state.heart_rate_confidence,
+                    "heart_rate_status": state.heart_rate_status,
                 }
                 # Thread-safe dispatch to asyncio queue
                 loop.call_soon_threadsafe(
@@ -836,6 +848,12 @@ class WifiSensingService:
                         "rssi_dbm": st.rssi_dbm,
                         "subcarrier_amplitudes": st.subcarrier_amplitudes[:64],
                         "calibration_status": "calibrated" if st.is_calibrated else "uncalibrated",
+                        "respiration_rate": st.respiration_rate,
+                        "respiration_confidence": st.respiration_confidence,
+                        "respiration_status": st.respiration_status,
+                        "heart_rate_bpm": st.heart_rate_bpm,
+                        "heart_rate_confidence": st.heart_rate_confidence,
+                        "heart_rate_status": st.heart_rate_status,
                     }
                     yield f"event: heartbeat\ndata: {json.dumps(heartbeat)}\n\n"
         finally:

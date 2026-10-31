@@ -301,13 +301,15 @@ class Esp32SerialCollector:
                                 self._status_message = f"ESP32 connecting to Wi-Fi SSID '{ssid}'..."
                             elif "Wi-Fi disconnected 201" in line or "NO_AP_FOUND" in line:
                                 self._wifi_status = "no_ap_found"
-                                self._status_message = "Wi-Fi AP 'SHIVAM_1010 7313' not found (Error 201). Turn on your mobile hotspot 'SHIVAM_1010 7313' to begin streaming."
+                                self._status_message = "Wi-Fi AP 'LPU Hostels' not found (Error 201). Ensure router is in range."
                             elif "Waiting for IP" in line:
                                 self._wifi_status = "waiting_ip"
                                 self._status_message = "Wi-Fi authenticated. Waiting for IP lease..."
                             elif "got ip:" in line:
                                 self._wifi_status = "connected"
                                 self._status_message = f"Wi-Fi connected ({line}). Initializing CSI ping..."
+                                # Automatically authenticate with college 24Online portal
+                                threading.Thread(target=self._authenticate_lpu_portal, daemon=True).start()
                             elif "================ CSI RECV ================" in line:
                                 self._status_message = "CSI subsystem initialized. Awaiting first frame..."
 
@@ -462,3 +464,30 @@ class Esp32SerialCollector:
         except Exception as exc:
             logger.debug("Malformed CSI line '%s...': %s", line[:40], exc)
             return None
+
+    def _authenticate_lpu_portal(self) -> None:
+        """Submits 24Online captive portal authentication for LPU Hostels network."""
+        import ssl
+        import urllib.parse
+        import urllib.request
+        try:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            payload = urllib.parse.urlencode({
+                "mode": "191",
+                "username": "12523420",
+                "password": "@Shivam@3902",
+                "logintype": "2",
+                "checkClose": "0",
+                "saveinfo": "",
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://internet.lpu.in/24online/servlet/E24onlineHTTPClient",
+                data=payload,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            resp = urllib.request.urlopen(req, context=ctx, timeout=6)
+            logger.info("LPU captive portal authentication response: HTTP %s", resp.status)
+        except Exception as err:
+            logger.debug("LPU captive portal auto-login attempt: %s", err)

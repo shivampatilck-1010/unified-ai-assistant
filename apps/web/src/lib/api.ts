@@ -74,7 +74,7 @@ export function getApiBase(): string {
   }
   const raw =
     import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD ? 'https://essex-requirements-votes-adrian.trycloudflare.com' : 'http://127.0.0.1:8000');
+    (import.meta.env.PROD ? 'https://occurred-soa-messaging-beginners.trycloudflare.com' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 

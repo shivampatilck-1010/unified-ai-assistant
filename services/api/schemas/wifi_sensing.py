@@ -218,6 +218,13 @@ class Esp32HardwareStatusResponse(BaseModel):
     velocity_mps: Optional[float] = 0.0
     occupant_count: Optional[int] = 0
     occupants: List[Dict[str, Any]] = Field(default_factory=list)
+    # RuView ADR-117 Vital Signs
+    respiration_rate: Optional[float] = None
+    respiration_confidence: Optional[float] = None
+    respiration_status: Optional[str] = "unavailable"
+    heart_rate_bpm: Optional[float] = None
+    heart_rate_confidence: Optional[float] = None
+    heart_rate_status: Optional[str] = "unavailable"
 
 
 class Esp32ConnectRequest(BaseModel):

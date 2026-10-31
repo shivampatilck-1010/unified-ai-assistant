@@ -17,6 +17,7 @@ import statistics
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from esp32_serial_collector import Esp32CsiPacket
+from ruview_vitals_engine import RuViewVitalsPipeline, VitalStatus
 
 
 def utc_now() -> datetime:
@@ -62,6 +63,13 @@ class CsiEngineState:
     velocity_mps: float = 0.0
     occupant_count: int = 0
     occupants: List[Dict[str, Any]] = field(default_factory=list)
+    # RuView ADR-117 Vital Signs
+    respiration_rate: Optional[float] = None
+    respiration_confidence: float = 0.0
+    respiration_status: str = "unavailable"
+    heart_rate_bpm: Optional[float] = None
+    heart_rate_confidence: float = 0.0
+    heart_rate_status: str = "unavailable"
 
 
 class Esp32CsiEngine:
@@ -71,6 +79,9 @@ class Esp32CsiEngine:
         self.window_size = window_size
         self._frame_history: Deque[Esp32CsiPacket] = deque(maxlen=window_size)
         self._sanitized_phase_history: Deque[List[float]] = deque(maxlen=window_size)
+
+        # RuView vitals pipeline
+        self.vitals_pipeline = RuViewVitalsPipeline(sample_rate=50.0, n_subcarriers=56)
 
         # Baseline calibration
         self.calibration = CsiCalibrationProfile()
@@ -107,6 +118,7 @@ class Esp32CsiEngine:
         self.calibration = CsiCalibrationProfile()
         self._is_calibrating = False
         self._calibration_frames.clear()
+        self.vitals_pipeline.reset()
 
     # --- Signal Processing Core ---
 
@@ -203,6 +215,13 @@ class Esp32CsiEngine:
                 variances.append(statistics.variance(vals))
 
         base_var = statistics.mean(variances) if variances else 0.04
+
+        # Compute mean amplitudes for baseline residual subtraction
+        mean_amps = [
+            statistics.mean([f.amplitudes[sc] for f in frames if len(f.amplitudes) > sc])
+            for sc in range(min(64, n_sc))
+        ]
+        self.vitals_pipeline.set_baseline(mean_amps)
 
         # Adaptive thresholds based on measured noise floor
         # Empty room baseline typically has variance 0.02 - 0.08
@@ -433,6 +452,19 @@ class Esp32CsiEngine:
                 "velocity": 0.02,
             })
 
+        # RuView Vitals Pipeline evaluation (ADR-117)
+        is_moving = (self._current_state == "movement_detected" or motion_intensity > 0.25)
+        sanitized_phases = list(self._sanitized_phase_history)[-1] if self._sanitized_phase_history else None
+        vitals = self.vitals_pipeline.process_frame(latest.amplitudes, sanitized_phases, is_moving=is_moving)
+
+        resp_rate = vitals.respiratory_rate.value_bpm if vitals.respiratory_rate and vitals.respiratory_rate.status != VitalStatus.UNAVAILABLE else None
+        resp_conf = vitals.respiratory_rate.confidence if vitals.respiratory_rate else 0.0
+        resp_status = vitals.respiratory_rate.status.value if vitals.respiratory_rate else "unavailable"
+
+        hr_bpm = vitals.heart_rate.value_bpm if vitals.heart_rate and vitals.heart_rate.status != VitalStatus.UNAVAILABLE else None
+        hr_conf = vitals.heart_rate.confidence if vitals.heart_rate else 0.0
+        hr_status = vitals.heart_rate.status.value if vitals.heart_rate else "unavailable"
+
         return CsiEngineState(
             timestamp=latest.timestamp,
             presence_state=self._current_state,
@@ -455,4 +487,10 @@ class Esp32CsiEngine:
             velocity_mps=self._velocity,
             occupant_count=detected_count,
             occupants=occupants,
+            respiration_rate=resp_rate,
+            respiration_confidence=round(resp_conf, 2),
+            respiration_status=resp_status,
+            heart_rate_bpm=hr_bpm,
+            heart_rate_confidence=round(hr_conf, 2),
+            heart_rate_status=hr_status,
         )

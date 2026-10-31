@@ -75,6 +75,12 @@ export const Esp32HardwarePanel: React.FC<Esp32HardwarePanelProps> = ({ onStatus
               velocity_mps: frame.velocity_mps,
               occupant_count: frame.occupant_count,
               occupants: frame.occupants,
+              respiration_rate: frame.respiration_rate,
+              respiration_confidence: frame.respiration_confidence,
+              respiration_status: frame.respiration_status,
+              heart_rate_bpm: frame.heart_rate_bpm,
+              heart_rate_confidence: frame.heart_rate_confidence,
+              heart_rate_status: frame.heart_rate_status,
             };
             if (onStatusUpdate) onStatusUpdate(updated);
             return updated;
@@ -101,6 +107,12 @@ export const Esp32HardwarePanel: React.FC<Esp32HardwarePanelProps> = ({ onStatus
                 ? hb.subcarrier_amplitudes
                 : prev.subcarrier_amplitudes,
               calibration_status: hb.calibration_status,
+              respiration_rate: hb.respiration_rate !== undefined ? hb.respiration_rate : prev.respiration_rate,
+              respiration_confidence: hb.respiration_confidence !== undefined ? hb.respiration_confidence : prev.respiration_confidence,
+              respiration_status: hb.respiration_status || prev.respiration_status,
+              heart_rate_bpm: hb.heart_rate_bpm !== undefined ? hb.heart_rate_bpm : prev.heart_rate_bpm,
+              heart_rate_confidence: hb.heart_rate_confidence !== undefined ? hb.heart_rate_confidence : prev.heart_rate_confidence,
+              heart_rate_status: hb.heart_rate_status || prev.heart_rate_status,
             };
             if (onStatusUpdate) onStatusUpdate(updated);
             return updated;
@@ -624,6 +636,136 @@ export const Esp32HardwarePanel: React.FC<Esp32HardwarePanelProps> = ({ onStatus
                 display: 'block',
               }}
             />
+          </div>
+
+          {/* RuView Bio-Vitals & Respiration Monitor (ADR-018 DSP) */}
+          <div
+            style={{
+              backgroundColor: '#0f172a',
+              border: '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px' }}>🫁</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc' }}>
+                  RuView Bio-Vitals & Respiration Monitor
+                </span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor:
+                      status?.respiration_status === 'VALID'
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : status?.respiration_status === 'DEGRADED'
+                        ? 'rgba(245, 158, 11, 0.15)'
+                        : 'rgba(56, 189, 248, 0.1)',
+                    color:
+                      status?.respiration_status === 'VALID'
+                        ? '#34d399'
+                        : status?.respiration_status === 'DEGRADED'
+                        ? '#fbbf24'
+                        : '#38bdf8',
+                    border: `1px solid ${
+                      status?.respiration_status === 'VALID'
+                        ? 'rgba(16, 185, 129, 0.3)'
+                        : status?.respiration_status === 'DEGRADED'
+                        ? 'rgba(245, 158, 11, 0.3)'
+                        : 'rgba(56, 189, 248, 0.2)'
+                    }`,
+                  }}
+                >
+                  {status?.respiration_status === 'VALID'
+                    ? '● LOCK: VALID'
+                    : status?.respiration_status === 'DEGRADED'
+                    ? '◐ LOW SNR: DEGRADED'
+                    : status?.respiration_status === 'UNAVAILABLE (MOTION GATED)'
+                    ? '⏸ MOTION GATED'
+                    : '○ SEARCHING BASELINE'}
+                </span>
+              </div>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>
+                2nd-Order Resonator IIR (0.1–0.5 Hz)
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: '8px',
+              }}
+            >
+              {/* Respiration Rate */}
+              <div style={{ backgroundColor: '#1e293b', padding: '8px 10px', borderRadius: '6px' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                  Respiration Rate
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '2px' }}>
+                  <span
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: status?.respiration_rate ? '#34d399' : '#64748b',
+                    }}
+                  >
+                    {status?.respiration_rate ? status.respiration_rate.toFixed(1) : '—'}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>BPM</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                  Confidence: {((status?.respiration_confidence ?? 0) * 100).toFixed(0)}%
+                </div>
+              </div>
+
+              {/* Heart Rate (Experimental) */}
+              <div style={{ backgroundColor: '#1e293b', padding: '8px 10px', borderRadius: '6px' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                  Heart Rate (Cardiac Band)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '2px' }}>
+                  <span
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: status?.heart_rate_bpm ? '#f43f5e' : '#64748b',
+                    }}
+                  >
+                    {status?.heart_rate_bpm ? status.heart_rate_bpm.toFixed(0) : '—'}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>BPM</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                  Single-Node DevKit V1: Experimental
+                </div>
+              </div>
+
+              {/* Motion Gating Indicator */}
+              <div style={{ backgroundColor: '#1e293b', padding: '8px 10px', borderRadius: '6px' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                  Motion Gating
+                </div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    marginTop: '4px',
+                    color: (status?.motion_intensity ?? 0) > 0.22 ? '#fbbf24' : '#34d399',
+                  }}
+                >
+                  {(status?.motion_intensity ?? 0) > 0.22 ? 'Active Displacement' : 'Stationary Subject'}
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                  Suppresses micro-vitals during gross movement
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Calibration Controls */}

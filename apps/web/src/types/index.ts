@@ -768,6 +768,12 @@ export interface Esp32HardwareStatus {
   velocity_mps?: number | null;
   occupant_count?: number | null;
   occupants?: Array<Record<string, unknown>> | null;
+  respiration_rate?: number | null;
+  respiration_confidence?: number | null;
+  respiration_status?: string | null;
+  heart_rate_bpm?: number | null;
+  heart_rate_confidence?: number | null;
+  heart_rate_status?: string | null;
 }
 
 export interface SensingEvent {

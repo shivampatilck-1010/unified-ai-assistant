@@ -82,6 +82,7 @@ export const PhysicalSensingWorkspace: React.FC<PhysicalSensingWorkspaceProps> =
   const fresnelMeshRef = useRef<THREE.Mesh | null>(null);
   const perturbationGroupRef = useRef<THREE.Group | null>(null);
   const userAvatarRef = useRef<THREE.Group | null>(null);
+  const userTorsoRef = useRef<THREE.Mesh | null>(null);
   const userLimbsRef = useRef<{
     leftArm: THREE.Group;
     rightArm: THREE.Group;
@@ -320,6 +321,7 @@ export const PhysicalSensingWorkspace: React.FC<PhysicalSensingWorkspaceProps> =
     const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.62, 16), userMat);
     torso.position.y = 1.15;
     userAvatar.add(torso);
+    userTorsoRef.current = torso;
 
     // Arms
     const armMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.4 });
@@ -469,6 +471,19 @@ export const PhysicalSensingWorkspace: React.FC<PhysicalSensingWorkspaceProps> =
             userLimbsRef.current.rightLeg.rotation.x *= 0.85;
             userLimbsRef.current.leftArm.rotation.x *= 0.85;
             userLimbsRef.current.rightArm.rotation.x *= 0.85;
+          }
+        }
+
+        // RuView Bio-Vitals Torso Respiration Rhythm (Chest micro-expansion)
+        if (userTorsoRef.current) {
+          const respBpm = hardwareStatus?.respiration_rate ?? 16.0;
+          const respStatus = hardwareStatus?.respiration_status;
+          if (!isMovementDetected && (respStatus === 'VALID' || respStatus === 'DEGRADED')) {
+            const breathFreq = (respBpm / 60.0) * (Math.PI * 2);
+            const breathExpansion = 1.0 + 0.045 * Math.sin(phase * (breathFreq / 1.8));
+            userTorsoRef.current.scale.set(breathExpansion, 1.0, breathExpansion);
+          } else {
+            userTorsoRef.current.scale.set(1.0, 1.0, 1.0);
           }
         }
 
@@ -963,6 +978,15 @@ export const PhysicalSensingWorkspace: React.FC<PhysicalSensingWorkspaceProps> =
               {hardwareStatus?.is_calibrated ? 'CALIBRATED' : 'UNCALIBRATED'}
             </span>
           </div>
+
+          {hardwareStatus?.respiration_rate ? (
+            <div className="hud-metric">
+              <span className="hud-label">Respiration:</span>
+              <span className="hud-val highlight" style={{ color: '#34d399' }}>
+                🫁 {hardwareStatus.respiration_rate.toFixed(1)} BPM
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
