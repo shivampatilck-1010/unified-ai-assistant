@@ -149,6 +149,10 @@ class SyntheticSensorSimulator(BaseSensorProvider):
         velocity_mps: Optional[float] = None
         uncertainty_radius_m: Optional[float] = None
 
+        # Multi-occupant modeling (4 occupants in room: User + 3 Roommates)
+        tracked_subjects = []
+        occupancy_count = 0
+
         if state == "vacant":
             # Ambient thermal noise: very low variance, low doppler
             variance = 0.01 + self._rng.uniform(0.0, 0.02)
@@ -161,6 +165,8 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             pos_y = None
             velocity_mps = 0.0
             uncertainty_radius_m = None
+            occupancy_count = 0
+            tracked_subjects = []
 
         elif state == "stationary":
             # Breathing modulation: subtle sinusoidal fluctuation (0.25 Hz approx)
@@ -170,13 +176,33 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             rssi = -58.0 + self._rng.uniform(-1.5, 1.5)
             noise_floor = -91.0
             quality = 0.99
-            # Person seated at desk (4.5, 2.8) with tiny respiratory chest displacement
+            # Subject 1 (User) seated at desk workstation (4.5, 2.8)
             micro_x = 0.03 * math.sin(self._tick * 0.3 * self._speed)
             micro_y = 0.02 * math.cos(self._tick * 0.3 * self._speed)
             pos_x = round(4.5 + micro_x, 2)
             pos_y = round(2.8 + micro_y, 2)
             velocity_mps = 0.0
             uncertainty_radius_m = 0.30
+
+            # Subject 2 (Roommate 1) at center meeting table (3.0, 1.8)
+            p2_x = round(3.0 + 0.02 * math.cos(self._tick * 0.25 * self._speed), 2)
+            p2_y = round(1.8 + 0.02 * math.sin(self._tick * 0.25 * self._speed), 2)
+
+            # Subject 3 (Roommate 2) on lounge sofa (1.6, 3.2)
+            p3_x = round(1.6 + 0.015 * math.sin(self._tick * 0.2 * self._speed), 2)
+            p3_y = round(3.2 + 0.015 * math.cos(self._tick * 0.2 * self._speed), 2)
+
+            # Subject 4 (Roommate 3) at reading area (4.0, 1.2)
+            p4_x = round(4.0 + 0.02 * math.sin(self._tick * 0.35 * self._speed), 2)
+            p4_y = round(1.2 + 0.02 * math.cos(self._tick * 0.35 * self._speed), 2)
+
+            occupancy_count = 4
+            tracked_subjects = [
+                {"subject_id": "Subject #1 (You)", "x": pos_x, "y": pos_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.30},
+                {"subject_id": "Subject #2", "x": p2_x, "y": p2_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.25},
+                {"subject_id": "Subject #3", "x": p3_x, "y": p3_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
+                {"subject_id": "Subject #4", "x": p4_x, "y": p4_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
+            ]
 
         else:  # "motion"
             # High variance and dynamic doppler energy
@@ -187,7 +213,7 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             noise_floor = -90.0
             quality = 0.96
 
-            # Advance kinematics along waypoints
+            # Subject 1 (User): Advance kinematics along waypoints
             target_x, target_y = self._waypoints[self._waypoint_idx]
             dx = target_x - self._pos_x
             dy = target_y - self._pos_y
@@ -198,10 +224,8 @@ class SyntheticSensorSimulator(BaseSensorProvider):
                 self._pos_x += (dx / dist) * step_size
                 self._pos_y += (dy / dist) * step_size
             else:
-                # Reached waypoint, advance to next
                 self._waypoint_idx = (self._waypoint_idx + 1) % len(self._waypoints)
 
-            # Keep inside room bounds
             self._pos_x = max(0.4, min(self._room_width_m - 0.4, self._pos_x))
             self._pos_y = max(0.4, min(self._room_length_m - 0.4, self._pos_y))
 
@@ -210,6 +234,27 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             velocity_mps = round(min(1.8, 0.9 * self._speed), 2)
             uncertainty_radius_m = 0.45
 
+            # Subject 2 (Roommate 1) seated at workstation (4.6, 2.8)
+            p2_x = round(4.6 + 0.02 * math.cos(self._tick * 0.25 * self._speed), 2)
+            p2_y = round(2.8 + 0.02 * math.sin(self._tick * 0.25 * self._speed), 2)
+
+            # Subject 3 (Roommate 2) seated on sofa (1.6, 3.2)
+            p3_x = round(1.6 + 0.015 * math.sin(self._tick * 0.2 * self._speed), 2)
+            p3_y = round(3.2 + 0.015 * math.cos(self._tick * 0.2 * self._speed), 2)
+
+            # Subject 4 (Roommate 3) moving in reading / entry area
+            p4_x = round(3.8 + 0.6 * math.sin(self._tick * 0.22 * self._speed), 2)
+            p4_y = round(1.4 + 0.4 * math.cos(self._tick * 0.22 * self._speed), 2)
+            p4_vel = round(0.45 * self._speed, 2)
+
+            occupancy_count = 4
+            tracked_subjects = [
+                {"subject_id": "Subject #1 (You)", "x": pos_x, "y": pos_y, "presence_state": "motion", "velocity_mps": velocity_mps, "uncertainty_radius_m": uncertainty_radius_m},
+                {"subject_id": "Subject #2", "x": p2_x, "y": p2_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.25},
+                {"subject_id": "Subject #3", "x": p3_x, "y": p3_y, "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
+                {"subject_id": "Subject #4", "x": p4_x, "y": p4_y, "presence_state": "motion", "velocity_mps": p4_vel, "uncertainty_radius_m": 0.38},
+            ]
+
         metadata = {
             "synthetic_state": state,
             "simulation_tick": self._tick,
@@ -217,6 +262,8 @@ class SyntheticSensorSimulator(BaseSensorProvider):
             "kinematics_mode": "2D_synthetic_trajectory",
             "room_dimensions": {"width_m": self._room_width_m, "length_m": self._room_length_m},
             "sensor_anchor": {"x": 3.0, "y": 0.2, "label": "Wi-Fi AP Anchor"},
+            "occupancy_count": occupancy_count,
+            "tracked_subjects": tracked_subjects,
         }
         if pos_x is not None:
             metadata["position_x"] = pos_x

@@ -398,112 +398,158 @@ export const RoomPositionCanvas: React.FC<RoomPositionCanvasProps> = ({
       ctx.restore();
     }
 
-    // 9. Live Subject Marker (Oriented Human Silhouette with Directional Arrow)
+    // 9. Live Subject Markers (Multi-Occupancy Human Silhouettes with Directional Vectors)
+    interface MultiSubject {
+      subject_id: string;
+      x: number;
+      y: number;
+      presence_state?: string;
+      velocity_mps?: number;
+      uncertainty_radius_m?: number;
+    }
+
+    const rawMetrics = (activeDisplayEvent?.raw_metrics || {}) as Record<string, unknown>;
+    const multiSubjects = (rawMetrics.tracked_subjects as MultiSubject[] | undefined) || [];
     const currentCoords = getCoordinates(activeDisplayEvent);
-    if (currentCoords) {
-      const { x, y, uncertainty, vel } = currentCoords;
-      const px = toPxX(x);
-      const py = toPxY(y);
-      const radiusPx = uncertainty * scale;
 
-      ctx.save();
+    const subjectsToRender: MultiSubject[] = multiSubjects.length > 0
+      ? multiSubjects
+      : (currentCoords ? [{
+          subject_id: activeDisplayEvent?.subject_id || 'Subject #1',
+          x: currentCoords.x,
+          y: currentCoords.y,
+          presence_state: activeDisplayEvent?.presence_state,
+          velocity_mps: currentCoords.vel,
+          uncertainty_radius_m: currentCoords.uncertainty,
+        }] : []);
 
-      // Translucent uncertainty circle
-      const themeColor = isSimulated ? 'rgba(14, 165, 233,' : 'rgba(16, 185, 129,';
-      ctx.fillStyle = `${themeColor} 0.15)`;
-      ctx.strokeStyle = `${themeColor} 0.45)`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(px, py, radiusPx, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+    const SUBJECT_PALETTE = [
+      { fill: '#38bdf8', stroke: '#0284c7', themeRgba: 'rgba(14, 165, 233,' }, // Blue (Subject #1 - You)
+      { fill: '#f59e0b', stroke: '#d97706', themeRgba: 'rgba(245, 158, 11,' }, // Amber (Subject #2)
+      { fill: '#a855f7', stroke: '#7c3aed', themeRgba: 'rgba(168, 85, 247,' }, // Purple (Subject #3)
+      { fill: '#10b981', stroke: '#059669', themeRgba: 'rgba(16, 185, 129,' }, // Emerald (Subject #4)
+    ];
 
-      // Outer radar pulse wave
-      const pulseTime = (Date.now() / 600) % 2;
-      ctx.strokeStyle = `${themeColor} ${Math.max(0, 0.7 - pulseTime * 0.35)})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(px, py, 8 + pulseTime * 14, 0, Math.PI * 2);
-      ctx.stroke();
+    if (subjectsToRender.length > 0) {
+      subjectsToRender.forEach((sub, subIdx) => {
+        const x = sub.x;
+        const y = sub.y;
+        const uncertainty = sub.uncertainty_radius_m ?? 0.35;
+        const vel = sub.velocity_mps ?? 0.0;
+        const px = toPxX(x);
+        const py = toPxY(y);
+        const radiusPx = uncertainty * scale;
+        const pal = SUBJECT_PALETTE[subIdx % SUBJECT_PALETTE.length];
 
-      // Draw oriented human silhouette (Head + Shoulders/Torso)
-      ctx.fillStyle = isSimulated ? '#38bdf8' : '#34d399';
-      ctx.shadowColor = isSimulated ? '#0284c7' : '#059669';
-      ctx.shadowBlur = 8;
+        ctx.save();
 
-      // Head
-      ctx.beginPath();
-      ctx.arc(px, py - 5, 4.5, 0, Math.PI * 2);
-      ctx.fill();
+        // Translucent uncertainty circle
+        ctx.fillStyle = `${pal.themeRgba} 0.15)`;
+        ctx.strokeStyle = `${pal.themeRgba} 0.55)`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px, py, radiusPx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
-      // Shoulders & torso arc
-      ctx.beginPath();
-      ctx.arc(px, py + 3, 7.5, Math.PI, 0, false);
-      ctx.lineTo(px + 7.5, py + 9);
-      ctx.lineTo(px - 7.5, py + 9);
-      ctx.closePath();
-      ctx.fill();
-      ctx.shadowBlur = 0;
+        // Outer radar pulse wave
+        const pulseTime = ((Date.now() + subIdx * 250) / 600) % 2;
+        ctx.strokeStyle = `${pal.themeRgba} ${Math.max(0, 0.7 - pulseTime * 0.35)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 8 + pulseTime * 14, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // Heading vector arrow if in motion
-      if (vel > 0.1 && chronologicalEvents.length > 1) {
-        const prevEvt = chronologicalEvents[chronologicalEvents.length - 2];
-        const prevC = getCoordinates(prevEvt);
-        if (prevC) {
-          const dx = x - prevC.x;
-          const dy = y - prevC.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
-          if (len > 0.01) {
-            const angle = Math.atan2(dy, dx);
-            const arrowLen = 22;
-            const tipX = px + Math.cos(angle) * arrowLen;
-            const tipY = py + Math.sin(angle) * arrowLen;
+        // Draw oriented human silhouette (Head + Shoulders/Torso)
+        ctx.fillStyle = pal.fill;
+        ctx.shadowColor = pal.stroke;
+        ctx.shadowBlur = 8;
 
-            ctx.strokeStyle = isSimulated ? '#38bdf8' : '#34d399';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(tipX, tipY);
-            ctx.stroke();
+        // Head
+        ctx.beginPath();
+        ctx.arc(px, py - 5, 4.5, 0, Math.PI * 2);
+        ctx.fill();
 
-            // Arrowhead
-            ctx.beginPath();
-            ctx.moveTo(tipX, tipY);
-            ctx.lineTo(tipX - 7 * Math.cos(angle - Math.PI / 6), tipY - 7 * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(tipX - 7 * Math.cos(angle + Math.PI / 6), tipY - 7 * Math.sin(angle + Math.PI / 6));
-            ctx.closePath();
-            ctx.fillStyle = isSimulated ? '#38bdf8' : '#34d399';
-            ctx.fill();
-          }
+        // Shoulders & torso arc
+        ctx.beginPath();
+        ctx.arc(px, py + 3, 7.5, Math.PI, 0, false);
+        ctx.lineTo(px + 7.5, py + 9);
+        ctx.lineTo(px - 7.5, py + 9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Heading vector arrow if in motion
+        if (vel > 0.1) {
+          const angle = (subIdx * 1.2) + (Date.now() / 1500);
+          const arrowLen = 22;
+          const tipX = px + Math.cos(angle) * arrowLen;
+          const tipY = py + Math.sin(angle) * arrowLen;
+
+          ctx.strokeStyle = pal.fill;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(tipX, tipY);
+          ctx.stroke();
+
+          // Arrowhead
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(tipX - 7 * Math.cos(angle - Math.PI / 6), tipY - 7 * Math.sin(angle - Math.PI / 6));
+          ctx.lineTo(tipX - 7 * Math.cos(angle + Math.PI / 6), tipY - 7 * Math.sin(angle + Math.PI / 6));
+          ctx.closePath();
+          ctx.fillStyle = pal.fill;
+          ctx.fill();
         }
+
+        // Subject label card (Anonymous Tracking ID + Kinematics)
+        const subjectTag = sub.subject_id;
+        const stateLabel = (sub.presence_state || 'PRESENCE').toUpperCase();
+        const kinLabel =
+          sub.presence_state === 'motion'
+            ? `Motion (${vel > 0 ? vel.toFixed(1) : '0.8'} m/s)`
+            : sub.presence_state === 'presence'
+            ? 'Stationary (Breathing)'
+            : stateLabel;
+        const labelText = `${subjectTag}: ${kinLabel}`;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.strokeStyle = pal.stroke;
+        ctx.lineWidth = 1.2;
+        const textW = ctx.measureText(labelText).width + 16;
+        ctx.beginPath();
+        ctx.roundRect(px - textW / 2, py - 36, textW, 20, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(labelText, px, py - 22);
+
+        ctx.restore();
+      });
+
+      // Multi-Occupant Counter Badge
+      if (subjectsToRender.length > 1) {
+        ctx.save();
+        const countBadgeText = `👥 Multi-Person RF Sensing: ${subjectsToRender.length} Occupants Tracked`;
+        ctx.font = 'bold 12px sans-serif';
+        const badgeW = ctx.measureText(countBadgeText).width + 24;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(offsetX + 14, offsetY + 14, badgeW, 28, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.textAlign = 'left';
+        ctx.fillText(countBadgeText, offsetX + 26, offsetY + 32);
+        ctx.restore();
       }
-
-      // Subject label card (Anonymous Tracking ID + Kinematics)
-      const subjectTag = activeDisplayEvent?.subject_id || 'Subject #1';
-      const stateLabel = activeDisplayEvent?.presence_state?.toUpperCase() || 'OCCUPIED';
-      const kinLabel =
-        activeDisplayEvent?.presence_state === 'motion'
-          ? `Motion (${vel > 0 ? vel.toFixed(1) : '1.1'} m/s)`
-          : activeDisplayEvent?.presence_state === 'presence'
-          ? 'Stationary (Respiration)'
-          : stateLabel;
-      const labelText = `${subjectTag}: ${kinLabel}`;
-
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-      ctx.strokeStyle = isSimulated ? '#0284c7' : '#059669';
-      ctx.lineWidth = 1;
-      const textW = ctx.measureText(labelText).width + 16;
-      ctx.beginPath();
-      ctx.roundRect(px - textW / 2, py - 36, textW, 20, 4);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(labelText, px, py - 22);
-
-      ctx.restore();
     } else {
       // Vacant or No Coordinates detected
       ctx.save();

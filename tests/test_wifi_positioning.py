@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from httpx import ASGITransport, AsyncClient
 from main import app
@@ -47,11 +48,12 @@ async def test_synthetic_2d_position_kinematics():
 async def test_api_sensing_events_expose_2d_position():
     """Verify that /api/wifi-sensing/events exposes estimated_x and estimated_y in JSON."""
     await create_tables()
+    unique_room_id = f"lab_2d_pos_{uuid.uuid4().hex[:6]}"
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Create a test room
         room_payload = {
-            "room_id": "lab_2d_pos",
+            "room_id": unique_room_id,
             "room_name": "2D Kinematics Test Lab",
             "is_authorized": True,
             "simulation_speed": 1.0,
@@ -61,12 +63,12 @@ async def test_api_sensing_events_expose_2d_position():
         assert create_res.status_code in (200, 201)
 
         # Start simulation and step
-        await client.post("/api/sensing/simulation/start", json={"room_id": "lab_2d_pos", "speed": 1.0})
-        step_res = await client.post("/api/sensing/simulation/step", json={"room_id": "lab_2d_pos"})
+        await client.post("/api/sensing/simulation/start", json={"room_id": unique_room_id, "speed": 1.0})
+        step_res = await client.post("/api/sensing/simulation/step", json={"room_id": unique_room_id})
         assert step_res.status_code == 200
 
         # Query events
-        events_res = await client.get("/api/sensing/events?room_id=lab_2d_pos")
+        events_res = await client.get(f"/api/sensing/events?room_id={unique_room_id}")
         assert events_res.status_code == 200
         data = events_res.json()
         assert "events" in data

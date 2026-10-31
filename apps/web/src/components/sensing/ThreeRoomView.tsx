@@ -42,6 +42,7 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
 
   // Dynamic 3D Objects
   const skeletonGroupRef = useRef<THREE.Group | null>(null);
+  const extraAvatarsRef = useRef<THREE.Group[]>([]);
   const trailLineRef = useRef<THREE.Line | null>(null);
   const uncertaintyMeshRef = useRef<THREE.Mesh | null>(null);
   const rfWavesGroupRef = useRef<THREE.Group | null>(null);
@@ -62,6 +63,7 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
   const [hudConfidence, setHudConfidence] = useState<number>(0);
   const [hudFps, setHudFps] = useState<number>(10);
   const [jointCount, setJointCount] = useState<number>(0);
+  const [hudOccupants, setHudOccupants] = useState<number>(1);
 
   // Update Camera Orbit based on spherical coordinates
   const updateCameraPosition = useCallback(() => {
@@ -238,6 +240,50 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
     scene.add(uncMesh);
     uncertaintyMeshRef.current = uncMesh;
 
+    // Extra Multi-Occupant Avatar Groups (Roommates 2, 3, 4)
+    extraAvatarsRef.current = [];
+    const extraColors = [
+      { main: 0xf59e0b, emissive: 0xb45309 }, // Amber (Subject #2)
+      { main: 0xa855f7, emissive: 0x7e22ce }, // Violet (Subject #3)
+      { main: 0x10b981, emissive: 0x047857 }, // Emerald (Subject #4)
+    ];
+
+    extraColors.forEach((col) => {
+      const avatarGroup = new THREE.Group();
+      avatarGroup.visible = false;
+
+      // Head
+      const headMat = new THREE.MeshStandardMaterial({
+        color: col.main,
+        emissive: col.emissive,
+        roughness: 0.3,
+        metalness: 0.7,
+      });
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), headMat);
+      head.position.y = 1.62;
+      avatarGroup.add(head);
+
+      // Torso
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.65, 12), headMat);
+      torso.position.y = 1.15;
+      avatarGroup.add(torso);
+
+      // Floor footprint disc
+      const footMat = new THREE.MeshBasicMaterial({
+        color: col.main,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+      });
+      const foot = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.35, 24), footMat);
+      foot.rotation.x = Math.PI / 2;
+      foot.position.y = 0.02;
+      avatarGroup.add(foot);
+
+      scene.add(avatarGroup);
+      extraAvatarsRef.current.push(avatarGroup);
+    });
+
     // 8. Historical Trail Line
     const trailGeo = new THREE.BufferGeometry();
     const trailMat = new THREE.LineBasicMaterial({
@@ -372,10 +418,32 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
       uncertaintyMeshRef.current.scale.set(scale, scale, 1);
     }
 
+    // Multi-occupant avatar positioning (Roommates 2, 3, 4)
+    interface MultiSubject {
+      subject_id: string;
+      x: number;
+      y: number;
+      presence_state?: string;
+      velocity_mps?: number;
+      uncertainty_radius_m?: number;
+    }
+    const tracked = (raw.tracked_subjects as MultiSubject[] | undefined) || [];
+
+    extraAvatarsRef.current.forEach((av, idx) => {
+      const sub = tracked[idx + 1];
+      if (sub && typeof sub.x === 'number' && typeof sub.y === 'number') {
+        av.visible = true;
+        av.position.set(sub.x, 0.0, sub.y);
+      } else {
+        av.visible = false;
+      }
+    });
+
     // Update HUD telemetry
     setHudCoords({ x, y, z: 0.0 });
     setHudConfidence(Math.round(confidence * 100));
     setHudFps(fps);
+    setHudOccupants(tracked.length > 0 ? tracked.length : 1);
   }, [currentEvent]);
 
   // Update 3D Historical Movement Trail
@@ -503,6 +571,10 @@ export const ThreeRoomView: React.FC<ThreeRoomViewProps> = ({
         <div className="telemetry-item">
           <span className="telemetry-label">Throughput:</span>
           <span className="telemetry-val">{hudFps.toFixed(1)} FPS</span>
+        </div>
+        <div className="telemetry-item">
+          <span className="telemetry-label">Occupancy:</span>
+          <span className="telemetry-val highlight">{hudOccupants} {hudOccupants === 1 ? 'Person' : 'People'}</span>
         </div>
       </div>
     </div>

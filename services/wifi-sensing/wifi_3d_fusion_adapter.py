@@ -229,7 +229,7 @@ class Wifi3DFusionAdapter(BaseSensorProvider):
             engine_source = "wifi-3d-fusion-daemon"
         else:
             # 2. Standalone high-fidelity kinematic simulation matching wifi-3d-fusion logic
-            # Smooth circular/lissajous path inside a 6m x 4m room
+            # Multi-occupant modeling (4 occupants in room: User + 3 Roommates)
             t = self._sim_t
             center_x, center_y = 3.0, 2.0
             radius_x, radius_y = 1.8, 1.1
@@ -239,6 +239,24 @@ class Wifi3DFusionAdapter(BaseSensorProvider):
             pos = [x, y, z]
             confidence = 0.94
             skeleton = self._generate_kinematic_skeleton(pos, variance=0.04)
+
+            # Positions & skeletons for Roommate 2, 3, 4
+            pos2 = [4.6 + 0.02 * math.cos(t * 0.3), 2.8 + 0.02 * math.sin(t * 0.3), 0.0]
+            pos3 = [1.6 + 0.015 * math.sin(t * 0.2), 3.2 + 0.015 * math.cos(t * 0.2), 0.0]
+            pos4 = [3.8 + 0.5 * math.sin(t * 0.25), 1.3 + 0.3 * math.cos(t * 0.25), 0.0]
+
+            skeleton2 = self._generate_kinematic_skeleton(pos2, variance=0.01)
+            skeleton3 = self._generate_kinematic_skeleton(pos3, variance=0.01)
+            skeleton4 = self._generate_kinematic_skeleton(pos4, variance=0.03)
+
+            multi_skeletons = [skeleton, skeleton2, skeleton3, skeleton4]
+            tracked_subjects = [
+                {"subject_id": "Subject #1 (You)", "x": round(pos[0], 2), "y": round(pos[1], 2), "presence_state": "motion", "velocity_mps": 0.65, "uncertainty_radius_m": 0.35},
+                {"subject_id": "Subject #2", "x": round(pos2[0], 2), "y": round(pos2[1], 2), "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.25},
+                {"subject_id": "Subject #3", "x": round(pos3[0], 2), "y": round(pos3[1], 2), "presence_state": "presence", "velocity_mps": 0.0, "uncertainty_radius_m": 0.28},
+                {"subject_id": "Subject #4", "x": round(pos4[0], 2), "y": round(pos4[1], 2), "presence_state": "motion", "velocity_mps": 0.40, "uncertainty_radius_m": 0.35},
+            ]
+
             fps = 10.0
             rssi = -54.0 + 3.0 * math.sin(t * 0.5)
             engine_source = "wifi-3d-fusion-embedded"
@@ -249,12 +267,15 @@ class Wifi3DFusionAdapter(BaseSensorProvider):
             "engine": "wifi-3d-fusion",
             "engine_source": engine_source,
             "skeleton_3d": skeleton,
+            "multi_skeletons": multi_skeletons if engine_source == "wifi-3d-fusion-embedded" else [skeleton],
             "skeleton_connections": SKELETON_CONNECTIONS,
             "joint_names": JOINT_NAMES_25,
             "position_3d": pos,
             "fps": fps,
             "confidence": confidence,
             "person_id": self._person_id,
+            "occupancy_count": 4 if engine_source == "wifi-3d-fusion-embedded" else 1,
+            "tracked_subjects": tracked_subjects if engine_source == "wifi-3d-fusion-embedded" else [],
             "room_bounds": {"width": 6.0, "length": 4.0, "height": 2.8},
         }
 

@@ -363,6 +363,14 @@ class RealRssiSensorAdapter(BaseSensorProvider):
         est_y = round(max(0.5, min(3.8, anchor_y + est_distance_m * math.sin(angle_rad))), 2)
         uncertainty_m = round(max(0.6, min(2.5, est_distance_m * 0.4)), 2)
 
+        # Crowd & multi-person motion disturbance tier based on real temporal RSSI variance
+        if variance_val > 0.35:
+            crowd_motion_tier = "High Multi-Person Movement (Active RF Multipath Scattering)"
+        elif variance_val > 0.12:
+            crowd_motion_tier = "Moderate Disturbance (Multiple occupants moving / subtle respiration)"
+        else:
+            crowd_motion_tier = "Low Disturbance (Occupants seated / quiet environment)"
+
         return RawSensorSample(
             timestamp=self._last_sample_time,
             room_id=self._room_id,
@@ -396,6 +404,11 @@ class RealRssiSensorAdapter(BaseSensorProvider):
                 "position_x": est_x,
                 "position_y": est_y,
                 "uncertainty_radius_m": uncertainty_m,
+                "crowd_motion_tier": crowd_motion_tier,
+                "multi_person_rf_superposition": (
+                    "Physical radio waves reflected off all people in the room linearly superimpose at the single Realtek antenna. "
+                    "Individual coordinate tracking of multiple distinct bodies requires 3+ non-collinear links (ESP32 mesh)."
+                ),
                 "room_dimensions": {"width_m": 6.0, "length_m": 4.0},
                 "sensor_anchor": {"x": anchor_x, "y": anchor_y, "label": "Host Wi-Fi NIC Anchor"},
                 "variance_source": "rssi_temporal_variance",
