@@ -20,15 +20,29 @@ class GeminiProvider(BaseProviderAdapter):
 
     MODELS = [
         ModelInfo(
-            id="gemini-2.5-flash",
-            name="Gemini 2.5 Flash",
+            id="gemini-3.5-flash-lite",
+            name="Gemini 3.5 Flash Lite",
             provider="gemini",
             context_window=1048576,
             is_default=True,
         ),
         ModelInfo(
-            id="gemini-2.5-flash-lite",
-            name="Gemini 2.5 Flash Lite",
+            id="gemini-flash-lite-latest",
+            name="Gemini Flash Lite Latest",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-3-flash-preview",
+            name="Gemini 3 Flash Preview",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
+            id="gemini-3.8-flash",
+            name="Gemini 3.8 Flash",
             provider="gemini",
             context_window=1048576,
             is_default=False,
@@ -41,6 +55,13 @@ class GeminiProvider(BaseProviderAdapter):
             is_default=False,
         ),
         ModelInfo(
+            id="gemini-3.5-flash",
+            name="Gemini 3.5 Flash",
+            provider="gemini",
+            context_window=1048576,
+            is_default=False,
+        ),
+        ModelInfo(
             id="gemini-3.6-flash",
             name="Gemini 3.6 Flash (Preview)",
             provider="gemini",
@@ -48,22 +69,8 @@ class GeminiProvider(BaseProviderAdapter):
             is_default=False,
         ),
         ModelInfo(
-            id="gemini-3.5-flash",
-            name="Gemini 3.5 Flash (Legacy)",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-3.5-flash-lite",
-            name="Gemini 3.5 Flash Lite",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-3.8-flash",
-            name="Gemini 3.8 Flash",
+            id="gemini-2.5-flash",
+            name="Gemini 2.5 Flash (Legacy)",
             provider="gemini",
             context_window=1048576,
             is_default=False,
@@ -113,7 +120,21 @@ class GeminiProvider(BaseProviderAdapter):
         return bool(self._api_key)
 
     def list_models(self) -> List[ModelInfo]:
-        return self.MODELS
+        default_model_id = os.getenv("DEFAULT_GEMINI_MODEL", "gemini-3.5-flash-lite")
+        result = []
+        for m in self.MODELS:
+            result.append(
+                ModelInfo(
+                    id=m.id,
+                    name=m.name,
+                    provider=m.provider,
+                    context_window=m.context_window,
+                    is_default=(m.id == default_model_id),
+                )
+            )
+        if not any(m.is_default for m in result) and result:
+            result[0].is_default = True
+        return result
 
     def _get_client(self) -> genai.Client:
         if not self.is_configured():
@@ -272,7 +293,8 @@ class GeminiProvider(BaseProviderAdapter):
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
-        selected_model = model or "gemini-2.5-flash"
+        default_model_id = os.getenv("DEFAULT_GEMINI_MODEL", "gemini-3.5-flash-lite")
+        selected_model = model or default_model_id
         valid_models = {m.id for m in self.MODELS}
         if selected_model not in valid_models:
             raise InvalidModelError(selected_model, self.provider_id)
@@ -298,16 +320,18 @@ class GeminiProvider(BaseProviderAdapter):
         except genai_errors.APIError as err:
             status_code = getattr(err, "code", None)
             err_str = str(err)
-            if status_code in (503, 429) or "RESOURCE_EXHAUSTED" in err_str:
-                # Upstream demand spike (503) or preview model quota exhaustion (429):
-                # Gracefully attempt fallback high-capacity flash models before surfacing error
+            if status_code in (503, 429, 404) or "RESOURCE_EXHAUSTED" in err_str or "no longer available" in err_str:
+                # Upstream demand spike (503), preview model quota exhaustion (429), or retired model (404):
+                # Gracefully attempt active fallback models before surfacing error
                 fallback_candidates = [
                     m
                     for m in (
-                        "gemini-2.5-flash",
-                        "gemini-2.5-flash-lite",
-                        "gemini-flash-latest",
                         "gemini-3.5-flash-lite",
+                        "gemini-flash-lite-latest",
+                        "gemini-3-flash-preview",
+                        "gemini-3.8-flash",
+                        "gemini-flash-latest",
+                        "gemini-3.5-flash",
                     )
                     if m != selected_model and m in valid_models
                 ]
