@@ -70,6 +70,11 @@ export const Esp32HardwarePanel: React.FC<Esp32HardwarePanelProps> = ({ onStatus
               current_state: frame.presence_state,
               calibration_status: frame.calibration_status,
               last_packet_time: frame.timestamp,
+              estimated_x: frame.estimated_x,
+              estimated_y: frame.estimated_y,
+              velocity_mps: frame.velocity_mps,
+              occupant_count: frame.occupant_count,
+              occupants: frame.occupants,
             };
             if (onStatusUpdate) onStatusUpdate(updated);
             return updated;

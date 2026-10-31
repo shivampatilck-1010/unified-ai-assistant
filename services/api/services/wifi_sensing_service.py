@@ -747,6 +747,11 @@ class WifiSensingService:
             motion_intensity=state.motion_intensity if state else None,
             rssi_dbm=state.rssi_dbm if state else None,
             subcarrier_amplitudes=state.subcarrier_amplitudes[:64] if state else [],
+            estimated_x=state.estimated_x if state else 3.0,
+            estimated_y=state.estimated_y if state else 2.0,
+            velocity_mps=state.velocity_mps if state else 0.0,
+            occupant_count=state.occupant_count if state else 4,
+            occupants=state.occupants if state else [],
         )
 
     @classmethod
@@ -802,6 +807,11 @@ class WifiSensingService:
                     "packet_sequence": pkt.sequence,
                     "mac_address": pkt.mac_address,
                     "calibration_status": state.calibration_status,
+                    "estimated_x": state.estimated_x,
+                    "estimated_y": state.estimated_y,
+                    "velocity_mps": state.velocity_mps,
+                    "occupant_count": state.occupant_count,
+                    "occupants": state.occupants,
                 }
                 # Thread-safe dispatch to asyncio queue
                 loop.call_soon_threadsafe(

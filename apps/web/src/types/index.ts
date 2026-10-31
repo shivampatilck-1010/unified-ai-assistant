@@ -763,6 +763,11 @@ export interface Esp32HardwareStatus {
   rssi_dbm?: number | null;
   subcarrier_count?: number | null;
   subcarrier_amplitudes?: number[] | null;
+  estimated_x?: number | null;
+  estimated_y?: number | null;
+  velocity_mps?: number | null;
+  occupant_count?: number | null;
+  occupants?: Array<Record<string, unknown>> | null;
 }
 
 export interface SensingEvent {

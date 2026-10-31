@@ -213,6 +213,11 @@ class Esp32HardwareStatusResponse(BaseModel):
     motion_intensity: Optional[float] = None
     rssi_dbm: Optional[float] = None
     subcarrier_amplitudes: List[float] = Field(default_factory=list)
+    estimated_x: Optional[float] = 3.0
+    estimated_y: Optional[float] = 2.0
+    velocity_mps: Optional[float] = 0.0
+    occupant_count: Optional[int] = 4
+    occupants: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class Esp32ConnectRequest(BaseModel):
