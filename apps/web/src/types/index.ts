@@ -720,6 +720,34 @@ export interface SimulationControlResponse {
   message: string;
 }
 
+export interface Esp32DetectedPort {
+  port: string;
+  description: string;
+  hardware_id: string;
+  is_likely_esp32: boolean;
+}
+
+export interface Esp32HardwareStatus {
+  is_connected: boolean;
+  port: string;
+  baud_rate: number;
+  status: 'connected' | 'disconnected' | 'port_busy' | 'connecting' | 'error' | string;
+  status_message: string;
+  packets_captured: number;
+  packets_per_second: number;
+  malformed_packets: number;
+  last_packet_time?: string | null;
+  last_error?: string | null;
+  device_description?: string | null;
+  detected_ports: Esp32DetectedPort[];
+  calibration_status: string;
+  baseline_variance?: number | null;
+  presence_state?: string | null;
+  motion_intensity?: number | null;
+  subcarrier_count?: number | null;
+  subcarrier_amplitudes?: number[] | null;
+}
+
 export interface SensingEvent {
   id: string;
   room_id: string;

@@ -145,7 +145,7 @@ export function ChatView({
             </div>
           ) : (
             <div className="chat-view__model-unconfigured">
-              <span>Model: Unconfigured</span>
+              <span>Connecting to AI gateway...</span>
             </div>
           )}
         </div>

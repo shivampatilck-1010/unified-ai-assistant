@@ -2,12 +2,16 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from routers.deps import get_current_user_id
 from schemas.wifi_sensing import (
     BaselineCalibrationRequest,
+    Esp32CalibrateRequest,
+    Esp32ConnectRequest,
+    Esp32HardwareStatusResponse,
     CalibrationProfileSchema,
     SensingCapabilitiesResponse,
     SensingEventListResponse,
@@ -292,3 +296,55 @@ async def record_room_baseline(
         )
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# ESP32 DevKit V1 Hardware Endpoints (Serial CSI Receiver)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/esp32/status", response_model=Esp32HardwareStatusResponse)
+def get_esp32_hardware_status() -> Esp32HardwareStatusResponse:
+    """Returns the live hardware connection status of the ESP32 CSI serial receiver."""
+    return WifiSensingService.get_esp32_status()
+
+
+@router.post("/esp32/connect", response_model=Esp32HardwareStatusResponse)
+async def connect_esp32_hardware(payload: Optional[Esp32ConnectRequest] = None) -> Esp32HardwareStatusResponse:
+    """Connects to the ESP32 DevKit V1 serial port (default COM7 at 921600 baud)."""
+    port = payload.port if payload else "COM7"
+    baud_rate = payload.baud_rate if payload else 921600
+    return await WifiSensingService.connect_esp32(port=port, baud_rate=baud_rate)
+
+
+@router.post("/esp32/disconnect", response_model=Esp32HardwareStatusResponse)
+async def disconnect_esp32_hardware() -> Esp32HardwareStatusResponse:
+    """Disconnects and frees the serial COM port so external tools like idf.py monitor can access it."""
+    return await WifiSensingService.disconnect_esp32()
+
+
+@router.post("/esp32/calibrate", response_model=Esp32HardwareStatusResponse)
+def calibrate_esp32_hardware(payload: Optional[Esp32CalibrateRequest] = None) -> Esp32HardwareStatusResponse:
+    """Initiates an empty-room environmental noise floor calibration window."""
+    duration = payload.duration_seconds if payload else 5.0
+    return WifiSensingService.calibrate_esp32(duration_seconds=duration)
+
+
+@router.post("/esp32/calibrate/clear", response_model=Esp32HardwareStatusResponse)
+def clear_esp32_calibration() -> Esp32HardwareStatusResponse:
+    """Resets the environmental baseline calibration."""
+    return WifiSensingService.clear_esp32_calibration()
+
+
+@router.get("/esp32/stream")
+async def stream_esp32_hardware_events() -> StreamingResponse:
+    """Streams live real ESP32 CSI telemetry, 64-subcarrier amplitudes, Doppler energy, and motion classification via SSE."""
+    return StreamingResponse(
+        WifiSensingService.stream_esp32_events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

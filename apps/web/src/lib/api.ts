@@ -12,6 +12,7 @@ import type {
   ConversationDetail,
   ConversationListResponse,
   ConversationSummary,
+  Esp32HardwareStatus,
   ExtractRequest,
   ExtractResponse,
   FileDetailResponse,
@@ -131,17 +132,26 @@ export function getBaseHeaders(extra: Record<string, string> = {}): Record<strin
 }
 
 export async function safeParseJson<T = unknown>(response: Response): Promise<T> {
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await response.text();
-    if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('Error 1033')) {
-      throw new Error(
-        'Backend tunnel unreachable or returned HTML. Please check the backend tunnel or update the endpoint in Settings.'
-      );
-    }
-    throw new Error(`Expected JSON response, but received "${contentType || 'unknown'}".`);
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (
+    trimmed.startsWith('<') ||
+    trimmed.includes('<!DOCTYPE') ||
+    trimmed.includes('<html') ||
+    trimmed.includes('Error 1033')
+  ) {
+    throw new Error(
+      `Backend tunnel unreachable or returned HTML (${response.status} ${response.statusText}). Please check that the backend tunnel is running or update endpoint in Settings.`
+    );
   }
-  return response.json() as Promise<T>;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status} ${response.statusText}): ${trimmed.slice(0, 100)}`);
+    }
+    throw new Error(`Failed to parse backend response as JSON: ${trimmed.slice(0, 100)}`);
+  }
 }
 
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse> {
@@ -253,7 +263,7 @@ export async function createConversation(
     throw new Error(`Failed to create conversation: ${response.status}`);
   }
 
-  return (await response.json()) as ConversationSummary;
+  return safeParseJson<ConversationSummary>(response);
 }
 
 export async function fetchConversation(
@@ -269,7 +279,7 @@ export async function fetchConversation(
     throw new Error(`Failed to load conversation: ${response.status}`);
   }
 
-  return (await response.json()) as ConversationDetail;
+  return safeParseJson<ConversationDetail>(response);
 }
 
 export async function renameConversation(
@@ -291,7 +301,7 @@ export async function renameConversation(
     throw new Error(`Failed to rename conversation: ${response.status}`);
   }
 
-  return (await response.json()) as ConversationSummary;
+  return safeParseJson<ConversationSummary>(response);
 }
 
 export async function deleteConversation(
@@ -323,7 +333,7 @@ export async function searchConversations(
     throw new Error(`Search failed: ${response.status}`);
   }
 
-  return (await response.json()) as SearchResponse;
+  return safeParseJson<SearchResponse>(response);
 }
 
 export function getStreamUrl(): string {
@@ -340,7 +350,7 @@ export async function fetchWorkerStatus(signal?: AbortSignal): Promise<WorkerSta
   if (!response.ok) {
     throw new Error(`Worker status check failed: ${response.status}`);
   }
-  return (await response.json()) as WorkerStatus;
+  return safeParseJson<WorkerStatus>(response);
 }
 
 export async function createBrowserTask(
@@ -361,7 +371,7 @@ export async function createBrowserTask(
     const errorText = await response.text();
     throw new Error(`Failed to create browser task: ${response.status} ${errorText}`);
   }
-  return (await response.json()) as BrowserTask;
+  return safeParseJson<BrowserTask>(response);
 }
 
 export async function fetchBrowserTask(taskId: string, signal?: AbortSignal): Promise<BrowserTask> {
@@ -372,7 +382,7 @@ export async function fetchBrowserTask(taskId: string, signal?: AbortSignal): Pr
   if (!response.ok) {
     throw new Error(`Failed to fetch browser task: ${response.status}`);
   }
-  return (await response.json()) as BrowserTask;
+  return safeParseJson<BrowserTask>(response);
 }
 
 export async function listBrowserTasks(
@@ -387,7 +397,7 @@ export async function listBrowserTasks(
   if (!response.ok) {
     throw new Error(`Failed to list browser tasks: ${response.status}`);
   }
-  return (await response.json()) as { items: BrowserTask[]; total: number };
+  return safeParseJson<{ items: BrowserTask[]; total: number }>(response);
 }
 
 export async function approveBrowserTask(
@@ -405,7 +415,7 @@ export async function approveBrowserTask(
     const err = await response.text();
     throw new Error(`Failed to approve task: ${response.status} ${err}`);
   }
-  return (await response.json()) as BrowserTask;
+  return safeParseJson<BrowserTask>(response);
 }
 
 export async function confirmBrowserTaskAction(
@@ -424,7 +434,7 @@ export async function confirmBrowserTaskAction(
     const err = await response.text();
     throw new Error(`Failed to submit confirmation: ${response.status} ${err}`);
   }
-  return (await response.json()) as BrowserTask;
+  return safeParseJson<BrowserTask>(response);
 }
 
 export async function cancelBrowserTask(
@@ -441,7 +451,7 @@ export async function cancelBrowserTask(
   if (!response.ok) {
     throw new Error(`Failed to cancel task: ${response.status}`);
   }
-  return (await response.json()) as BrowserTask;
+  return safeParseJson<BrowserTask>(response);
 }
 
 export async function fetchBrowserTaskEvents(
@@ -455,7 +465,7 @@ export async function fetchBrowserTaskEvents(
   if (!response.ok) {
     throw new Error(`Failed to load task events: ${response.status}`);
   }
-  return (await response.json()) as BrowserTaskEvent[];
+  return safeParseJson<BrowserTaskEvent[]>(response);
 }
 
 export function getBrowserStreamUrl(taskId: string): string {
@@ -488,7 +498,7 @@ export async function fetchTasks(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to load tasks: ${res.status}`);
-  return (await res.json()) as TaskListResponse;
+  return safeParseJson<TaskListResponse>(res);
 }
 
 export async function createTask(payload: TaskCreatePayload, signal?: AbortSignal): Promise<Task> {
@@ -502,7 +512,7 @@ export async function createTask(payload: TaskCreatePayload, signal?: AbortSigna
     const err = await res.text();
     throw new Error(`Failed to create task: ${res.status} ${err}`);
   }
-  return (await res.json()) as Task;
+  return safeParseJson<Task>(res);
 }
 
 export async function updateTask(
@@ -517,7 +527,7 @@ export async function updateTask(
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Failed to update task: ${res.status}`);
-  return (await res.json()) as Task;
+  return safeParseJson<Task>(res);
 }
 
 export async function toggleTask(
@@ -535,7 +545,7 @@ export async function toggleTask(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to toggle task: ${res.status}`);
-  return (await res.json()) as Task;
+  return safeParseJson<Task>(res);
 }
 
 export async function deleteTask(taskId: string, signal?: AbortSignal): Promise<void> {
@@ -557,10 +567,10 @@ export async function extractTasksAndEvents(
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    const err = await safeParseJson<Record<string, any>>(res).catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || `Extraction failed with status ${res.status}`);
   }
-  return (await res.json()) as ExtractResponse;
+  return safeParseJson<ExtractResponse>(res);
 }
 
 export async function fetchCalendarEvents(
@@ -577,7 +587,7 @@ export async function fetchCalendarEvents(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to load calendar events: ${res.status}`);
-  return (await res.json()) as CalendarEventsQueryResponse;
+  return safeParseJson<CalendarEventsQueryResponse>(res);
 }
 
 export async function createCalendarEvent(
@@ -594,7 +604,7 @@ export async function createCalendarEvent(
     const err = await res.text();
     throw new Error(`Failed to create event: ${res.status} ${err}`);
   }
-  return (await res.json()) as CalendarEvent;
+  return safeParseJson<CalendarEvent>(res);
 }
 
 export async function updateCalendarEvent(
@@ -609,7 +619,7 @@ export async function updateCalendarEvent(
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Failed to update event: ${res.status}`);
-  return (await res.json()) as CalendarEvent;
+  return safeParseJson<CalendarEvent>(res);
 }
 
 export async function deleteCalendarEvent(eventId: string, signal?: AbortSignal): Promise<void> {
@@ -636,7 +646,7 @@ export async function fetchReminders(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to load reminders: ${res.status}`);
-  return (await res.json()) as ReminderListResponse;
+  return safeParseJson<ReminderListResponse>(res);
 }
 
 export async function createReminder(
@@ -650,7 +660,7 @@ export async function createReminder(
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Failed to create reminder: ${res.status}`);
-  return (await res.json()) as Reminder;
+  return safeParseJson<Reminder>(res);
 }
 
 export async function dismissReminder(
@@ -663,7 +673,7 @@ export async function dismissReminder(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to dismiss reminder: ${res.status}`);
-  return (await res.json()) as Reminder;
+  return safeParseJson<Reminder>(res);
 }
 
 export async function deleteReminder(reminderId: string, signal?: AbortSignal): Promise<void> {
@@ -694,7 +704,7 @@ export async function uploadFile(
   if (!res.ok) {
     let errorDetail = `Upload failed with status ${res.status}`;
     try {
-      const errJson = await res.json();
+      const errJson = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
       if (errJson.detail) errorDetail = errJson.detail;
     } catch {
       // ignore
@@ -702,7 +712,7 @@ export async function uploadFile(
     throw new Error(errorDetail);
   }
 
-  return (await res.json()) as FileMetadata;
+  return safeParseJson<FileMetadata>(res);
 }
 
 export async function fetchFiles(
@@ -720,7 +730,7 @@ export async function fetchFiles(
   });
 
   if (!res.ok) throw new Error(`Failed to fetch files: ${res.status}`);
-  return (await res.json()) as FileListResponse;
+  return safeParseJson<FileListResponse>(res);
 }
 
 export async function fetchFileDetail(
@@ -733,7 +743,7 @@ export async function fetchFileDetail(
   });
 
   if (!res.ok) throw new Error(`Failed to fetch file details: ${res.status}`);
-  return (await res.json()) as FileDetailResponse;
+  return safeParseJson<FileDetailResponse>(res);
 }
 
 export async function fetchFileStatus(
@@ -746,7 +756,7 @@ export async function fetchFileStatus(
   });
 
   if (!res.ok) throw new Error(`Failed to fetch file status: ${res.status}`);
-  return (await res.json()) as FileStatusResponse;
+  return safeParseJson<FileStatusResponse>(res);
 }
 
 export async function deleteFile(
@@ -772,7 +782,7 @@ export async function reprocessFile(
   });
 
   if (!res.ok) throw new Error(`Failed to reprocess file: ${res.status}`);
-  return (await res.json()) as FileMetadata;
+  return safeParseJson<FileMetadata>(res);
 }
 
 export async function searchKnowledge(
@@ -787,7 +797,7 @@ export async function searchKnowledge(
   });
 
   if (!res.ok) throw new Error(`Knowledge search failed: ${res.status}`);
-  return (await res.json()) as KnowledgeSearchResponse;
+  return safeParseJson<KnowledgeSearchResponse>(res);
 }
 
 export async function answerKnowledge(
@@ -804,7 +814,7 @@ export async function answerKnowledge(
   if (!res.ok) {
     let errorDetail = `Knowledge answer failed with status ${res.status}`;
     try {
-      const errJson = await res.json();
+      const errJson = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
       if (errJson.detail) errorDetail = errJson.detail;
     } catch {
       // ignore
@@ -812,7 +822,7 @@ export async function answerKnowledge(
     throw new Error(errorDetail);
   }
 
-  return (await res.json()) as KnowledgeAnswerResponse;
+  return safeParseJson<KnowledgeAnswerResponse>(res);
 }
 
 // --- Phase 6: Web Research & Intelligence API ---
@@ -831,7 +841,7 @@ export async function createResearchJob(
   if (!res.ok) {
     let detail = `Failed to create research job (${res.status})`;
     try {
-      const err = await res.json();
+      const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
       if (err.detail) detail = err.detail;
     } catch {
       // ignore
@@ -839,7 +849,7 @@ export async function createResearchJob(
     throw new Error(detail);
   }
 
-  return (await res.json()) as ResearchJob;
+  return safeParseJson<ResearchJob>(res);
 }
 
 export async function fetchResearchJobs(
@@ -856,7 +866,7 @@ export async function fetchResearchJobs(
   const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
 
   if (!res.ok) throw new Error(`Failed to fetch research jobs: ${res.status}`);
-  return (await res.json()) as ResearchJobListResponse;
+  return safeParseJson<ResearchJobListResponse>(res);
 }
 
 export async function fetchResearchJobDetail(
@@ -869,7 +879,7 @@ export async function fetchResearchJobDetail(
   });
 
   if (!res.ok) throw new Error(`Failed to fetch research job detail: ${res.status}`);
-  return (await res.json()) as ResearchJobDetailResponse;
+  return safeParseJson<ResearchJobDetailResponse>(res);
 }
 
 export async function approveResearchJob(
@@ -885,7 +895,7 @@ export async function approveResearchJob(
   if (!res.ok) {
     let detail = `Failed to approve research plan: ${res.status}`;
     try {
-      const err = await res.json();
+      const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
       if (err.detail) detail = err.detail;
     } catch {
       // ignore
@@ -893,7 +903,7 @@ export async function approveResearchJob(
     throw new Error(detail);
   }
 
-  return (await res.json()) as ResearchJob;
+  return safeParseJson<ResearchJob>(res);
 }
 
 export async function cancelResearchJob(
@@ -911,7 +921,7 @@ export async function cancelResearchJob(
   if (!res.ok) {
     let detail = `Failed to cancel research job: ${res.status}`;
     try {
-      const err = await res.json();
+      const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
       if (err.detail) detail = err.detail;
     } catch {
       // ignore
@@ -919,7 +929,7 @@ export async function cancelResearchJob(
     throw new Error(detail);
   }
 
-  return (await res.json()) as ResearchJob;
+  return safeParseJson<ResearchJob>(res);
 }
 
 export async function fetchResearchSources(
@@ -932,7 +942,7 @@ export async function fetchResearchSources(
   });
 
   if (!res.ok) throw new Error(`Failed to fetch research sources: ${res.status}`);
-  return (await res.json()) as ResearchSource[];
+  return safeParseJson<ResearchSource[]>(res);
 }
 
 export async function fetchResearchSource(
@@ -946,7 +956,7 @@ export async function fetchResearchSource(
   );
 
   if (!res.ok) throw new Error(`Failed to fetch research source: ${res.status}`);
-  return (await res.json()) as ResearchSource;
+  return safeParseJson<ResearchSource>(res);
 }
 
 export async function fetchResearchReport(
@@ -959,7 +969,7 @@ export async function fetchResearchReport(
   });
 
   if (!res.ok) throw new Error(`Failed to fetch research report: ${res.status}`);
-  return (await res.json()) as ResearchReport;
+  return safeParseJson<ResearchReport>(res);
 }
 
 export async function exportResearchReportMarkdown(
@@ -983,7 +993,7 @@ export async function fetchSensingStatus(signal?: AbortSignal): Promise<WifiSens
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing status: ${res.status}`);
-  return (await res.json()) as WifiSensingStatusResponse;
+  return safeParseJson<WifiSensingStatusResponse>(res);
 }
 
 export async function fetchSensingCapabilities(signal?: AbortSignal): Promise<SensingCapabilitiesResponse> {
@@ -992,7 +1002,7 @@ export async function fetchSensingCapabilities(signal?: AbortSignal): Promise<Se
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing capabilities: ${res.status}`);
-  return (await res.json()) as SensingCapabilitiesResponse;
+  return safeParseJson<SensingCapabilitiesResponse>(res);
 }
 
 export async function fetchSensorConfigs(signal?: AbortSignal): Promise<SensorConfig[]> {
@@ -1001,7 +1011,7 @@ export async function fetchSensorConfigs(signal?: AbortSignal): Promise<SensorCo
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch sensor configs: ${res.status}`);
-  return (await res.json()) as SensorConfig[];
+  return safeParseJson<SensorConfig[]>(res);
 }
 
 export async function createSensorConfig(
@@ -1015,10 +1025,10 @@ export async function createSensorConfig(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to create sensor config: ${res.status}`);
   }
-  return (await res.json()) as SensorConfig;
+  return safeParseJson<SensorConfig>(res);
 }
 
 export async function updateSensorConfig(
@@ -1033,10 +1043,10 @@ export async function updateSensorConfig(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to update sensor config: ${res.status}`);
   }
-  return (await res.json()) as SensorConfig;
+  return safeParseJson<SensorConfig>(res);
 }
 
 export async function startSensingSimulation(
@@ -1051,10 +1061,10 @@ export async function startSensingSimulation(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to start simulation: ${res.status}`);
   }
-  return (await res.json()) as SimulationControlResponse;
+  return safeParseJson<SimulationControlResponse>(res);
 }
 
 export async function stopSensingSimulation(
@@ -1068,10 +1078,10 @@ export async function stopSensingSimulation(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to stop simulation: ${res.status}`);
   }
-  return (await res.json()) as SimulationControlResponse;
+  return safeParseJson<SimulationControlResponse>(res);
 }
 
 export async function resetSensingSimulation(
@@ -1085,10 +1095,10 @@ export async function resetSensingSimulation(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to reset simulation: ${res.status}`);
   }
-  return (await res.json()) as SimulationControlResponse;
+  return safeParseJson<SimulationControlResponse>(res);
 }
 
 export async function stepSensingSimulation(
@@ -1102,7 +1112,7 @@ export async function stepSensingSimulation(
     signal,
   });
   if (!res.ok) throw new Error(`Failed to step simulation: ${res.status}`);
-  return (await res.json()) as SensingEvent | null;
+  return safeParseJson<SensingEvent | null>(res);
 }
 
 export async function fetchSensingEvents(
@@ -1121,7 +1131,7 @@ export async function fetchSensingEvents(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing events: ${res.status}`);
-  return (await res.json()) as SensingEventListResponse;
+  return safeParseJson<SensingEventListResponse>(res);
 }
 
 export async function fetchSensingSummary(
@@ -1133,7 +1143,7 @@ export async function fetchSensingSummary(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing summary: ${res.status}`);
-  return (await res.json()) as SensingOccupancySummary;
+  return safeParseJson<SensingOccupancySummary>(res);
 }
 
 export async function purgeSensingEvents(
@@ -1148,7 +1158,7 @@ export async function purgeSensingEvents(
     signal,
   });
   if (!res.ok) throw new Error(`Failed to purge events: ${res.status}`);
-  return (await res.json()) as SensingPurgeResponse;
+  return safeParseJson<SensingPurgeResponse>(res);
 }
 
 export async function fetchSensingAudits(
@@ -1161,7 +1171,7 @@ export async function fetchSensingAudits(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch sensing audits: ${res.status}`);
-  return (await res.json()) as WifiSensingAudit[];
+  return safeParseJson<WifiSensingAudit[]>(res);
 }
 
 export async function fetchRoomCalibration(
@@ -1174,7 +1184,7 @@ export async function fetchRoomCalibration(
     headers: getBaseHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch room calibration: ${res.status}`);
-  return (await res.json()) as CalibrationProfile;
+  return safeParseJson<CalibrationProfile>(res);
 }
 
 export async function saveRoomCalibration(
@@ -1190,10 +1200,10 @@ export async function saveRoomCalibration(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to save calibration: ${res.status}`);
   }
-  return (await res.json()) as CalibrationProfile;
+  return safeParseJson<CalibrationProfile>(res);
 }
 
 export async function recordRoomBaseline(
@@ -1209,10 +1219,10 @@ export async function recordRoomBaseline(
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = await safeParseJson<{ detail?: string }>(res).catch(() => ({ detail: undefined }));
     throw new Error(err.detail || `Failed to record baseline: ${res.status}`);
   }
-  return (await res.json()) as BaselineCalibrationResult;
+  return safeParseJson<BaselineCalibrationResult>(res);
 }
 
 // ---------------------------------------------------------------------------
@@ -1233,7 +1243,7 @@ export async function createWorkflow(
     const err = await res.text();
     throw new Error(`Failed to create workflow: ${res.status} ${err}`);
   }
-  return (await res.json()) as Workflow;
+  return safeParseJson<Workflow>(res);
 }
 
 export async function listWorkflows(
@@ -1252,7 +1262,7 @@ export async function listWorkflows(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to list workflows: ${res.status}`);
-  return (await res.json()) as WorkflowListResponse;
+  return safeParseJson<WorkflowListResponse>(res);
 }
 
 export async function getWorkflow(
@@ -1264,7 +1274,7 @@ export async function getWorkflow(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to load workflow: ${res.status}`);
-  return (await res.json()) as Workflow;
+  return safeParseJson<Workflow>(res);
 }
 
 export async function getWorkflowPlan(
@@ -1276,7 +1286,7 @@ export async function getWorkflowPlan(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to load workflow plan: ${res.status}`);
-  return (await res.json()) as WorkflowPlan;
+  return safeParseJson<WorkflowPlan>(res);
 }
 
 export async function approveWorkflowPlan(
@@ -1294,7 +1304,7 @@ export async function approveWorkflowPlan(
     const err = await res.text();
     throw new Error(`Failed to approve workflow: ${res.status} ${err}`);
   }
-  return (await res.json()) as Workflow;
+  return safeParseJson<Workflow>(res);
 }
 
 export async function submitWorkflowClarification(
@@ -1312,7 +1322,7 @@ export async function submitWorkflowClarification(
     const err = await res.text();
     throw new Error(`Failed to submit clarification: ${res.status} ${err}`);
   }
-  return (await res.json()) as Workflow;
+  return safeParseJson<Workflow>(res);
 }
 
 export async function confirmWorkflowStep(
@@ -1330,7 +1340,7 @@ export async function confirmWorkflowStep(
     const err = await res.text();
     throw new Error(`Failed to confirm step: ${res.status} ${err}`);
   }
-  return (await res.json()) as Workflow;
+  return safeParseJson<Workflow>(res);
 }
 
 export async function cancelWorkflow(
@@ -1348,7 +1358,7 @@ export async function cancelWorkflow(
     const err = await res.text();
     throw new Error(`Failed to cancel workflow: ${res.status} ${err}`);
   }
-  return (await res.json()) as Workflow;
+  return safeParseJson<Workflow>(res);
 }
 
 export async function listWorkflowEvents(
@@ -1360,7 +1370,7 @@ export async function listWorkflowEvents(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to list workflow events: ${res.status}`);
-  return (await res.json()) as WorkflowEvent[];
+  return safeParseJson<WorkflowEvent[]>(res);
 }
 
 // Data Retention & Privacy APIs (72-Hour Automatic Purge)
@@ -1370,7 +1380,7 @@ export async function fetchRetentionStatus(signal?: AbortSignal): Promise<Retent
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to fetch retention status: ${res.status}`);
-  return (await res.json()) as RetentionStatusResponse;
+  return safeParseJson<RetentionStatusResponse>(res);
 }
 
 export async function triggerRetentionCleanup(signal?: AbortSignal): Promise<RetentionCleanupResponse> {
@@ -1380,7 +1390,7 @@ export async function triggerRetentionCleanup(signal?: AbortSignal): Promise<Ret
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Failed to trigger retention cleanup: ${res.status}`);
-  return (await res.json()) as RetentionCleanupResponse;
+  return safeParseJson<RetentionCleanupResponse>(res);
 }
 
 export async function purgeAllUserData(confirmPurge: boolean = true, signal?: AbortSignal): Promise<RetentionPurgeResponse> {
@@ -1391,7 +1401,77 @@ export async function purgeAllUserData(confirmPurge: boolean = true, signal?: Ab
     body: JSON.stringify({ confirm_purge: confirmPurge }),
   });
   if (!res.ok) throw new Error(`Failed to purge user data: ${res.status}`);
-  return (await res.json()) as RetentionPurgeResponse;
+  return safeParseJson<RetentionPurgeResponse>(res);
 }
 
 export { API_BASE };
+
+// --- ESP32 Hardware Endpoints ---
+
+export async function fetchEsp32Status(signal?: AbortSignal): Promise<Esp32HardwareStatus> {
+  const response = await fetch(`${API_BASE}/api/sensing/esp32/status`, {
+    signal,
+    headers: getBaseHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ESP32 status: ${response.status}`);
+  }
+  return safeParseJson<Esp32HardwareStatus>(response);
+}
+
+export async function connectEsp32(
+  port: string = 'COM7',
+  baudRate: number = 921600,
+  signal?: AbortSignal
+): Promise<Esp32HardwareStatus> {
+  const response = await fetch(`${API_BASE}/api/sensing/esp32/connect`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ port, baud_rate: baudRate }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to connect ESP32: ${response.status}`);
+  }
+  return safeParseJson<Esp32HardwareStatus>(response);
+}
+
+export async function disconnectEsp32(signal?: AbortSignal): Promise<Esp32HardwareStatus> {
+  const response = await fetch(`${API_BASE}/api/sensing/esp32/disconnect`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to disconnect ESP32: ${response.status}`);
+  }
+  return safeParseJson<Esp32HardwareStatus>(response);
+}
+
+export async function calibrateEsp32(
+  durationSeconds: number = 5,
+  signal?: AbortSignal
+): Promise<Esp32HardwareStatus> {
+  const response = await fetch(`${API_BASE}/api/sensing/esp32/calibrate`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ duration_seconds: durationSeconds }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to start ESP32 calibration: ${response.status}`);
+  }
+  return safeParseJson<Esp32HardwareStatus>(response);
+}
+
+export async function clearEsp32Calibration(signal?: AbortSignal): Promise<Esp32HardwareStatus> {
+  const response = await fetch(`${API_BASE}/api/sensing/esp32/calibrate/clear`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to clear ESP32 calibration: ${response.status}`);
+  }
+  return safeParseJson<Esp32HardwareStatus>(response);
+}

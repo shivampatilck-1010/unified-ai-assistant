@@ -34,27 +34,6 @@ class GeminiProvider(BaseProviderAdapter):
             is_default=False,
         ),
         ModelInfo(
-            id="gemini-3-flash-preview",
-            name="Gemini 3 Flash Preview",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-3.8-flash",
-            name="Gemini 3.8 Flash",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-flash-latest",
-            name="Gemini Flash Latest",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
             id="gemini-3.5-flash",
             name="Gemini 3.5 Flash",
             provider="gemini",
@@ -69,38 +48,17 @@ class GeminiProvider(BaseProviderAdapter):
             is_default=False,
         ),
         ModelInfo(
-            id="gemini-2.5-flash",
-            name="Gemini 2.5 Flash (Legacy)",
+            id="gemini-3.8-flash",
+            name="Gemini 3.8 Flash",
             provider="gemini",
             context_window=1048576,
             is_default=False,
         ),
         ModelInfo(
-            id="gemini-2.5-pro",
-            name="Gemini 2.5 Pro",
-            provider="gemini",
-            context_window=2097152,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-2.0-flash",
-            name="Gemini 2.0 Flash (Legacy)",
+            id="gemini-3-flash-preview",
+            name="Gemini 3 Flash Preview",
             provider="gemini",
             context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-1.5-flash",
-            name="Gemini 1.5 Flash (Legacy)",
-            provider="gemini",
-            context_window=1048576,
-            is_default=False,
-        ),
-        ModelInfo(
-            id="gemini-1.5-pro",
-            name="Gemini 1.5 Pro (Legacy)",
-            provider="gemini",
-            context_window=2097152,
             is_default=False,
         ),
     ]
@@ -194,7 +152,15 @@ class GeminiProvider(BaseProviderAdapter):
             if model_match:
                 routed_model = model_match.group(1)
 
-        # Fallback retry_after from text if not extracted (e.g. "retry in 11h43m7.89s" or "retry in 42187s")
+        # Fallback retry_after from text if not extracted (e.g. "retry in 11h43m7.89s" or "retry in 42187s" or 'retryDelay': '42187s')
+        if retry_after is None:
+            delay_sec_match = re.search(r"['\"]?retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s?['\"]?", raw_message)
+            if delay_sec_match:
+                try:
+                    retry_after = float(delay_sec_match.group(1))
+                except ValueError:
+                    pass
+
         if retry_after is None:
             time_match = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?", raw_message)
             if time_match:
@@ -328,10 +294,9 @@ class GeminiProvider(BaseProviderAdapter):
                     for m in (
                         "gemini-3.5-flash-lite",
                         "gemini-flash-lite-latest",
-                        "gemini-3-flash-preview",
-                        "gemini-3.8-flash",
-                        "gemini-flash-latest",
                         "gemini-3.5-flash",
+                        "gemini-3.6-flash",
+                        "gemini-3-flash-preview",
                     )
                     if m != selected_model and m in valid_models
                 ]

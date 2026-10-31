@@ -23,6 +23,7 @@ import type {
   WifiSensingStatusResponse,
 } from '../../types';
 import { RoomPositionCanvas } from './RoomPositionCanvas';
+import { Esp32HardwarePanel } from './Esp32HardwarePanel';
 import './WifiSensingView.css';
 
 export const WifiSensingView: React.FC = () => {
@@ -296,6 +297,9 @@ export const WifiSensingView: React.FC = () => {
           {errorMessage}
         </div>
       )}
+
+      {/* ESP32 Physical Hardware Controller & Spectrum Monitor */}
+      <Esp32HardwarePanel />
 
       {/* Toolbar / Room Controls */}
       <div className="room-toolbar">

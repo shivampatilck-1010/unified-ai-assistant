@@ -186,3 +186,37 @@ class WifiSensingAuditResponse(BaseModel):
     action: str
     details: Dict[str, Any]
     created_at: datetime
+
+
+class Esp32HardwareStatusResponse(BaseModel):
+    is_connected: bool
+    port: str = "COM7"
+    baud_rate: int = 921600
+    status: str = "disconnected"  # "connected", "disconnected", "port_busy", "connecting", "error"
+    status_message: str = ""
+    packets_captured: int = 0
+    packets_per_second: float = 0.0
+    malformed_packets: int = 0
+    last_packet_time: Optional[datetime] = None
+    last_error: Optional[str] = None
+    device_description: Optional[str] = None
+    detected_ports: List[Dict[str, Any]] = Field(default_factory=list)
+    is_calibrated: bool = False
+    baseline_variance: float = 0.04
+    motion_threshold: float = 0.22
+    presence_threshold: float = 0.09
+    current_state: Optional[str] = None
+    presence_probability: Optional[float] = None
+    motion_intensity: Optional[float] = None
+    rssi_dbm: Optional[float] = None
+    subcarrier_amplitudes: List[float] = Field(default_factory=list)
+
+
+class Esp32ConnectRequest(BaseModel):
+    port: str = Field(default="COM7", description="Serial COM port e.g. COM7")
+    baud_rate: int = Field(default=921600, ge=9600, le=2000000, description="Serial baud rate (esp-csi default: 921600)")
+
+
+class Esp32CalibrateRequest(BaseModel):
+    duration_seconds: float = Field(default=5.0, ge=2.0, le=30.0, description="Baseline sampling window in seconds")
+

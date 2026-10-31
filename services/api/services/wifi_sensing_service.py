@@ -1,9 +1,10 @@
 import asyncio
+import json
 import os
 from pathlib import Path
 import sys
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 _wifi_sensing_dir = str(Path(__file__).resolve().parent.parent.parent / "wifi-sensing")
 if _wifi_sensing_dir not in sys.path:
@@ -18,6 +19,7 @@ from real_rssi_adapter import RealRssiSensorAdapter
 from models.wifi_sensing import WifiSensingAudit, WifiSensingEvent, WifiSensorConfig
 from presence_estimator import BaselinePresenceEstimator
 from schemas.wifi_sensing import (
+    Esp32HardwareStatusResponse,
     SensingCapabilitiesResponse,
     SensingEventResponse,
     SensingOccupancySummary,
@@ -149,7 +151,7 @@ class WifiSensingService:
         ]
 
         active_prov = cls._room_providers.get("default", "synthetic_csi_simulator")
-        is_hw_any = esp_caps.is_available or hw_caps.is_available
+        is_hw_any = esp_caps.is_available or hw_caps.is_available or rssi_caps.is_available
 
         return SensingCapabilitiesResponse(
             providers=items,
@@ -168,7 +170,9 @@ class WifiSensingService:
         result = await db.execute(stmt)
         active_rooms = [r[0] for r in result.all()]
 
+        esp_caps = cls._esp32_csi_adapter.discover_capabilities()
         hw_caps = cls._hardware_adapter.discover_capabilities()
+        rssi_caps = cls._real_rssi_adapter.discover_capabilities()
 
         return WifiSensingStatusResponse(
             status="operational",
@@ -176,7 +180,7 @@ class WifiSensingService:
             simulation_mode=True,
             active_simulations_count=len(active_rooms),
             active_rooms=active_rooms,
-            hardware_detected=hw_caps.is_available,
+            hardware_detected=(esp_caps.is_available or hw_caps.is_available or rssi_caps.is_available),
             timestamp=utc_now().isoformat(),
         )
 
@@ -708,3 +712,118 @@ class WifiSensingService:
         )
         result = await db.execute(stmt)
         return list(result.scalars().all())
+
+    # --- ESP32 DevKit V1 Hardware Controls & Real-Time Ingestion ---
+
+    @classmethod
+    def get_esp32_status(cls) -> Esp32HardwareStatusResponse:
+        adapter = cls._esp32_csi_adapter
+        health = adapter.collector.get_health()
+        cal = adapter.engine.calibration
+        state = adapter._latest_state
+
+        return Esp32HardwareStatusResponse(
+            is_connected=health.is_connected,
+            port=health.port,
+            baud_rate=health.baud_rate,
+            status=health.status,
+            status_message=health.status_message,
+            packets_captured=health.packets_captured,
+            packets_per_second=health.packets_per_second,
+            malformed_packets=health.malformed_packets,
+            last_packet_time=health.last_packet_time,
+            last_error=health.last_error,
+            device_description=health.device_description or adapter._detected_device,
+            detected_ports=health.detected_ports,
+            is_calibrated=cal.is_calibrated,
+            baseline_variance=cal.baseline_variance,
+            motion_threshold=cal.motion_threshold,
+            presence_threshold=cal.presence_threshold,
+            current_state=state.presence_state if state else None,
+            presence_probability=state.presence_probability if state else None,
+            motion_intensity=state.motion_intensity if state else None,
+            rssi_dbm=state.rssi_dbm if state else None,
+            subcarrier_amplitudes=state.subcarrier_amplitudes[:64] if state else [],
+        )
+
+    @classmethod
+    async def connect_esp32(cls, port: str = "COM7", baud_rate: int = 921600) -> Esp32HardwareStatusResponse:
+        adapter = cls._esp32_csi_adapter
+        adapter.serial_port = port
+        adapter.baud_rate = baud_rate
+        await adapter.start(room_id="esp32_hardware_room")
+        await asyncio.sleep(0.3)
+        return cls.get_esp32_status()
+
+    @classmethod
+    async def disconnect_esp32(cls) -> Esp32HardwareStatusResponse:
+        adapter = cls._esp32_csi_adapter
+        await adapter.stop()
+        return cls.get_esp32_status()
+
+    @classmethod
+    def calibrate_esp32(cls, duration_seconds: float = 5.0) -> Esp32HardwareStatusResponse:
+        adapter = cls._esp32_csi_adapter
+        adapter.start_calibration(duration_seconds=duration_seconds)
+        return cls.get_esp32_status()
+
+    @classmethod
+    def clear_esp32_calibration(cls) -> Esp32HardwareStatusResponse:
+        adapter = cls._esp32_csi_adapter
+        adapter.reset_calibration()
+        return cls.get_esp32_status()
+
+    @classmethod
+    async def stream_esp32_events(cls) -> AsyncGenerator[str, None]:
+        adapter = cls._esp32_csi_adapter
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue(maxsize=40)
+
+        def on_packet(pkt: Any) -> None:
+            state = adapter._latest_state
+            if state:
+                data = {
+                    "type": "csi_packet",
+                    "timestamp": state.timestamp.isoformat(),
+                    "presence_state": state.presence_state,
+                    "presence_probability": state.presence_probability,
+                    "motion_intensity": state.motion_intensity,
+                    "motion_level": state.motion_level,
+                    "detection_confidence": state.detection_confidence,
+                    "rssi_dbm": state.rssi_dbm,
+                    "subcarrier_variance": state.subcarrier_variance,
+                    "doppler_energy": state.doppler_energy,
+                    "subcarrier_count": state.active_subcarrier_count,
+                    "subcarrier_amplitudes": state.subcarrier_amplitudes[:64],
+                    "packets_captured": adapter.collector._packets_captured,
+                    "packet_sequence": pkt.sequence,
+                    "mac_address": pkt.mac_address,
+                    "calibration_status": state.calibration_status,
+                }
+                # Thread-safe dispatch to asyncio queue
+                loop.call_soon_threadsafe(
+                    lambda: queue.put_nowait(data) if not queue.full() else None
+                )
+
+        adapter.collector.add_packet_listener(on_packet)
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    yield f"event: csi_frame\ndata: {json.dumps(item)}\n\n"
+                except asyncio.TimeoutError:
+                    st = cls.get_esp32_status()
+                    heartbeat = {
+                        "type": "heartbeat",
+                        "status": st.status,
+                        "status_message": st.status_message,
+                        "packets_per_second": st.packets_per_second,
+                        "packets_captured": st.packets_captured,
+                        "current_state": st.current_state,
+                        "rssi_dbm": st.rssi_dbm,
+                        "subcarrier_amplitudes": st.subcarrier_amplitudes[:64],
+                        "calibration_status": "calibrated" if st.is_calibrated else "uncalibrated",
+                    }
+                    yield f"event: heartbeat\ndata: {json.dumps(heartbeat)}\n\n"
+        finally:
+            adapter.collector.remove_packet_listener(on_packet)
