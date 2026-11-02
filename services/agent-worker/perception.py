@@ -60,6 +60,10 @@ class PagePerception:
     screenshot_base64: Optional[str] = None
     injection_warning: Optional[str] = None
     accessibility_snapshot: Optional[Dict[str, Any]] = None
+    page_state: str = "ready"  # ready | loading | modal_open | auth_gate | error
+    detected_obstacles: List[Dict[str, Any]] = field(default_factory=list)
+    recommended_actions: List[str] = field(default_factory=list)
+    confidence_score: float = 0.95
 
     def get_element_by_index(self, index: int) -> Optional[InteractiveElement]:
         for el in self.interactive_elements:
@@ -205,7 +209,7 @@ DOM_EXTRACTION_SCRIPT = """() => {
         .filter(t => t.length > 0)
         .slice(0, 8);
 
-    // 3. Active Dialog / Modal
+    // 3. Active Dialog / Modal & Obstacles
     const modalEl = document.querySelector('dialog[open], .modal:not(.hidden), [role="dialog"][aria-modal="true"]');
     let dialogInfo = null;
     if (modalEl && isVisible(modalEl)) {
@@ -213,6 +217,30 @@ DOM_EXTRACTION_SCRIPT = """() => {
             title: modalEl.querySelector('h1, h2, h3, [class*="title"]')?.innerText?.trim() || 'Dialog',
             text: (modalEl.innerText || '').slice(0, 300)
         };
+    }
+
+    const obstacles = [];
+    if (dialogInfo) {
+        obstacles.push({ type: 'modal_dialog', title: dialogInfo.title, selector: 'dialog[open], [role="dialog"]' });
+    }
+
+    // Cookie consent overlay detection
+    const cookieEl = document.querySelector('#cookie-banner, [id*="cookie"], [class*="cookie-consent"], [class*="cookie-banner"], [aria-label*="cookie" i]');
+    if (cookieEl && isVisible(cookieEl)) {
+        obstacles.push({ type: 'cookie_banner', selector: generateSelector(cookieEl) });
+    }
+
+    // Captcha / bot challenge iframe
+    const captchaIframe = document.querySelector('iframe[src*="recaptcha"], iframe[src*="turnstile"], iframe[src*="hcaptcha"], iframe[title*="reCAPTCHA" i]');
+    if (captchaIframe) {
+        obstacles.push({ type: 'captcha_gate', selector: 'iframe[src*="captcha"]' });
+    }
+
+    // Loading indicator
+    const spinner = document.querySelector('.spinner, .loading-spinner, [role="progressbar"], [aria-busy="true"]');
+    const isDocLoading = document.readyState !== 'complete';
+    if (spinner && isVisible(spinner)) {
+        obstacles.push({ type: 'loading_spinner', selector: '.spinner, [role="progressbar"]' });
     }
 
     // 4. Tables
@@ -235,13 +263,30 @@ DOM_EXTRACTION_SCRIPT = """() => {
         headings: headings,
         interactive: interactive,
         dialog: dialogInfo,
+        obstacles: obstacles,
+        isDocLoading: isDocLoading,
         tables: tables,
         bodyText: bodyText
     };
 }"""
 
 
-async def extract_page_perception(page: Any, capture_screenshot: bool = False) -> PagePerception:
+def detect_model_vision_capability(model_gateway: Optional[Any] = None) -> bool:
+    """Returns True if the active configured model supports multimodal vision input."""
+    if not model_gateway:
+        return False
+    try:
+        active_model = getattr(model_gateway, "active_model", "") or ""
+        provider = getattr(model_gateway, "provider", "") or ""
+        text = f"{active_model} {provider}".lower()
+        if any(m in text for m in ("gemini", "gpt-4o", "claude-3-5", "vision", "omni")):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+async def extract_page_perception(page: Any, capture_screenshot: bool = False, model_gateway: Optional[Any] = None) -> PagePerception:
     """Extracts rich, normalized DOM and visual perception from active Playwright page."""
     url = page.url or ""
     title = ""
@@ -255,7 +300,7 @@ async def extract_page_perception(page: Any, capture_screenshot: bool = False) -
         dom_data = await page.evaluate(DOM_EXTRACTION_SCRIPT)
     except Exception as ex:
         logger.debug("DOM perception script execution fallback: %s", ex)
-        dom_data = {"headings": [], "interactive": [], "dialog": None, "tables": [], "bodyText": ""}
+        dom_data = {"headings": [], "interactive": [], "dialog": None, "obstacles": [], "tables": [], "bodyText": ""}
 
     elements: List[InteractiveElement] = []
     for item in dom_data.get("interactive", []):
@@ -301,6 +346,44 @@ async def extract_page_perception(page: Any, capture_screenshot: bool = False) -
     except Exception:
         pass
 
+    # Determine page state & obstacles
+    obstacles = dom_data.get("obstacles", [])
+    has_captcha = any(o.get("type") == "captcha_gate" for o in obstacles)
+    has_modal = dom_data.get("dialog") is not None or any(o.get("type") == "modal_dialog" for o in obstacles)
+    has_spinner = any(o.get("type") == "loading_spinner" for o in obstacles) or dom_data.get("isDocLoading", False)
+
+    page_state = "ready"
+    if has_captcha or "verify you are human" in sanitized_text.lower():
+        page_state = "auth_gate"
+    elif has_modal:
+        page_state = "modal_open"
+    elif has_spinner and len(elements) < 3:
+        page_state = "loading"
+    elif any(err in title.lower() for err in ("404", "500", "error", "not found")):
+        page_state = "error"
+
+    # Compute recommended actions
+    recommended: List[str] = []
+    if page_state == "modal_open":
+        recommended.extend(["dismiss_modal", "click_dialog_button"])
+    elif page_state == "auth_gate":
+        recommended.append("request_human_verification")
+    elif any(el.input_type == "search" or "search" in (el.name or "") for el in elements):
+        recommended.append("type_search_query")
+    elif any(el.input_type in ("text", "email", "password") for el in elements):
+        recommended.append("fill_form_inputs")
+    else:
+        recommended.extend(["navigate", "click_link", "extract_table"])
+
+    # Compute perception confidence score
+    confidence = 0.95
+    if page_state in ("error", "auth_gate"):
+        confidence = 0.50
+    elif page_state == "modal_open":
+        confidence = 0.75
+    elif len(elements) == 0:
+        confidence = 0.60
+
     return PagePerception(
         url=url,
         title=title,
@@ -312,4 +395,8 @@ async def extract_page_perception(page: Any, capture_screenshot: bool = False) -
         screenshot_base64=screenshot_b64,
         injection_warning=inj_warn if is_inj else None,
         accessibility_snapshot=a11y_tree,
+        page_state=page_state,
+        detected_obstacles=obstacles,
+        recommended_actions=recommended,
+        confidence_score=confidence,
     )

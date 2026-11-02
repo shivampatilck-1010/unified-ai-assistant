@@ -10,6 +10,7 @@ interface SectionConfig {
   description: string;
   plannedFeatures: string[];
   icon: React.ReactNode;
+  isImplemented?: boolean;
 }
 
 const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> = {
@@ -17,6 +18,7 @@ const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> 
     title: 'Search & History',
     badge: 'Database Text Search (Active)',
     phase: 'Phase 2',
+    isImplemented: true,
     description:
       'Database-backed text search across conversation titles and message content using PostgreSQL/SQLite text indexes.',
     plannedFeatures: [
@@ -34,8 +36,9 @@ const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> 
   },
   projects: {
     title: 'Projects & Workspaces',
-    badge: 'Phase 2 Milestone',
+    badge: 'Projects Workspace (Active)',
     phase: 'Phase 2',
+    isImplemented: true,
     description:
       'Isolated workspaces with scoped project instructions, pinned reference materials, and custom knowledge sets.',
     plannedFeatures: [
@@ -52,8 +55,9 @@ const sectionConfigs: Record<Exclude<NavigationSection, 'chat'>, SectionConfig> 
   },
   'browser-agent': {
     title: 'Autonomous Browser Agent',
-    badge: 'Phase 3 Milestone',
+    badge: 'Universal Computer-Use Engine (Active)',
     phase: 'Phase 3',
+    isImplemented: true,
     description:
       'Autonomous web execution worker supporting local Chrome via DevTools Protocol (CDP) and isolated cloud sandboxes.',
     plannedFeatures: [
@@ -257,8 +261,8 @@ export function SectionPlaceholder({ section, onBackToChat, onSelectConversation
           <div className="section-placeholder__status-box">
             <div className="section-placeholder__status-label">Implementation Status</div>
             <div className="section-placeholder__status-value">
-              <span className="section-placeholder__status-dot" />
-              Not Implemented Yet — Scheduled for {config.phase}
+              <span className={`section-placeholder__status-dot ${config.isImplemented ? 'section-placeholder__status-dot--active' : ''}`} />
+              {config.isImplemented ? `Active Production Module (${config.phase})` : `Not Implemented Yet — Scheduled for ${config.phase}`}
             </div>
           </div>
         )}

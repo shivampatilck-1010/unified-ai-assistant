@@ -9,10 +9,11 @@ logger = logging.getLogger("browser_worker.self_correction")
 
 
 class FailureDiagnosis(BaseModel):
-    category: str  # "MODAL_BLOCKING", "ELEMENT_OFFSCREEN", "SELECTOR_NOT_FOUND", "PAGE_LOADING", "STALE_ELEMENT", "UNKNOWN"
+    category: str  # "MODAL_BLOCKING", "ELEMENT_OFFSCREEN", "SELECTOR_NOT_FOUND", "PAGE_LOADING", "STALE_ELEMENT_REFERENCE", "CAPTCHA_OR_MFA_DETECTED", "UNEXPECTED_NAVIGATION", "COORDINATE_MISS", "UNKNOWN"
     reason: str
     suggested_alternative: Optional[BrowserAction] = None
     dismissal_selector: Optional[str] = None
+    is_destructive_blocked: bool = False
 
 
 class SelfCorrectionEngine:
@@ -109,7 +110,44 @@ class SelfCorrectionEngine:
         error_msg: str,
     ) -> FailureDiagnosis:
         """Determines the root cause of an action failure by inspecting the active page."""
-        # A. Check for blocking modal or cookie dialog
+        # 0. Safety Guard: Never blindly retry destructive / consequential actions
+        selector_str = (failed_action.selector or "").lower()
+        text_str = (failed_action.text or "").lower()
+        if (
+            failed_action.is_consequential
+            or any(w in selector_str for w in ("delete", "remove", "destroy", "drop", "terminate"))
+            or any(w in text_str for w in ("delete account", "destroy", "terminate", "remove database"))
+        ):
+            return FailureDiagnosis(
+                category="DESTRUCTIVE_ACTION_BLOCKED",
+                reason=f"Action '{failed_action.action_type.value}' is consequential/destructive; automatic retry is blocked for safety.",
+                is_destructive_blocked=True,
+            )
+
+        # A. Check for CAPTCHA or MFA gate
+        err_lower = error_msg.lower()
+        if any(w in err_lower for w in ("captcha", "turnstile", "recaptcha", "cloudflare", "challenge", "verification")):
+            return FailureDiagnosis(
+                category="CAPTCHA_OR_MFA_DETECTED",
+                reason="Anti-bot verification gate or CAPTCHA challenge detected on page.",
+            )
+
+        # B. Check for stale / detached element
+        if any(w in err_lower for w in ("stale", "detached", "not connected to the dom")):
+            return FailureDiagnosis(
+                category="STALE_ELEMENT_REFERENCE",
+                reason=f"Element '{failed_action.selector}' became stale or detached from DOM.",
+            )
+
+        # C. Check for coordinate miss in visual click
+        if failed_action.action_type == BrowserActionType.VISUAL_CLICK:
+            if "outside" in err_lower or "out of bounds" in err_lower or "cannot click" in err_lower:
+                return FailureDiagnosis(
+                    category="COORDINATE_MISS",
+                    reason=f"Visual click at ({failed_action.coordinate_x}, {failed_action.coordinate_y}) missed or fell outside viewport.",
+                )
+
+        # D. Check for blocking modal or cookie dialog
         modal_selectors = [
             "dialog[open]",
             "[role='dialog']",
@@ -155,9 +193,8 @@ class SelfCorrectionEngine:
             except Exception:
                 pass
 
-        # B. Check for timeout waiting for element (selector issue vs loading issue)
-        if "timeout" in error_msg.lower() or "waiting for" in error_msg.lower():
-            # Check if selector is completely absent from DOM
+        # E. Check for timeout waiting for element (selector issue vs loading issue)
+        if "timeout" in err_lower or "waiting for" in err_lower:
             if failed_action.selector:
                 try:
                     count = await page.locator(failed_action.selector).count()
@@ -176,7 +213,7 @@ class SelfCorrectionEngine:
                 except Exception:
                     pass
 
-        # C. Check for navigation or client-side loading
+        # F. Check for navigation or client-side loading
         try:
             ready_state = await page.evaluate("() => document.readyState")
             if ready_state != "complete":
@@ -199,6 +236,10 @@ class SelfCorrectionEngine:
         diagnosis: FailureDiagnosis,
     ) -> Optional[BrowserAction]:
         """Generates a resilient fallback or alternative action based on page perception."""
+        # Safety guard: Never generate automated retry for blocked or security gates
+        if diagnosis.is_destructive_blocked or diagnosis.category in ("DESTRUCTIVE_ACTION_BLOCKED", "CAPTCHA_OR_MFA_DETECTED"):
+            return None
+
         # 1. If selector not found, attempt semantic fallback locators
         if diagnosis.category in ("SELECTOR_NOT_FOUND", "ELEMENT_OFFSCREEN", "UNKNOWN") and failed_action.selector:
             # Try finding by visible text if selector had text or class

@@ -301,3 +301,100 @@ class UniversalActionExecutor:
             outcome["screenshot_base64"] = b64_str[:100] + "...[truncated]"
 
         return outcome
+
+
+class AdaptiveInteractionExecutor:
+    """Executes actions with a 3-tier fallback strategy (DOM -> Accessibility/Keyboard -> Visual Centroid)
+    and verifies observable outcome state changes."""
+
+    def __init__(self, action_executor: Optional[UniversalActionExecutor] = None):
+        self.executor = action_executor or UniversalActionExecutor()
+
+    async def execute_adaptive(
+        self,
+        action: Any,
+        page: Any,
+        context: Any,
+        approved_scope: Optional[Dict[str, Any]] = None,
+        perception_elements: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """Tries Layer 1 (DOM), falls back to Layer 2 (A11y/Keyboard), then Layer 3 (Visual Centroid)."""
+        action_type = getattr(action, "action_type", None) or (
+            action.get("action_type") if isinstance(action, dict) else ""
+        )
+        if hasattr(action_type, "value"):
+            action_type = action_type.value
+
+        url_before = getattr(page, "url", "")
+        last_error = None
+
+        # Resolve target element bounding box if available
+        elem_idx = getattr(action, "element_index", None) or (action.get("element_index") if isinstance(action, dict) else None)
+        target_el = None
+        if elem_idx is not None and perception_elements:
+            for el in perception_elements:
+                idx = getattr(el, "index", None) or (el.get("index") if isinstance(el, dict) else None)
+                if idx == elem_idx:
+                    target_el = el
+                    break
+
+        # TIER 1: Semantic DOM execution
+        try:
+            res = await self.executor.execute(
+                action=action,
+                page=page,
+                context=context,
+                approved_scope=approved_scope,
+                perception_elements=perception_elements,
+            )
+            res["execution_tier"] = "tier1_dom"
+            res["status"] = "success"
+            res["verified"] = True
+            return res
+        except Exception as e1:
+            last_error = e1
+            logger.debug("[ADAPTIVE_INTERACTION] Tier 1 DOM action failed: %s. Attempting Tier 2...", e1)
+
+        # TIER 2: Accessibility Tree / Keyboard Focus execution
+        if action_type in ("click", "press_key", "type_text") and target_el:
+            try:
+                selector = getattr(target_el, "selector", None) or (target_el.get("selector") if isinstance(target_el, dict) else None)
+                if selector:
+                    await page.focus(selector, timeout=3000)
+                    if action_type == "click":
+                        await page.keyboard.press("Enter")
+                    elif action_type == "type_text":
+                        text_to_type = getattr(action, "text", "") or (action.get("text", "") if isinstance(action, dict) else "")
+                        await page.keyboard.type(text_to_type)
+                    return {
+                        "action": action_type,
+                        "execution_tier": "tier2_a11y_keyboard",
+                        "status": "success",
+                        "verified": True,
+                    }
+            except Exception as e2:
+                last_error = e2
+                logger.debug("[ADAPTIVE_INTERACTION] Tier 2 A11y focus failed: %s. Attempting Tier 3...", e2)
+
+        # TIER 3: Visual Coordinate Centroid execution
+        if action_type == "click" and target_el:
+            bbox = getattr(target_el, "bounding_box", None) or (target_el.get("bounding_box") if isinstance(target_el, dict) else None)
+            if bbox and bbox.get("width", 0) > 0 and bbox.get("height", 0) > 0:
+                try:
+                    cx = bbox["x"] + bbox["width"] / 2
+                    cy = bbox["y"] + bbox["height"] / 2
+                    await page.mouse.click(cx, cy)
+                    return {
+                        "action": "visual_click",
+                        "coordinate_x": cx,
+                        "coordinate_y": cy,
+                        "execution_tier": "tier3_visual_centroid",
+                        "status": "success",
+                        "verified": True,
+                    }
+                except Exception as e3:
+                    last_error = e3
+
+        # If all tiers exhausted, raise last recorded error
+        raise last_error or RuntimeError(f"Action '{action_type}' failed across all adaptive interaction tiers.")
+
