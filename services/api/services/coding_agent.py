@@ -40,11 +40,20 @@ class CodingAgent:
     """Autonomous software engineering agent for inspecting, modifying, testing, and verifying code."""
 
     def __init__(self, default_workspace: Optional[str] = None):
-        self.default_workspace = Path(default_workspace or Path(__file__).resolve().parent.parent.parent)
+        self.default_workspace = Path(default_workspace or Path(__file__).resolve().parent.parent.parent).resolve()
+
+    def _validate_path(self, target: Path) -> Path:
+        resolved = target.resolve()
+        try:
+            resolved.relative_to(self.default_workspace)
+        except ValueError:
+            raise PermissionError(f"Access denied: path '{target}' is outside authorized workspace root '{self.default_workspace}'")
+        return resolved
 
     def inspect_workspace(self, workspace_path: Optional[str] = None, max_files: int = 100) -> List[WorkspaceFile]:
         """Inspects authorized workspace directory and lists codebase structure."""
-        root = Path(workspace_path) if workspace_path else self.default_workspace
+        root = Path(workspace_path).resolve() if workspace_path else self.default_workspace
+        root = self._validate_path(root)
         files: List[WorkspaceFile] = []
         ignored_dirs = {".git", "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", "dist", "build"}
 
@@ -70,6 +79,7 @@ class CodingAgent:
         p = Path(file_path)
         if not p.is_absolute():
             p = self.default_workspace / p
+        p = self._validate_path(p)
         if not p.exists() or p.is_dir():
             raise FileNotFoundError(f"Source file not found: {file_path}")
 
@@ -81,6 +91,7 @@ class CodingAgent:
         p = Path(file_path)
         if not p.is_absolute():
             p = self.default_workspace / p
+        p = self._validate_path(p)
 
         p.parent.mkdir(parents=True, exist_ok=True)
         old_lines = p.read_text(encoding="utf-8", errors="replace").splitlines() if p.exists() else []
@@ -105,7 +116,8 @@ class CodingAgent:
         timeout_seconds: int = 30,
     ) -> TestExecutionResult:
         """Executes automated test suites within the workspace in an isolated subprocess."""
-        root = Path(workspace_path) if workspace_path else self.default_workspace
+        root = Path(workspace_path).resolve() if workspace_path else self.default_workspace
+        root = self._validate_path(root)
         cmd = test_command or f'"{sys.executable}" -m pytest -q --tb=short'
 
         start_time = asyncio.get_event_loop().time()

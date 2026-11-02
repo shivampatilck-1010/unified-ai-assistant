@@ -97,20 +97,26 @@ async def get_capabilities():
 async def inspect_code_workspace(req: CodingInspectRequest):
     """Lists files and structure of authorized project workspace."""
     agent = CodingAgent()
-    files = agent.inspect_workspace(req.workspace_path, max_files=req.max_files)
-    return {"files": [f.model_dump() for f in files], "total_count": len(files)}
+    try:
+        files = agent.inspect_workspace(req.workspace_path, max_files=req.max_files)
+        return {"files": [f.model_dump() for f in files], "total_count": len(files)}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
 
 
 @router.post("/coding/test")
 async def execute_code_tests(req: CodingTestRequest):
     """Executes test suite in authorized workspace with timeout safeguards."""
     agent = CodingAgent()
-    res = await agent.run_tests(
-        workspace_path=req.workspace_path,
-        test_command=req.test_command,
-        timeout_seconds=req.timeout_seconds,
-    )
-    return res.model_dump()
+    try:
+        res = await agent.run_tests(
+            workspace_path=req.workspace_path,
+            test_command=req.test_command,
+            timeout_seconds=req.timeout_seconds,
+        )
+        return res.model_dump()
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
 
 
 @router.post("/data-analysis/csv")
