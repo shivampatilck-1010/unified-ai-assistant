@@ -13,6 +13,7 @@ _agent_worker_dir = str(Path(__file__).resolve().parent.parent.parent / "service
 if _agent_worker_dir not in sys.path:
     sys.path.insert(0, _agent_worker_dir)
 
+from config import get_settings
 from models.browser_task import BrowserTask, BrowserTaskEvent
 from schemas.browser_task import (
     BrowserPlan,
@@ -38,7 +39,8 @@ class BrowserTaskService:
         """Creates a browser task and generates a structured plan awaiting user approval."""
         # 1. Validate initial URL if provided
         if req.initial_url:
-            validate_url(req.initial_url, allowed_domains=req.allowed_domains, allow_local=True)
+            settings = get_settings()
+            validate_url(req.initial_url, allowed_domains=req.allowed_domains, allow_local=settings.allow_local_browser_targets)
 
         # 2. Generate structured plan (model-based or deterministic template)
         plan: BrowserPlan = await generate_browser_plan(

@@ -28,6 +28,7 @@ from schemas.browser_task import (
 )
 from services.browser_task_service import BrowserTaskService
 from services.model_gateway import get_model_gateway
+from policy import PolicyViolationError
 from worker import BrowserWorkerRunner, get_worker_runner
 
 router = APIRouter(prefix="/api/browser", tags=["browser"])
@@ -57,8 +58,13 @@ async def create_browser_task(
     """Creates a new browser task and generates a structured plan awaiting review."""
     gateway = get_model_gateway()
     svc = BrowserTaskService(db=db, model_gateway=gateway)
-    task = await svc.create_task(user_id=user_id, req=req)
-    return task
+    try:
+        task = await svc.create_task(user_id=user_id, req=req)
+        return task
+    except PolicyViolationError as pve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(pve))
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
 @router.get("/tasks", response_model=BrowserTaskListResponse)
@@ -100,12 +106,14 @@ async def get_browser_task_plan(
 @router.post("/tasks/{task_id}/approve", response_model=BrowserTaskResponse)
 async def approve_browser_task(
     task_id: str,
-    req: BrowserTaskApproveRequest,
+    req: Optional[BrowserTaskApproveRequest] = None,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     runner: BrowserWorkerRunner = Depends(get_runner),
 ):
     """Approves a proposed browser plan and initiates asynchronous execution."""
+    if req is None:
+        req = BrowserTaskApproveRequest(approved=True)
     svc = BrowserTaskService(db=db)
     return await svc.approve_task(user_id=user_id, task_id=task_id, req=req, runner=runner)
 
@@ -126,12 +134,14 @@ async def confirm_browser_task_action(
 @router.post("/tasks/{task_id}/cancel", response_model=BrowserTaskResponse)
 async def cancel_browser_task(
     task_id: str,
-    req: BrowserTaskCancelRequest,
+    req: Optional[BrowserTaskCancelRequest] = None,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     runner: BrowserWorkerRunner = Depends(get_runner),
 ):
     """Cancels a pending, running, or awaiting-confirmation browser task."""
+    if req is None:
+        req = BrowserTaskCancelRequest(reason="User requested cancellation")
     svc = BrowserTaskService(db=db)
     return await svc.cancel_task(user_id=user_id, task_id=task_id, req=req, runner=runner)
 
