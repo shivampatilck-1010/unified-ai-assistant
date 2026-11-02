@@ -266,6 +266,17 @@ export function BrowserAgentView() {
                 placeholder="e.g. Visit https://news.ycombinator.com and extract top headline"
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey) {
+                    if (e.nativeEvent.isComposing) return;
+                    e.preventDefault();
+                    if (!isSubmitting && taskDescription.trim()) {
+                      const form = e.currentTarget.form;
+                      if (form) form.requestSubmit();
+                    }
+                  }
+                }}
+                enterKeyHint="send"
                 required
               />
             </label>

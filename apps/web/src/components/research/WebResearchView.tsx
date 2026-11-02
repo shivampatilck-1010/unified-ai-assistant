@@ -274,6 +274,17 @@ export function WebResearchView() {
                   rows={3}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey) {
+                      if (e.nativeEvent.isComposing) return;
+                      e.preventDefault();
+                      if (!isSubmitting && question.trim()) {
+                        const form = e.currentTarget.form;
+                        if (form) form.requestSubmit();
+                      }
+                    }
+                  }}
+                  enterKeyHint="send"
                   placeholder="e.g. Compare recent advancements in solid-state lithium ceramic batteries versus sodium-ion cells..."
                   required
                 />

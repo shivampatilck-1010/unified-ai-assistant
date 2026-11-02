@@ -25,10 +25,26 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey) {
+      if (e.nativeEvent.isComposing) return;
       e.preventDefault();
       handleSubmit();
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    // On mobile keyboards (e.g. Android Gboard), tapping Return often appends '\n' without firing standard Enter keydown
+    if (val.endsWith('\n') && !val.endsWith('\n\n')) {
+      const trimmed = val.replace(/\r?\n$/, '');
+      if (trimmed.trim().length > 0 && !isStreaming && !disabled) {
+        onSend(trimmed.trim());
+        setValue('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        return;
+      }
+    }
+    setValue(val);
   };
 
   // Auto-resize textarea
@@ -64,8 +80,9 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
           ref={textareaRef}
           className="composer__input"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
+          enterKeyHint="send"
           placeholder="Send a message…"
           rows={1}
           disabled={disabled}

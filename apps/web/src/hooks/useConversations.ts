@@ -193,94 +193,98 @@ export function useConversations(backendConnected: boolean = true) {
       abortRef.current = controller;
       setIsStreaming(true);
 
-      await streamChat(
-        {
-          conversation_id: activeId,
-          message: content,
-          provider: provider || undefined,
-          model: model || undefined,
-          use_knowledge: useKnowledge,
-          selected_file_ids: selectedFileIds,
-          use_research: useResearch,
-          research_depth: researchDepth,
-          use_orchestration: useOrchestration,
-        },
-        {
-          onMessageStart: (conversationId: string) => {
-            if (activeId !== conversationId) {
-              setActiveId(conversationId);
-            }
+      try {
+        await streamChat(
+          {
+            conversation_id: activeId,
+            message: content,
+            provider: provider || undefined,
+            model: model || undefined,
+            use_knowledge: useKnowledge,
+            selected_file_ids: selectedFileIds,
+            use_research: useResearch,
+            research_depth: researchDepth,
+            use_orchestration: useOrchestration,
           },
-          onTextDelta: (text: string) => {
-            setActiveConversation((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                messages: prev.messages.map((m) =>
-                  m.id === assistantMsgId ? { ...m, content: m.content + text } : m
-                ),
-              };
-            });
+          {
+            onMessageStart: (conversationId: string) => {
+              if (activeId !== conversationId) {
+                setActiveId(conversationId);
+              }
+            },
+            onTextDelta: (text: string) => {
+              setActiveConversation((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((m) =>
+                    m.id === assistantMsgId ? { ...m, content: m.content + text } : m
+                  ),
+                };
+              });
+            },
+            onMessageComplete: (_finishReason: string, citations?: ChunkCitation[]) => {
+              setActiveConversation((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((m) =>
+                    m.id === assistantMsgId ? { ...m, isStreaming: false, citations } : m
+                  ),
+                };
+              });
+              setIsStreaming(false);
+              void refreshList();
+            },
+            onError: (errData: ErrorData) => {
+              setActiveConversation((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          content: errData.message,
+                          isStreaming: false,
+                          isError: true,
+                          error_code: errData.code,
+                          error_category: errData.category,
+                          retry_after: errData.retry_after,
+                          retryable: errData.retryable,
+                          routed_model: errData.routed_model,
+                        }
+                      : m
+                  ),
+                };
+              });
+              setIsStreaming(false);
+            },
+            onStreamError: (streamErr: Error) => {
+              setActiveConversation((prev) => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  messages: prev.messages.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          content: `Connection error: ${streamErr.message}`,
+                          isStreaming: false,
+                          isError: true,
+                        }
+                      : m
+                  ),
+                };
+              });
+              setIsStreaming(false);
+            },
           },
-          onMessageComplete: (_finishReason: string, citations?: ChunkCitation[]) => {
-            setActiveConversation((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                messages: prev.messages.map((m) =>
-                  m.id === assistantMsgId ? { ...m, isStreaming: false, citations } : m
-                ),
-              };
-            });
-            setIsStreaming(false);
-            void refreshList();
-          },
-          onError: (errData: ErrorData) => {
-            setActiveConversation((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                messages: prev.messages.map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: errData.message,
-                        isStreaming: false,
-                        isError: true,
-                        error_code: errData.code,
-                        error_category: errData.category,
-                        retry_after: errData.retry_after,
-                        retryable: errData.retryable,
-                        routed_model: errData.routed_model,
-                      }
-                    : m
-                ),
-              };
-            });
-            setIsStreaming(false);
-          },
-          onStreamError: (streamErr: Error) => {
-            setActiveConversation((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                messages: prev.messages.map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: `Connection error: ${streamErr.message}`,
-                        isStreaming: false,
-                        isError: true,
-                      }
-                    : m
-                ),
-              };
-            });
-            setIsStreaming(false);
-          },
-        },
-        controller.signal
-      );
+          controller.signal
+        );
+      } finally {
+        setIsStreaming(false);
+      }
     },
     [activeId, refreshList]
   );
