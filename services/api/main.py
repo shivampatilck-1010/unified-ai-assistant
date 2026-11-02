@@ -45,6 +45,7 @@ from routers import (
     tasks_router,
     wifi_sensing_router,
     retention_router,
+    intelligence_router,
 )
 from services.model_gateway import get_model_gateway
 from services.orchestration.engine import OrchestrationEngine
@@ -128,6 +129,7 @@ app.include_router(research_router)
 app.include_router(wifi_sensing_router)
 app.include_router(orchestration_router)
 app.include_router(retention_router)
+app.include_router(intelligence_router)
 
 
 class HealthResponse(BaseModel):

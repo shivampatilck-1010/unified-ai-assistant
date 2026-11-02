@@ -167,6 +167,59 @@ class StreamingService:
             yield format_sse(SSEEventType.MESSAGE_COMPLETE, complete_payload)
             return
 
+        # 5a. UNIFIED AI INTELLIGENCE CORE INTENT DISPATCH
+        # Determines required capabilities (Browser, Research, Coding, Data, Calendar, Documents)
+        # without requiring manual mode toggles.
+        try:
+            from services.intelligence import IntelligenceCore
+
+            core = IntelligenceCore(gateway)
+            core_res = await core.process(
+                db=db,
+                user_id=owner_id,
+                message=request.message,
+                conversation_id=conversation_id,
+                project_id=effective_project_id,
+                file_ids=request.selected_file_ids,
+            )
+
+            if not core_res.get("is_conversational_direct"):
+                final_text = core_res.get("response_markdown", "")
+                yield format_sse(
+                    SSEEventType.TEXT_DELTA,
+                    SSEEventPayload(
+                        event=SSEEventType.TEXT_DELTA,
+                        conversation_id=conversation_id,
+                        message_id=assistant_msg_id,
+                        data={"text": final_text},
+                    ),
+                )
+                extra_meta = {
+                    "finish_reason": "stop",
+                    "intent": core_res["classification"].intent.value,
+                    "confidence": core_res["classification"].confidence,
+                    "verdict": core_res["verdict"].model_dump() if core_res.get("verdict") else None,
+                }
+                await ConversationService.update_message(
+                    db=db,
+                    message_id=assistant_msg_id,
+                    content=final_text,
+                    status="completed",
+                    extra_metadata=json.dumps(extra_meta),
+                )
+                yield format_sse(
+                    SSEEventType.MESSAGE_COMPLETE,
+                    SSEEventPayload(
+                        event=SSEEventType.MESSAGE_COMPLETE,
+                        conversation_id=conversation_id,
+                        message_id=assistant_msg_id,
+                        data={"finish_reason": "stop", "meta": extra_meta},
+                    ),
+                )
+                return
+        except Exception as core_err:
+            logger.warning("Intelligence Core fallback to conversational stream: %s", core_err)
+
         # 5b. Check web research workflow
         if request.use_research:
             try:
