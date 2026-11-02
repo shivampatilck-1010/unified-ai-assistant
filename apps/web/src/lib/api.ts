@@ -74,7 +74,7 @@ export function getApiBase(): string {
   }
   const raw =
     import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD ? 'https://minnesota-liable-treatments-marvel.trycloudflare.com' : 'http://127.0.0.1:8000');
+    (import.meta.env.PROD ? 'https://tears-combination-soldiers-donald.trycloudflare.com' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 
