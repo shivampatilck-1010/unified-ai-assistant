@@ -91,9 +91,30 @@ class BrowserWorkerRunner:
         # In-memory coordination
         self.active_tasks: Set[str] = set()
         self.cancelled_tasks: Set[str] = set()
+        self.paused_tasks: Dict[str, asyncio.Event] = {}
+        self.latest_screenshots: Dict[str, str] = {}
         self.confirmation_events: Dict[str, asyncio.Event] = {}
         self.confirmation_results: Dict[str, bool] = {}
         self.event_subscribers: Dict[str, List[asyncio.Queue]] = {}
+
+    def pause_task(self, task_id: str) -> bool:
+        """Pauses execution of an active task."""
+        if task_id in self.active_tasks and task_id not in self.paused_tasks:
+            self.paused_tasks[task_id] = asyncio.Event()
+            return True
+        return False
+
+    def resume_task(self, task_id: str) -> bool:
+        """Resumes execution of a paused task."""
+        if task_id in self.paused_tasks:
+            ev = self.paused_tasks.pop(task_id)
+            ev.set()
+            return True
+        return False
+
+    def get_latest_screenshot(self, task_id: str) -> Optional[str]:
+        """Returns the latest captured compressed screenshot for a task."""
+        return self.latest_screenshots.get(task_id)
 
     def get_status(self) -> Dict[str, Any]:
         return {
@@ -349,6 +370,34 @@ class BrowserWorkerRunner:
                             await self._handle_cancellation(task_id, evidence)
                             return
 
+                        # Pause gate
+                        if task_id in self.paused_tasks:
+                            async with async_session_factory() as session:
+                                async with session.begin():
+                                    t = await session.get(BrowserTask, task_id)
+                                    if t:
+                                        t.status = BrowserTaskStatus.PAUSED.value
+                            await self.emit_event(
+                                task_id=task_id,
+                                event_type=BrowserTaskEventType.TASK_PAUSED,
+                                message=f"Task execution paused by user before step {step_index}.",
+                                step_index=step_index,
+                            )
+                            pause_event = self.paused_tasks.get(task_id)
+                            if pause_event:
+                                await pause_event.wait()
+                            async with async_session_factory() as session:
+                                async with session.begin():
+                                    t = await session.get(BrowserTask, task_id)
+                                    if t:
+                                        t.status = BrowserTaskStatus.RUNNING.value
+                            await self.emit_event(
+                                task_id=task_id,
+                                event_type=BrowserTaskEventType.TASK_RESUMED,
+                                message=f"Task execution resumed for step {step_index}.",
+                                step_index=step_index,
+                            )
+
                         # Step limit check
                         if step_index > self.max_steps:
                             raise PolicyViolationError(f"Task exceeded maximum permitted step count ({self.max_steps}).")
@@ -432,6 +481,23 @@ class BrowserWorkerRunner:
 
                         evidence.append(step_outcome)
 
+                        # Capture real-time compressed preview frame
+                        try:
+                            screenshot_bytes = await page.screenshot(type="jpeg", quality=60)
+                            b64_str = base64.b64encode(screenshot_bytes).decode("ascii")
+                            data_url = f"data:image/jpeg;base64,{b64_str}"
+                            self.latest_screenshots[task_id] = data_url
+                            step_outcome["screenshot_data_url"] = data_url
+                            await self.emit_event(
+                                task_id=task_id,
+                                event_type=BrowserTaskEventType.SCREENSHOT_UPDATED,
+                                message=f"Viewport frame captured at step {step_index}",
+                                step_index=step_index,
+                                payload={"screenshot_data_url": data_url, "url": page.url},
+                            )
+                        except Exception as ss_ex:
+                            logger.debug("Screenshot capture skipped: %s", ss_ex)
+
                         await self.emit_event(
                             task_id=task_id,
                             event_type=BrowserTaskEventType.STEP_COMPLETED,
@@ -489,25 +555,21 @@ class BrowserWorkerRunner:
         if action_type == "navigate":
             nav_timeout = max(timeout_ms, 30000)
             try:
-                # Use "domcontentloaded" so single-page apps (SPAs) and heavy portals don't hang waiting for infinite trackers
-                response = await page.goto(action.url, timeout=nav_timeout, wait_until="domcontentloaded")
-            except Exception as goto_err:
-                err_str = str(goto_err).lower()
-                if "timeout" in err_str:
-                    try:
-                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
-                    except Exception:
-                        pass
-                    if page.url and "about:blank" not in page.url:
+                # Use commit so infinite media streams (e.g. background looping video) don't trigger timeouts
+                response = await page.goto(action.url, timeout=nav_timeout, wait_until="commit")
+            except Exception:
+                try:
+                    response = await page.goto(action.url, timeout=nav_timeout, wait_until="domcontentloaded")
+                except Exception as goto_err:
+                    err_str = str(goto_err).lower()
+                    if "timeout" in err_str and page.url and "about:blank" not in page.url:
                         response = None
                     else:
                         raise goto_err
-                else:
-                    raise goto_err
 
             # Brief stabilization window for client-side routing & hydration
             try:
-                await page.wait_for_timeout(1500)
+                await page.wait_for_timeout(2000)
             except Exception:
                 pass
 
@@ -515,7 +577,10 @@ class BrowserWorkerRunner:
             current_url = page.url
             validate_url(current_url, allowed_domains=approved_scope.get("allowed_domains"), allow_local=self.allow_local)
             outcome["url"] = current_url
-            outcome["title"] = await page.title()
+            try:
+                outcome["title"] = await page.title()
+            except Exception:
+                outcome["title"] = ""
             outcome["status_code"] = response.status if response else 200
 
         elif action_type == "inspect":
@@ -550,6 +615,21 @@ class BrowserWorkerRunner:
             outcome["selector"] = selector
             outcome["typed_characters"] = len(action.text or "")
 
+        elif action_type == "select_option":
+            selector = action.selector
+            val = action.value or action.text or ""
+            await page.select_option(selector, val, timeout=timeout_ms)
+            outcome["selector"] = selector
+            outcome["value"] = val
+
+        elif action_type == "press_key":
+            key_name = action.key or action.text or "Enter"
+            if action.selector:
+                await page.press(action.selector, key_name, timeout=timeout_ms)
+            else:
+                await page.keyboard.press(key_name)
+            outcome["key"] = key_name
+
         elif action_type == "scroll":
             direction = (action.direction or "down").lower()
             amount = action.amount or 500
@@ -560,10 +640,16 @@ class BrowserWorkerRunner:
 
         elif action_type == "wait_for":
             condition = action.condition or "domcontentloaded"
-            if condition in ("load", "domcontentloaded", "networkidle"):
-                await page.wait_for_load_state(condition, timeout=timeout_ms)
-            elif action.selector:
-                await page.wait_for_selector(action.selector, timeout=timeout_ms)
+            try:
+                if condition in ("load", "domcontentloaded", "networkidle"):
+                    await page.wait_for_load_state(condition, timeout=timeout_ms)
+                elif action.selector:
+                    await page.wait_for_selector(action.selector, timeout=timeout_ms)
+            except Exception as wait_err:
+                if page.url and "about:blank" not in page.url:
+                    outcome["settled_note"] = f"Wait condition '{condition}' settled with active document."
+                else:
+                    raise wait_err
             outcome["condition"] = condition
 
         elif action_type == "screenshot":

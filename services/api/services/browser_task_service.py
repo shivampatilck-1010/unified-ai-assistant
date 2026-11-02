@@ -184,3 +184,36 @@ class BrowserTaskService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def pause_task(self, user_id: str, task_id: str, runner: BrowserWorkerRunner) -> BrowserTask:
+        """Pauses an active task."""
+        task = await self.get_task(user_id, task_id)
+        if task.status in (BrowserTaskStatus.COMPLETED.value, BrowserTaskStatus.FAILED.value, BrowserTaskStatus.CANCELLED.value):
+            return task
+        runner.pause_task(task_id)
+        task.status = BrowserTaskStatus.PAUSED.value
+        await self.db.commit()
+        await self.db.refresh(task)
+        return task
+
+    async def resume_task(self, user_id: str, task_id: str, runner: BrowserWorkerRunner) -> BrowserTask:
+        """Resumes a paused task."""
+        task = await self.get_task(user_id, task_id)
+        if task.status != BrowserTaskStatus.PAUSED.value:
+            return task
+        runner.resume_task(task_id)
+        task.status = BrowserTaskStatus.RUNNING.value
+        await self.db.commit()
+        await self.db.refresh(task)
+        return task
+
+    async def get_latest_screenshot(self, user_id: str, task_id: str, runner: BrowserWorkerRunner) -> Dict[str, Any]:
+        """Retrieves the latest captured screenshot frame for a task."""
+        task = await self.get_task(user_id, task_id)
+        screenshot = runner.get_latest_screenshot(task_id)
+        if not screenshot and task.evidence:
+            for item in reversed(task.evidence):
+                if isinstance(item, dict) and item.get("screenshot_data_url"):
+                    screenshot = item["screenshot_data_url"]
+                    break
+        return {"screenshot_data_url": screenshot, "task_id": task_id, "status": task.status}

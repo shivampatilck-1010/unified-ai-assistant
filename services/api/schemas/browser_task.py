@@ -10,6 +10,8 @@ class BrowserActionType(str, Enum):
     READ_TEXT = "read_text"
     CLICK = "click"
     TYPE_TEXT = "type_text"
+    SELECT_OPTION = "select_option"
+    PRESS_KEY = "press_key"
     SCROLL = "scroll"
     WAIT_FOR = "wait_for"
     SCREENSHOT = "screenshot"
@@ -19,6 +21,7 @@ class BrowserTaskStatus(str, Enum):
     PENDING = "pending"
     AWAITING_APPROVAL = "awaiting_approval"
     RUNNING = "running"
+    PAUSED = "paused"
     AWAITING_CONFIRMATION = "awaiting_confirmation"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -35,6 +38,16 @@ class BrowserTaskEventType(str, Enum):
     TASK_COMPLETED = "task_completed"
     TASK_FAILED = "task_failed"
     TASK_CANCELLED = "task_cancelled"
+    # Typed live streaming events
+    SESSION_CREATED = "browser.session.created"
+    NAVIGATION_STARTED = "browser.navigation.started"
+    SCREENSHOT_UPDATED = "browser.screenshot.updated"
+    ACTION_STARTED = "browser.action.started"
+    ACTION_COMPLETED = "browser.action.completed"
+    TASK_PROGRESS = "browser.task.progress"
+    TASK_PAUSED = "browser.task.paused"
+    TASK_RESUMED = "browser.task.resumed"
+    SESSION_CLOSED = "browser.session.closed"
 
 
 class BrowserAction(BaseModel):
@@ -42,6 +55,8 @@ class BrowserAction(BaseModel):
     url: Optional[str] = None
     selector: Optional[str] = None
     text: Optional[str] = None
+    key: Optional[str] = None
+    value: Optional[str] = None
     direction: Optional[str] = None  # "up", "down", "top", "bottom"
     amount: Optional[int] = None
     condition: Optional[str] = None

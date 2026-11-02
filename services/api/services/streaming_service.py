@@ -503,9 +503,58 @@ INTERACTION GUIDELINES:
 """
             conversation_history.insert(0, {"role": "system", "content": base_system_prompt})
 
+        # Detect natural-language browser agent request
+        browser_task_id = None
+        user_msg_lower = request.message.lower()
+        url_match = re.search(r"https?://[^\s\"'>]+", request.message)
+
+        if url_match or any(kw in user_msg_lower for kw in ["browser agent", "auto browser", "navigate to", "open url", "visit website", "complete lesson", "fluent edge"]):
+            try:
+                from services.browser_task_service import BrowserTaskService
+                from schemas.browser_task import BrowserTaskCreateRequest, BrowserTaskApproveRequest
+                from worker import get_worker_runner
+                from config import get_settings
+
+                settings = get_settings()
+                runner = get_worker_runner(
+                    headless=settings.browser_headless,
+                    allow_local=settings.allow_local_browser_targets,
+                    max_concurrency=settings.browser_worker_concurrency,
+                )
+                b_svc = BrowserTaskService(db=db, model_gateway=gateway)
+                b_task = await b_svc.create_task(
+                    user_id=owner_id,
+                    req=BrowserTaskCreateRequest(
+                        task_description=request.message,
+                        initial_url=url_match.group(0) if url_match else None,
+                    ),
+                )
+                await b_svc.approve_task(
+                    user_id=owner_id,
+                    task_id=b_task.id,
+                    req=BrowserTaskApproveRequest(approved=True),
+                    runner=runner,
+                )
+                browser_task_id = b_task.id
+                logger.info("Autonomous browser task %s auto-launched from chat.", browser_task_id)
+            except Exception as b_err:
+                logger.warning("Browser task auto-creation skipped: %s", b_err)
+
         conversation_history.append({"role": "user", "content": request.message})
 
         accumulated_chunks = []
+        if browser_task_id:
+            intro_text = f"<!-- browser-task: {browser_task_id} -->\n\n🌐 **Autonomous Browser Session Initiated**\n\nTask ID: `{browser_task_id}`\n\n"
+            accumulated_chunks.append(intro_text)
+            yield format_sse(
+                SSEEventType.TEXT_DELTA,
+                SSEEventPayload(
+                    event=SSEEventType.TEXT_DELTA,
+                    conversation_id=conversation_id,
+                    message_id=assistant_msg_id,
+                    data={"text": intro_text},
+                ),
+            )
         try:
             async for chunk in adapter.generate_stream(conversation_history, model=model_id):
                 accumulated_chunks.append(chunk)

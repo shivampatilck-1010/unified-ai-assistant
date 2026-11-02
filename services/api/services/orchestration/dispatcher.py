@@ -283,19 +283,64 @@ class CapabilityDispatcher:
         allowed_domains = params.get("allowed_domains") or []
 
         from policy import validate_url
-
         if initial_url:
             validate_url(initial_url, allowed_domains=allowed_domains, allow_local=True)
 
+        from services.browser_task_service import BrowserTaskService
+        from schemas.browser_task import BrowserTaskCreateRequest, BrowserTaskApproveRequest
+        from worker import get_worker_runner
+        from config import get_settings
+
+        settings = get_settings()
+        runner = get_worker_runner(
+            headless=settings.browser_headless,
+            allow_local=settings.allow_local_browser_targets,
+            max_concurrency=settings.browser_worker_concurrency,
+        )
+
+        svc = BrowserTaskService(db=db)
+        b_task = await svc.create_task(
+            user_id=owner_id,
+            req=BrowserTaskCreateRequest(
+                task_description=task_description,
+                initial_url=initial_url,
+                allowed_domains=allowed_domains or None,
+            ),
+        )
+        approved_task = await svc.approve_task(
+            user_id=owner_id,
+            task_id=b_task.id,
+            req=BrowserTaskApproveRequest(approved=True),
+            runner=runner,
+        )
+
+        # Wait for worker completion or timeout
+        final_task = approved_task
+        for _ in range(60):
+            await asyncio.sleep(0.5)
+            final_task = await svc.get_task(user_id=owner_id, task_id=b_task.id)
+            if final_task.status in ("completed", "failed", "cancelled", "awaiting_confirmation"):
+                break
+
+        latest_screenshot = runner.get_latest_screenshot(b_task.id)
+
         return {
-            "success": True,
+            "success": final_task.status == "completed",
             "data": {
-                "task_description": task_description,
-                "initial_url": initial_url,
-                "status": "completed",
+                "task_id": b_task.id,
+                "status": final_task.status,
+                "evidence_count": len(final_task.evidence or []),
+                "screenshot_data_url": latest_screenshot,
             },
-            "summary": f"Browser navigation verified for {initial_url or 'target page'}.",
-            "citations": [],
+            "summary": final_task.result_summary or f"Browser task {final_task.status}: {task_description}",
+            "citations": [
+                {
+                    "title": f"Browser Session: {initial_url or 'Target Page'}",
+                    "source_url": initial_url or "https://unified-ai-assistant.pages.dev",
+                    "snippet": final_task.result_summary or "Browser execution verified.",
+                    "author": "Autonomous Browser Agent",
+                }
+            ] if initial_url else [],
         }
 
     @classmethod

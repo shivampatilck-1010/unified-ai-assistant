@@ -474,6 +474,46 @@ export function getBrowserStreamUrl(taskId: string): string {
   return `${API_BASE}/api/browser/tasks/${encodeURIComponent(taskId)}/stream`;
 }
 
+
+
+export async function pauseBrowserTask(taskId: string, signal?: AbortSignal): Promise<BrowserTask> {
+  const response = await fetch(`${API_BASE}/api/browser/tasks/${encodeURIComponent(taskId)}/pause`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to pause task: ${response.status}`);
+  }
+  return safeParseJson<BrowserTask>(response);
+}
+
+export async function resumeBrowserTask(taskId: string, signal?: AbortSignal): Promise<BrowserTask> {
+  const response = await fetch(`${API_BASE}/api/browser/tasks/${encodeURIComponent(taskId)}/resume`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to resume task: ${response.status}`);
+  }
+  return safeParseJson<BrowserTask>(response);
+}
+
+export async function fetchBrowserTaskScreenshot(
+  taskId: string,
+  signal?: AbortSignal
+): Promise<{ screenshot_data_url: string | null; url?: string }> {
+  const response = await fetch(`${API_BASE}/api/browser/tasks/${encodeURIComponent(taskId)}/screenshot`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    return { screenshot_data_url: null };
+  }
+  return safeParseJson<{ screenshot_data_url: string | null; url?: string }>(response);
+}
+
 // ==========================================
 // Phase 4: Tasks, Calendar & Reminders Endpoints
 // ==========================================

@@ -25,6 +25,8 @@ ALLOWED_ACTION_TYPES = {
     "read_text",
     "click",
     "type_text",
+    "select_option",
+    "press_key",
     "scroll",
     "wait_for",
     "screenshot",
@@ -248,7 +250,7 @@ def validate_action(action: Any, approved_scope: Optional[Dict[str, Any]] = None
         url = getattr(action, "url", None) or (action.get("url") if isinstance(action, dict) else None)
         validate_url(url, allowed_domains=scope.get("allowed_domains"), allow_local=allow_local)
 
-    elif action_type in ("click", "type_text", "read_text"):
+    elif action_type in ("click", "type_text", "read_text", "select_option"):
         selector = getattr(action, "selector", None) or (action.get("selector") if isinstance(action, dict) else None)
         if not selector or not isinstance(selector, str):
             raise PolicyViolationError(f"Action '{action_type}' requires a non-empty CSS or text selector.")
@@ -260,6 +262,13 @@ def validate_action(action: Any, approved_scope: Optional[Dict[str, Any]] = None
         text = getattr(action, "text", None) or (action.get("text") if isinstance(action, dict) else None)
         if text is None:
             raise PolicyViolationError("Action 'type_text' requires a 'text' parameter.")
+
+    elif action_type == "press_key":
+        key = getattr(action, "key", None) or getattr(action, "text", None) or (
+            action.get("key") or action.get("text") if isinstance(action, dict) else None
+        )
+        if not key:
+            raise PolicyViolationError("Action 'press_key' requires a 'key' or 'text' parameter (e.g. 'Enter').")
 
 
 def is_consequential_action(action: Any, task_goal: str = "") -> Tuple[bool, Optional[str]]:

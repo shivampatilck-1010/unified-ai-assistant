@@ -12,6 +12,7 @@ import {
   getBrowserStreamUrl,
 } from '../../lib/api';
 import { WebResearchView } from '../research/WebResearchView';
+import { BrowserLivePreviewCard } from './BrowserLivePreviewCard';
 import './BrowserAgentView.css';
 
 export function BrowserAgentView() {
@@ -376,6 +377,9 @@ export function BrowserAgentView() {
                   )}
                 </div>
               </div>
+
+              {/* Real-time Viewport & Interactive Stream */}
+              <BrowserLivePreviewCard taskId={activeTask.id} initialTask={activeTask} />
 
               {/* Consequential Action Confirmation Banner */}
               {activeTask.status === 'awaiting_confirmation' && activeTask.pending_confirmation && (

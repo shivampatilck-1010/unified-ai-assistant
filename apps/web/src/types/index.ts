@@ -153,6 +153,8 @@ export type BrowserActionType =
   | 'read_text'
   | 'click'
   | 'type_text'
+  | 'select_option'
+  | 'press_key'
   | 'scroll'
   | 'wait_for'
   | 'screenshot';
@@ -161,6 +163,7 @@ export type BrowserTaskStatus =
   | 'pending'
   | 'awaiting_approval'
   | 'running'
+  | 'paused'
   | 'awaiting_confirmation'
   | 'completed'
   | 'failed'

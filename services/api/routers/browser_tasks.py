@@ -136,6 +136,42 @@ async def cancel_browser_task(
     return await svc.cancel_task(user_id=user_id, task_id=task_id, req=req, runner=runner)
 
 
+@router.post("/tasks/{task_id}/pause", response_model=BrowserTaskResponse)
+async def pause_browser_task(
+    task_id: str,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    runner: BrowserWorkerRunner = Depends(get_runner),
+):
+    """Pauses execution of an active browser task."""
+    svc = BrowserTaskService(db=db)
+    return await svc.pause_task(user_id=user_id, task_id=task_id, runner=runner)
+
+
+@router.post("/tasks/{task_id}/resume", response_model=BrowserTaskResponse)
+async def resume_browser_task(
+    task_id: str,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    runner: BrowserWorkerRunner = Depends(get_runner),
+):
+    """Resumes execution of a paused browser task."""
+    svc = BrowserTaskService(db=db)
+    return await svc.resume_task(user_id=user_id, task_id=task_id, runner=runner)
+
+
+@router.get("/tasks/{task_id}/screenshot")
+async def get_browser_task_screenshot(
+    task_id: str,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    runner: BrowserWorkerRunner = Depends(get_runner),
+):
+    """Returns the latest captured viewport screenshot data URL."""
+    svc = BrowserTaskService(db=db)
+    return await svc.get_latest_screenshot(user_id=user_id, task_id=task_id, runner=runner)
+
+
 @router.get("/tasks/{task_id}/events", response_model=list[BrowserTaskEventResponse])
 async def get_browser_task_events(
     task_id: str,

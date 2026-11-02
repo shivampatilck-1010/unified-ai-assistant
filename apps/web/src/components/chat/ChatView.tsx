@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import type { ChatMessage, ModelInfo } from '../../types';
 import { Composer } from '../composer/Composer';
 import { MarkdownContent } from './MarkdownContent';
+import { BrowserLivePreviewCard } from '../browser/BrowserLivePreviewCard';
 import './ChatView.css';
 
 interface ChatViewProps {
@@ -289,7 +290,20 @@ export function ChatView({
                       </div>
                     </div>
                   ) : msg.role === 'assistant' ? (
-                    <MarkdownContent content={msg.content} />
+                    (() => {
+                      const browserTaskMatch = msg.content?.match(/<!--\s*browser-task:\s*([a-zA-Z0-9_-]+)\s*-->/);
+                      const browserTaskId = browserTaskMatch ? browserTaskMatch[1] : null;
+                      const cleanContent = msg.content ? msg.content.replace(/<!--\s*browser-task:\s*[a-zA-Z0-9_-]+\s*-->/g, '').trim() : '';
+
+                      return (
+                        <>
+                          {browserTaskId && (
+                            <BrowserLivePreviewCard taskId={browserTaskId} compact />
+                          )}
+                          <MarkdownContent content={cleanContent} />
+                        </>
+                      );
+                    })()
                   ) : (
                     <span>{msg.content}</span>
                   )}
