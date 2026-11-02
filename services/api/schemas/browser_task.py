@@ -9,12 +9,30 @@ class BrowserActionType(str, Enum):
     INSPECT = "inspect"
     READ_TEXT = "read_text"
     CLICK = "click"
+    DOUBLE_CLICK = "double_click"
+    RIGHT_CLICK = "right_click"
+    HOVER = "hover"
     TYPE_TEXT = "type_text"
+    CLEAR_INPUT = "clear_input"
     SELECT_OPTION = "select_option"
+    CHECK_BOX = "check_box"
+    UNCHECK_BOX = "uncheck_box"
     PRESS_KEY = "press_key"
+    DRAG_AND_DROP = "drag_and_drop"
     SCROLL = "scroll"
     WAIT_FOR = "wait_for"
     SCREENSHOT = "screenshot"
+    UPLOAD_FILE = "upload_file"
+    DOWNLOAD_FILE = "download_file"
+    NEW_TAB = "new_tab"
+    SWITCH_TAB = "switch_tab"
+    CLOSE_TAB = "close_tab"
+    GO_BACK = "go_back"
+    GO_FORWARD = "go_forward"
+    RELOAD = "reload"
+    EXTRACT_TABLE = "extract_table"
+    HANDLE_DIALOG = "handle_dialog"
+    VISUAL_CLICK = "visual_click"
 
 
 class BrowserTaskStatus(str, Enum):
@@ -63,6 +81,13 @@ class BrowserAction(BaseModel):
     timeout_ms: Optional[int] = None
     is_consequential: bool = False
     consequential_reason: Optional[str] = None
+    target_selector: Optional[str] = None  # For drag and drop destination
+    file_path: Optional[str] = None  # For upload_file
+    tab_index: Optional[int] = None  # For switch_tab / close_tab
+    coordinate_x: Optional[float] = None  # For visual_click x
+    coordinate_y: Optional[float] = None  # For visual_click y
+    dialog_action: Optional[str] = None  # "accept" or "dismiss"
+    element_index: Optional[int] = None  # Referencing numbered perception element index
 
 
 class BrowserPlanStep(BaseModel):

@@ -60,18 +60,19 @@ export function useConversations(backendConnected: boolean = true) {
     []
   );
 
-  const startNewChat = useCallback(async () => {
+  const startNewChat = useCallback(async (projectId?: string | null) => {
     abortRef.current?.abort();
     setIsStreaming(false);
 
     try {
-      const created = await createConversation('New conversation');
+      const created = await createConversation('New conversation', projectId);
       setConversations((prev) => [created, ...prev]);
       setActiveId(created.id);
       setActiveConversation({
         id: created.id,
         owner_id: created.owner_id,
         title: created.title,
+        project_id: created.project_id,
         created_at: created.created_at,
         updated_at: created.updated_at,
         messages: [],
@@ -85,6 +86,7 @@ export function useConversations(backendConnected: boolean = true) {
         id: tempId,
         owner_id: 'local',
         title: 'New conversation',
+        project_id: projectId || undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         messages: [],
@@ -205,6 +207,7 @@ export function useConversations(backendConnected: boolean = true) {
             use_research: useResearch,
             research_depth: researchDepth,
             use_orchestration: useOrchestration,
+            project_id: activeConversation?.project_id || undefined,
           },
           {
             onMessageStart: (conversationId: string) => {

@@ -1,37 +1,5 @@
 import asyncio
 import base64
-import re
-import uuid
-from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Dict, List, Optional, Set
-
-from database import async_session_factory
-from models.browser_task import BrowserTask, BrowserTaskEvent
-from schemas.browser_task import (
-    BrowserAction,
-    BrowserActionType,
-    BrowserPlan,
-    BrowserPlanStep,
-    BrowserTaskEventType,
-    BrowserTaskStatus,
-)
-from policy import (
-    ConsequentialActionError,
-    PolicyViolationError,
-    is_consequential_action,
-    validate_action,
-    validate_url,
-)
-from prompt_defense import detect_prompt_injection, sanitize_page_text
-from browser_session import BrowserSessionManager
-
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-import asyncio
-import base64
 import logging
 import re
 import uuid
@@ -59,6 +27,9 @@ from policy import (
 )
 from prompt_defense import detect_prompt_injection, sanitize_page_text
 from browser_session import BrowserSessionManager
+from perception import extract_page_perception
+from actions import UniversalActionExecutor
+from reasoning import UniversalReasoningEngine
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +45,11 @@ class BrowserWorkerRunner:
         self,
         headless: bool = True,
         allow_local: bool = False,
-        max_steps: int = 15,
+        max_steps: int = 25,
         timeout_seconds: int = 180,
         max_concurrency: int = 3,
         worker_id: Optional[str] = None,
+        model_gateway: Optional[Any] = None,
     ):
         self.headless = headless
         self.allow_local = allow_local
@@ -85,8 +57,11 @@ class BrowserWorkerRunner:
         self.timeout_seconds = timeout_seconds
         self.max_concurrency = max_concurrency
         self.worker_id = worker_id or f"worker-{uuid.uuid4().hex[:8]}"
+        self.model_gateway = model_gateway
         self.concurrency_semaphore = asyncio.Semaphore(max_concurrency)
         self.session_manager = BrowserSessionManager(headless=headless, allow_local=allow_local)
+        self.action_executor = UniversalActionExecutor(allow_local=allow_local)
+        self.reasoning_engine = UniversalReasoningEngine(model_gateway=self.model_gateway)
 
         # In-memory coordination
         self.active_tasks: Set[str] = set()
@@ -359,155 +334,166 @@ class BrowserWorkerRunner:
 
                 # 3. Run browser session
                 async with self.session_manager.create_session() as (browser, context, page):
-                    for step_dict in steps_data:
-                        step_index = step_dict.get("step_index", 0)
-                        step_desc = step_dict.get("description", f"Step {step_index}")
-                        raw_action = step_dict.get("action", {})
-                        action = BrowserAction(**raw_action)
+                    if steps_data:
+                        for step_dict in steps_data:
+                            step_index = step_dict.get("step_index", 0)
+                            step_desc = step_dict.get("description", f"Step {step_index}")
+                            raw_action = step_dict.get("action", {})
+                            action = BrowserAction(**raw_action)
 
-                        # Cancellation check
-                        if task_id in self.cancelled_tasks:
-                            await self._handle_cancellation(task_id, evidence)
-                            return
+                            # Cancellation check
+                            if task_id in self.cancelled_tasks:
+                                await self._handle_cancellation(task_id, evidence)
+                                return
 
-                        # Pause gate
-                        if task_id in self.paused_tasks:
+                            # Pause gate
+                            if task_id in self.paused_tasks:
+                                async with async_session_factory() as session:
+                                    async with session.begin():
+                                        t = await session.get(BrowserTask, task_id)
+                                        if t:
+                                            t.status = BrowserTaskStatus.PAUSED.value
+                                await self.emit_event(
+                                    task_id=task_id,
+                                    event_type=BrowserTaskEventType.TASK_PAUSED,
+                                    message=f"Task execution paused by user before step {step_index}.",
+                                    step_index=step_index,
+                                )
+                                pause_event = self.paused_tasks.get(task_id)
+                                if pause_event:
+                                    await pause_event.wait()
+                                async with async_session_factory() as session:
+                                    async with session.begin():
+                                        t = await session.get(BrowserTask, task_id)
+                                        if t:
+                                            t.status = BrowserTaskStatus.RUNNING.value
+                                await self.emit_event(
+                                    task_id=task_id,
+                                    event_type=BrowserTaskEventType.TASK_RESUMED,
+                                    message=f"Task execution resumed for step {step_index}.",
+                                    step_index=step_index,
+                                )
+
+                            # Step limit check
+                            if step_index > self.max_steps:
+                                raise PolicyViolationError(f"Task exceeded maximum permitted step count ({self.max_steps}).")
+
+                            # Policy validation
+                            validate_action(action, approved_scope=approved_scope, allow_local=self.allow_local)
+
+                            # Consequential action detection & confirmation gate
+                            is_conseq, conseq_reason = is_consequential_action(action, task_description)
+                            if is_conseq or action.is_consequential:
+                                confirmation_id = str(uuid.uuid4())
+                                conf_payload = {
+                                    "confirmation_id": confirmation_id,
+                                    "step_index": step_index,
+                                    "action_type": action.action_type.value,
+                                    "target": action.selector or action.url,
+                                    "data": action.text,
+                                    "reason": conseq_reason or action.consequential_reason or "Consequential operation requiring human approval",
+                                }
+
+                                # Update task status to awaiting_confirmation
+                                async with async_session_factory() as session:
+                                    async with session.begin():
+                                        t = await session.get(BrowserTask, task_id)
+                                        if t:
+                                            t.status = BrowserTaskStatus.AWAITING_CONFIRMATION.value
+                                            t.pending_confirmation = conf_payload
+
+                                await self.emit_event(
+                                    task_id=task_id,
+                                    event_type=BrowserTaskEventType.CONFIRMATION_REQUIRED,
+                                    message=f"Human approval required: {conf_payload['reason']}",
+                                    step_index=step_index,
+                                    payload=conf_payload,
+                                )
+
+                                # Wait for confirmation or timeout
+                                conf_event = asyncio.Event()
+                                self.confirmation_events[confirmation_id] = conf_event
+                                try:
+                                    await asyncio.wait_for(conf_event.wait(), timeout=120.0)
+                                except asyncio.TimeoutError:
+                                    raise PolicyViolationError("Confirmation request timed out. Task aborted for safety.")
+                                finally:
+                                    self.confirmation_events.pop(confirmation_id, None)
+
+                                # Check confirmation result
+                                approved = self.confirmation_results.pop(confirmation_id, False)
+                                if not approved:
+                                    raise PolicyViolationError("User declined confirmation for consequential action. Task aborted.")
+
+                                # Resume running status
+                                async with async_session_factory() as session:
+                                    async with session.begin():
+                                        t = await session.get(BrowserTask, task_id)
+                                        if t:
+                                            t.status = BrowserTaskStatus.RUNNING.value
+                                            t.pending_confirmation = None
+
+                            # Emit step started
+                            await self.emit_event(
+                                task_id=task_id,
+                                event_type=BrowserTaskEventType.STEP_STARTED,
+                                message=f"Step {step_index}: {step_desc}",
+                                step_index=step_index,
+                            )
+
+                            # Update current step in DB
                             async with async_session_factory() as session:
                                 async with session.begin():
                                     t = await session.get(BrowserTask, task_id)
                                     if t:
-                                        t.status = BrowserTaskStatus.PAUSED.value
-                            await self.emit_event(
-                                task_id=task_id,
-                                event_type=BrowserTaskEventType.TASK_PAUSED,
-                                message=f"Task execution paused by user before step {step_index}.",
-                                step_index=step_index,
-                            )
-                            pause_event = self.paused_tasks.get(task_id)
-                            if pause_event:
-                                await pause_event.wait()
-                            async with async_session_factory() as session:
-                                async with session.begin():
-                                    t = await session.get(BrowserTask, task_id)
-                                    if t:
-                                        t.status = BrowserTaskStatus.RUNNING.value
-                            await self.emit_event(
-                                task_id=task_id,
-                                event_type=BrowserTaskEventType.TASK_RESUMED,
-                                message=f"Task execution resumed for step {step_index}.",
-                                step_index=step_index,
+                                        t.current_step = step_index
+
+                            # Execute the action in Playwright
+                            step_outcome = await self._execute_single_action(
+                                page=page,
+                                action=action,
+                                approved_scope=approved_scope,
+                                context=context,
                             )
 
-                        # Step limit check
-                        if step_index > self.max_steps:
-                            raise PolicyViolationError(f"Task exceeded maximum permitted step count ({self.max_steps}).")
+                            evidence.append(step_outcome)
 
-                        # Policy validation
-                        validate_action(action, approved_scope=approved_scope, allow_local=self.allow_local)
-
-                        # Consequential action detection & confirmation gate
-                        is_conseq, conseq_reason = is_consequential_action(action, task_description)
-                        if is_conseq or action.is_consequential:
-                            confirmation_id = str(uuid.uuid4())
-                            conf_payload = {
-                                "confirmation_id": confirmation_id,
-                                "step_index": step_index,
-                                "action_type": action.action_type.value,
-                                "target": action.selector or action.url,
-                                "data": action.text,
-                                "reason": conseq_reason or action.consequential_reason or "Consequential operation requiring human approval",
-                            }
-
-                            # Update task status to awaiting_confirmation
-                            async with async_session_factory() as session:
-                                async with session.begin():
-                                    t = await session.get(BrowserTask, task_id)
-                                    if t:
-                                        t.status = BrowserTaskStatus.AWAITING_CONFIRMATION.value
-                                        t.pending_confirmation = conf_payload
-
-                            await self.emit_event(
-                                task_id=task_id,
-                                event_type=BrowserTaskEventType.CONFIRMATION_REQUIRED,
-                                message=f"Human approval required: {conf_payload['reason']}",
-                                step_index=step_index,
-                                payload=conf_payload,
-                            )
-
-                            # Wait for confirmation or timeout
-                            conf_event = asyncio.Event()
-                            self.confirmation_events[confirmation_id] = conf_event
+                            # Capture real-time compressed preview frame
                             try:
-                                await asyncio.wait_for(conf_event.wait(), timeout=120.0)
-                            except asyncio.TimeoutError:
-                                raise PolicyViolationError("Confirmation request timed out. Task aborted for safety.")
-                            finally:
-                                self.confirmation_events.pop(confirmation_id, None)
+                                screenshot_bytes = await page.screenshot(type="jpeg", quality=60)
+                                b64_str = base64.b64encode(screenshot_bytes).decode("ascii")
+                                data_url = f"data:image/jpeg;base64,{b64_str}"
+                                self.latest_screenshots[task_id] = data_url
+                                step_outcome["screenshot_data_url"] = data_url
+                                await self.emit_event(
+                                    task_id=task_id,
+                                    event_type=BrowserTaskEventType.SCREENSHOT_UPDATED,
+                                    message=f"Viewport frame captured at step {step_index}",
+                                    step_index=step_index,
+                                    payload={"screenshot_data_url": data_url, "url": page.url},
+                                )
+                            except Exception as ss_ex:
+                                logger.debug("Screenshot capture skipped: %s", ss_ex)
 
-                            # Check confirmation result
-                            approved = self.confirmation_results.pop(confirmation_id, False)
-                            if not approved:
-                                raise PolicyViolationError("User declined confirmation for consequential action. Task aborted.")
-
-                            # Resume running status
-                            async with async_session_factory() as session:
-                                async with session.begin():
-                                    t = await session.get(BrowserTask, task_id)
-                                    if t:
-                                        t.status = BrowserTaskStatus.RUNNING.value
-                                        t.pending_confirmation = None
-
-                        # Emit step started
-                        await self.emit_event(
-                            task_id=task_id,
-                            event_type=BrowserTaskEventType.STEP_STARTED,
-                            message=f"Step {step_index}: {step_desc}",
-                            step_index=step_index,
-                        )
-
-                        # Update current step in DB
-                        async with async_session_factory() as session:
-                            async with session.begin():
-                                t = await session.get(BrowserTask, task_id)
-                                if t:
-                                    t.current_step = step_index
-
-                        # Execute the action in Playwright
-                        step_outcome = await self._execute_single_action(
-                            page=page,
-                            action=action,
-                            approved_scope=approved_scope,
-                        )
-
-                        evidence.append(step_outcome)
-
-                        # Capture real-time compressed preview frame
-                        try:
-                            screenshot_bytes = await page.screenshot(type="jpeg", quality=60)
-                            b64_str = base64.b64encode(screenshot_bytes).decode("ascii")
-                            data_url = f"data:image/jpeg;base64,{b64_str}"
-                            self.latest_screenshots[task_id] = data_url
-                            step_outcome["screenshot_data_url"] = data_url
                             await self.emit_event(
                                 task_id=task_id,
-                                event_type=BrowserTaskEventType.SCREENSHOT_UPDATED,
-                                message=f"Viewport frame captured at step {step_index}",
+                                event_type=BrowserTaskEventType.STEP_COMPLETED,
+                                message=f"Step {step_index} completed: {step_desc}",
                                 step_index=step_index,
-                                payload={"screenshot_data_url": data_url, "url": page.url},
+                                payload=step_outcome,
                             )
-                        except Exception as ss_ex:
-                            logger.debug("Screenshot capture skipped: %s", ss_ex)
 
-                        await self.emit_event(
+                        final_summary = await self._verify_final_browser_state(page, task_description, evidence)
+                    else:
+                        # Dynamic Autonomous Reasoning Loop
+                        final_summary = await self._run_autonomous_reasoning_loop(
                             task_id=task_id,
-                            event_type=BrowserTaskEventType.STEP_COMPLETED,
-                            message=f"Step {step_index} completed: {step_desc}",
-                            step_index=step_index,
-                            payload=step_outcome,
+                            task_description=task_description,
+                            approved_scope=approved_scope,
+                            page=page,
+                            context=context,
+                            evidence=evidence,
                         )
-
-                    # Final state verification before declaring success
-                    final_summary = await self._verify_final_browser_state(page, task_description, evidence)
 
                     # Mark completed
                     async with async_session_factory() as session:
@@ -545,119 +531,204 @@ class BrowserWorkerRunner:
         page: Any,
         action: BrowserAction,
         approved_scope: Dict[str, Any],
+        context: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        """Executes a single validated browser action with timeout and outcome tracking."""
-        timeout_ms = action.timeout_ms or 15000
-        action_type = action.action_type.value
+        """Executes a single validated browser action via UniversalActionExecutor."""
+        return await self.action_executor.execute(
+            action=action,
+            page=page,
+            context=context,
+            approved_scope=approved_scope,
+        )
 
-        outcome: Dict[str, Any] = {"action": action_type}
+    async def _run_autonomous_reasoning_loop(
+        self,
+        task_id: str,
+        task_description: str,
+        approved_scope: Dict[str, Any],
+        page: Any,
+        context: Any,
+        evidence: List[Dict[str, Any]],
+        start_step: int = 1,
+    ) -> str:
+        """Executes an adaptive autonomous reasoning loop: OBSERVE -> UNDERSTAND -> PLAN/REPLAN -> EXECUTE -> VERIFY."""
+        step_index = start_step - 1
+        history: List[Dict[str, Any]] = []
 
-        if action_type == "navigate":
-            nav_timeout = max(timeout_ms, 30000)
-            try:
-                # Use commit so infinite media streams (e.g. background looping video) don't trigger timeouts
-                response = await page.goto(action.url, timeout=nav_timeout, wait_until="commit")
-            except Exception:
+        while step_index < self.max_steps:
+            step_index += 1
+
+            # 1. Cancellation check
+            if task_id in self.cancelled_tasks:
+                await self._handle_cancellation(task_id, evidence)
+                return "Task was cancelled."
+
+            # 2. Pause gate
+            if task_id in self.paused_tasks:
+                async with async_session_factory() as session:
+                    async with session.begin():
+                        t = await session.get(BrowserTask, task_id)
+                        if t:
+                            t.status = BrowserTaskStatus.PAUSED.value
+                await self.emit_event(
+                    task_id=task_id,
+                    event_type=BrowserTaskEventType.TASK_PAUSED,
+                    message=f"Task execution paused by user before step {step_index}.",
+                    step_index=step_index,
+                )
+                pause_event = self.paused_tasks.get(task_id)
+                if pause_event:
+                    await pause_event.wait()
+                async with async_session_factory() as session:
+                    async with session.begin():
+                        t = await session.get(BrowserTask, task_id)
+                        if t:
+                            t.status = BrowserTaskStatus.RUNNING.value
+                await self.emit_event(
+                    task_id=task_id,
+                    event_type=BrowserTaskEventType.TASK_RESUMED,
+                    message=f"Task execution resumed for step {step_index}.",
+                    step_index=step_index,
+                )
+
+            # 3. OBSERVE: Extract rich perception
+            perception = await extract_page_perception(page, capture_screenshot=True)
+
+            # 4. REASON: Decide next action
+            decision = await self.reasoning_engine.decide_next_step(
+                task_description=task_description,
+                perception=perception,
+                history=history,
+                step_number=step_index,
+                max_steps=self.max_steps,
+            )
+
+            # Check if user intervention required (e.g. CAPTCHA / MFA gate)
+            if decision.pause_for_user:
+                await self.emit_event(
+                    task_id=task_id,
+                    event_type=BrowserTaskEventType.CONFIRMATION_REQUIRED,
+                    message=f"User intervention required: {decision.pause_reason}",
+                    step_index=step_index,
+                    payload={"pause_reason": decision.pause_reason, "step_index": step_index},
+                )
+                self.pause_task(task_id)
+                continue
+
+            # Check if terminal
+            if decision.is_terminal:
+                summary = decision.result_summary or f"Task goal achieved after {step_index} steps."
+                return summary
+
+            action = decision.action
+
+            # 5. Policy validation
+            validate_action(action, approved_scope=approved_scope, allow_local=self.allow_local)
+
+            # 6. Consequential action detection & confirmation gate
+            is_conseq, conseq_reason = is_consequential_action(action, task_description)
+            if is_conseq or action.is_consequential:
+                confirmation_id = str(uuid.uuid4())
+                conf_payload = {
+                    "confirmation_id": confirmation_id,
+                    "step_index": step_index,
+                    "action_type": action.action_type.value,
+                    "target": action.selector or action.url,
+                    "data": action.text,
+                    "reason": conseq_reason or action.consequential_reason or "Consequential operation requiring human approval",
+                }
+                async with async_session_factory() as session:
+                    async with session.begin():
+                        t = await session.get(BrowserTask, task_id)
+                        if t:
+                            t.status = BrowserTaskStatus.AWAITING_CONFIRMATION.value
+                            t.pending_confirmation = conf_payload
+
+                await self.emit_event(
+                    task_id=task_id,
+                    event_type=BrowserTaskEventType.CONFIRMATION_REQUIRED,
+                    message=f"Human approval required: {conf_payload['reason']}",
+                    step_index=step_index,
+                    payload=conf_payload,
+                )
+
+                conf_event = asyncio.Event()
+                self.confirmation_events[confirmation_id] = conf_event
                 try:
-                    response = await page.goto(action.url, timeout=nav_timeout, wait_until="domcontentloaded")
-                except Exception as goto_err:
-                    err_str = str(goto_err).lower()
-                    if "timeout" in err_str and page.url and "about:blank" not in page.url:
-                        response = None
-                    else:
-                        raise goto_err
+                    await asyncio.wait_for(conf_event.wait(), timeout=120.0)
+                except asyncio.TimeoutError:
+                    raise PolicyViolationError("Confirmation request timed out. Task aborted for safety.")
+                finally:
+                    self.confirmation_events.pop(confirmation_id, None)
 
-            # Brief stabilization window for client-side routing & hydration
+                approved = self.confirmation_results.pop(confirmation_id, False)
+                if not approved:
+                    raise PolicyViolationError("User declined confirmation for consequential action. Task aborted.")
+
+                async with async_session_factory() as session:
+                    async with session.begin():
+                        t = await session.get(BrowserTask, task_id)
+                        if t:
+                            t.status = BrowserTaskStatus.RUNNING.value
+                            t.pending_confirmation = None
+
+            # 7. EXECUTE: Emit step started & run action
+            await self.emit_event(
+                task_id=task_id,
+                event_type=BrowserTaskEventType.STEP_STARTED,
+                message=f"Step {step_index}: {decision.thought}",
+                step_index=step_index,
+            )
+
+            async with async_session_factory() as session:
+                async with session.begin():
+                    t = await session.get(BrowserTask, task_id)
+                    if t:
+                        t.current_step = step_index
+
+            outcome = await self.action_executor.execute(
+                action=action,
+                page=page,
+                context=context,
+                approved_scope=approved_scope,
+                perception_elements=perception.interactive_elements,
+            )
+            outcome["thought"] = decision.thought
+            evidence.append(outcome)
+            history.append({
+                "step": step_index,
+                "action": action.action_type.value,
+                "selector": action.selector,
+                "thought": decision.thought,
+                "outcome": outcome,
+            })
+
+            # Capture real-time compressed preview frame
             try:
-                await page.wait_for_timeout(2000)
-            except Exception:
-                pass
+                screenshot_bytes = await page.screenshot(type="jpeg", quality=60)
+                b64_str = base64.b64encode(screenshot_bytes).decode("ascii")
+                data_url = f"data:image/jpeg;base64,{b64_str}"
+                self.latest_screenshots[task_id] = data_url
+                outcome["screenshot_data_url"] = data_url
+                await self.emit_event(
+                    task_id=task_id,
+                    event_type=BrowserTaskEventType.SCREENSHOT_UPDATED,
+                    message=f"Viewport frame captured at step {step_index}",
+                    step_index=step_index,
+                    payload={"screenshot_data_url": data_url, "url": page.url},
+                )
+            except Exception as ss_ex:
+                logger.debug("Screenshot capture skipped: %s", ss_ex)
 
-            # Post-navigation redirect validation!
-            current_url = page.url
-            validate_url(current_url, allowed_domains=approved_scope.get("allowed_domains"), allow_local=self.allow_local)
-            outcome["url"] = current_url
-            try:
-                outcome["title"] = await page.title()
-            except Exception:
-                outcome["title"] = ""
-            outcome["status_code"] = response.status if response else 200
+            await self.emit_event(
+                task_id=task_id,
+                event_type=BrowserTaskEventType.STEP_COMPLETED,
+                message=f"Step {step_index} completed: {decision.thought}",
+                step_index=step_index,
+                payload=outcome,
+            )
 
-        elif action_type == "inspect":
-            outcome["url"] = page.url
-            outcome["title"] = await page.title()
-
-        elif action_type == "read_text":
-            selector = action.selector or "body"
-            text_content = await page.text_content(selector, timeout=timeout_ms)
-            sanitized = sanitize_page_text(text_content)
-
-            # Prompt injection defense audit
-            is_injection, warning = detect_prompt_injection(sanitized)
-            if is_injection:
-                outcome["injection_warning"] = warning
-                outcome["text_preview"] = "[Untrusted content sanitized - potential prompt injection detected]"
-            else:
-                outcome["text_preview"] = sanitized[:300]
-            outcome["selector"] = selector
-
-        elif action_type == "click":
-            selector = action.selector
-            await page.click(selector, timeout=timeout_ms)
-            # Revalidate URL after click in case navigation occurred
-            validate_url(page.url, allowed_domains=approved_scope.get("allowed_domains"), allow_local=self.allow_local)
-            outcome["selector"] = selector
-            outcome["current_url"] = page.url
-
-        elif action_type == "type_text":
-            selector = action.selector
-            await page.fill(selector, action.text or "", timeout=timeout_ms)
-            outcome["selector"] = selector
-            outcome["typed_characters"] = len(action.text or "")
-
-        elif action_type == "select_option":
-            selector = action.selector
-            val = action.value or action.text or ""
-            await page.select_option(selector, val, timeout=timeout_ms)
-            outcome["selector"] = selector
-            outcome["value"] = val
-
-        elif action_type == "press_key":
-            key_name = action.key or action.text or "Enter"
-            if action.selector:
-                await page.press(action.selector, key_name, timeout=timeout_ms)
-            else:
-                await page.keyboard.press(key_name)
-            outcome["key"] = key_name
-
-        elif action_type == "scroll":
-            direction = (action.direction or "down").lower()
-            amount = action.amount or 500
-            dy = amount if direction == "down" else -amount
-            await page.evaluate(f"window.scrollBy(0, {dy})")
-            outcome["direction"] = direction
-            outcome["amount"] = amount
-
-        elif action_type == "wait_for":
-            condition = action.condition or "domcontentloaded"
-            try:
-                if condition in ("load", "domcontentloaded", "networkidle"):
-                    await page.wait_for_load_state(condition, timeout=timeout_ms)
-                elif action.selector:
-                    await page.wait_for_selector(action.selector, timeout=timeout_ms)
-            except Exception as wait_err:
-                if page.url and "about:blank" not in page.url:
-                    outcome["settled_note"] = f"Wait condition '{condition}' settled with active document."
-                else:
-                    raise wait_err
-            outcome["condition"] = condition
-
-        elif action_type == "screenshot":
-            screenshot_bytes = await page.screenshot(type="png", full_page=False)
-            b64_str = base64.b64encode(screenshot_bytes).decode("ascii")
-            outcome["screenshot_base64"] = b64_str[:100] + "...[truncated]"
-
-        return outcome
+        return f"Autonomous reasoning completed across {len(evidence)} observed steps."
 
     async def _verify_final_browser_state(self, page: Any, goal: str, evidence: List[Dict[str, Any]]) -> str:
         """Verifies actual browser state before declaring task completion."""
@@ -721,6 +792,7 @@ def get_worker_runner(
     headless: bool = True,
     allow_local: bool = False,
     max_concurrency: int = 3,
+    model_gateway: Optional[Any] = None,
 ) -> BrowserWorkerRunner:
     """Returns singleton runner instance."""
     global _worker_instance
@@ -729,5 +801,6 @@ def get_worker_runner(
             headless=headless,
             allow_local=allow_local,
             max_concurrency=max_concurrency,
+            model_gateway=model_gateway,
         )
     return _worker_instance

@@ -38,6 +38,7 @@ from routers import (
     files_router,
     knowledge_router,
     orchestration_router,
+    projects_router,
     providers_router,
     reminders_router,
     research_router,
@@ -114,6 +115,7 @@ app.add_middleware(
 
 # Mount modular routers
 app.include_router(conversations_router)
+app.include_router(projects_router)
 app.include_router(chat_router)
 app.include_router(providers_router)
 app.include_router(browser_tasks_router)

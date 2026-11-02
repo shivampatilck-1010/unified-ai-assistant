@@ -137,7 +137,7 @@ Generate a structured, safe browser execution plan for the following task:
 Initial URL: {initial_url or "None specified"}
 Allowed domains: {allowed_domains or "Derive from URL"}
 
-Allowed action types ONLY: navigate, inspect, read_text, click, type_text, scroll, wait_for, screenshot.
+Allowed action types: navigate, inspect, read_text, click, double_click, right_click, hover, type_text, clear_input, select_option, check_box, uncheck_box, press_key, drag_and_drop, scroll, wait_for, screenshot, extract_table, visual_click.
 Do NOT output code or markdown prose. Output ONLY valid JSON conforming to this schema:
 {{
   "goal": "{task_description}",

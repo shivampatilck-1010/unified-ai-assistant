@@ -24,12 +24,30 @@ ALLOWED_ACTION_TYPES = {
     "inspect",
     "read_text",
     "click",
+    "double_click",
+    "right_click",
+    "hover",
     "type_text",
+    "clear_input",
     "select_option",
+    "check_box",
+    "uncheck_box",
     "press_key",
+    "drag_and_drop",
     "scroll",
     "wait_for",
     "screenshot",
+    "upload_file",
+    "download_file",
+    "new_tab",
+    "switch_tab",
+    "close_tab",
+    "go_back",
+    "go_forward",
+    "reload",
+    "extract_table",
+    "handle_dialog",
+    "visual_click",
 }
 
 # Permitted URL schemes
@@ -250,18 +268,50 @@ def validate_action(action: Any, approved_scope: Optional[Dict[str, Any]] = None
         url = getattr(action, "url", None) or (action.get("url") if isinstance(action, dict) else None)
         validate_url(url, allowed_domains=scope.get("allowed_domains"), allow_local=allow_local)
 
-    elif action_type in ("click", "type_text", "read_text", "select_option"):
+    elif action_type in (
+        "click", "double_click", "right_click", "hover", "type_text",
+        "clear_input", "read_text", "select_option", "check_box", "uncheck_box"
+    ):
         selector = getattr(action, "selector", None) or (action.get("selector") if isinstance(action, dict) else None)
-        if not selector or not isinstance(selector, str):
-            raise PolicyViolationError(f"Action '{action_type}' requires a non-empty CSS or text selector.")
-        # Reject raw JavaScript execution attempts inside selectors
-        if re.search(r"(javascript:|eval\(|<script|Function\()", selector, re.IGNORECASE):
-            raise PolicyViolationError("Potentially dangerous script pattern detected in element locator.")
+        elem_idx = getattr(action, "element_index", None) or (action.get("element_index") if isinstance(action, dict) else None)
+        if not selector and elem_idx is None:
+            raise PolicyViolationError(f"Action '{action_type}' requires a non-empty CSS or text selector or element_index.")
+        if selector and isinstance(selector, str):
+            # Reject raw JavaScript execution attempts inside selectors
+            if re.search(r"(javascript:|eval\(|<script|Function\()", selector, re.IGNORECASE):
+                raise PolicyViolationError("Potentially dangerous script pattern detected in element locator.")
 
     elif action_type == "type_text":
         text = getattr(action, "text", None) or (action.get("text") if isinstance(action, dict) else None)
         if text is None:
             raise PolicyViolationError("Action 'type_text' requires a 'text' parameter.")
+
+    elif action_type == "drag_and_drop":
+        source = getattr(action, "selector", None) or (action.get("selector") if isinstance(action, dict) else None)
+        target = getattr(action, "target_selector", None) or (action.get("target_selector") if isinstance(action, dict) else None)
+        if not source or not target:
+            raise PolicyViolationError("Action 'drag_and_drop' requires both 'selector' and 'target_selector'.")
+
+    elif action_type == "visual_click":
+        cx = getattr(action, "coordinate_x", None) or (action.get("coordinate_x") if isinstance(action, dict) else None)
+        cy = getattr(action, "coordinate_y", None) or (action.get("coordinate_y") if isinstance(action, dict) else None)
+        if cx is None or cy is None:
+            raise PolicyViolationError("Action 'visual_click' requires 'coordinate_x' and 'coordinate_y'.")
+
+    elif action_type == "upload_file":
+        fpath = getattr(action, "file_path", None) or (action.get("file_path") if isinstance(action, dict) else None)
+        if not fpath:
+            raise PolicyViolationError("Action 'upload_file' requires a valid 'file_path'.")
+
+    elif action_type in ("switch_tab", "close_tab"):
+        tab_idx = getattr(action, "tab_index", None) or (action.get("tab_index") if isinstance(action, dict) else None)
+        if tab_idx is not None and not isinstance(tab_idx, int):
+            raise PolicyViolationError(f"Action '{action_type}' requires integer 'tab_index'.")
+
+    elif action_type == "handle_dialog":
+        d_act = getattr(action, "dialog_action", None) or (action.get("dialog_action") if isinstance(action, dict) else None)
+        if d_act not in ("accept", "dismiss"):
+            raise PolicyViolationError("Action 'handle_dialog' requires 'dialog_action' to be 'accept' or 'dismiss'.")
 
     elif action_type == "press_key":
         key = getattr(action, "key", None) or getattr(action, "text", None) or (
@@ -290,7 +340,10 @@ def is_consequential_action(action: Any, task_goal: str = "") -> Tuple[bool, Opt
         action_type = action_type.value
 
     # Routine read-only or navigation actions are non-consequential unless pre-flagged
-    if action_type in ("navigate", "inspect", "read_text", "scroll", "wait_for"):
+    if action_type in (
+        "navigate", "inspect", "read_text", "scroll", "wait_for", "screenshot",
+        "extract_table", "switch_tab", "close_tab", "go_back", "go_forward", "reload"
+    ):
         return False, None
 
     # For mutating actions (click, type_text), analyze selector and input text

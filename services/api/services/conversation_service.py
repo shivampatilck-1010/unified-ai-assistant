@@ -28,12 +28,14 @@ class ConversationService:
         db: AsyncSession,
         owner_id: str,
         title: str = "New conversation",
+        project_id: Optional[str] = None,
     ) -> ConversationSummary:
         now = utc_now()
         conv = Conversation(
             id=str(uuid.uuid4()),
             owner_id=owner_id,
             title=title.strip() or "New conversation",
+            project_id=project_id,
             created_at=now,
             updated_at=now,
             expires_at=now + timedelta(hours=72),
@@ -46,6 +48,7 @@ class ConversationService:
             id=conv.id,
             owner_id=conv.owner_id,
             title=conv.title,
+            project_id=conv.project_id,
             created_at=conv.created_at,
             updated_at=conv.updated_at,
             message_count=0,
@@ -57,12 +60,15 @@ class ConversationService:
         owner_id: str,
         limit: int = 50,
         offset: int = 0,
+        project_id: Optional[str] = None,
     ) -> Tuple[List[ConversationSummary], int]:
         # Count total
         count_stmt = (
             select(func.count(Conversation.id))
             .where(Conversation.owner_id == owner_id)
         )
+        if project_id is not None:
+            count_stmt = count_stmt.where(Conversation.project_id == project_id)
         total_res = await db.execute(count_stmt)
         total = total_res.scalar_one_or_none() or 0
 
@@ -74,7 +80,12 @@ class ConversationService:
             )
             .outerjoin(Message, Message.conversation_id == Conversation.id)
             .where(Conversation.owner_id == owner_id)
-            .group_by(Conversation.id)
+        )
+        if project_id is not None:
+            stmt = stmt.where(Conversation.project_id == project_id)
+
+        stmt = (
+            stmt.group_by(Conversation.id)
             .order_by(Conversation.updated_at.desc())
             .limit(limit)
             .offset(offset)
@@ -87,6 +98,7 @@ class ConversationService:
                 id=conv.id,
                 owner_id=conv.owner_id,
                 title=conv.title,
+                project_id=conv.project_id,
                 created_at=conv.created_at,
                 updated_at=conv.updated_at,
                 message_count=msg_count,
@@ -134,6 +146,7 @@ class ConversationService:
             id=conv.id,
             owner_id=conv.owner_id,
             title=conv.title,
+            project_id=conv.project_id,
             created_at=conv.created_at,
             updated_at=conv.updated_at,
             messages=messages_resp,
@@ -145,19 +158,24 @@ class ConversationService:
         conversation_id: str,
         owner_id: str,
         title: str,
+        project_id: Optional[str] = None,
     ) -> Optional[ConversationSummary]:
         now = utc_now()
+        values: dict = {
+            "title": title.strip(),
+            "updated_at": now,
+            "expires_at": now + timedelta(hours=72),
+        }
+        if project_id is not None:
+            values["project_id"] = project_id
+
         stmt = (
             update(Conversation)
             .where(
                 Conversation.id == conversation_id,
                 Conversation.owner_id == owner_id,
             )
-            .values(
-                title=title.strip(),
-                updated_at=now,
-                expires_at=now + timedelta(hours=72),
-            )
+            .values(**values)
             .returning(Conversation)
         )
         result = await db.execute(stmt)
@@ -170,6 +188,7 @@ class ConversationService:
             id=conv.id,
             owner_id=conv.owner_id,
             title=conv.title,
+            project_id=conv.project_id,
             created_at=conv.created_at,
             updated_at=conv.updated_at,
         )

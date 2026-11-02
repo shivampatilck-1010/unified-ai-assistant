@@ -12,6 +12,7 @@ import { WifiSensingView } from './components/sensing/WifiSensingView';
 import { OrchestrationView } from './components/orchestration/OrchestrationView';
 import { SettingsView } from './components/settings/SettingsView';
 import { SearchView } from './components/search/SearchView';
+import { ProjectsView } from './components/projects/ProjectsView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
@@ -198,6 +199,18 @@ export default function App() {
                 setActiveSection('chat');
               }}
               onNewChat={handleNewChat}
+            />
+          ) : activeSection === 'projects' ? (
+            <ProjectsView
+              onSelectConversation={(id) => {
+                handleSelectConversation(id);
+                setActiveSection('chat');
+              }}
+              onOpenChatInProject={(_projId, convId) => {
+                handleSelectConversation(convId);
+                setActiveSection('chat');
+              }}
+              onBackToChat={() => setActiveSection('chat')}
             />
           ) : (
             <SectionPlaceholder

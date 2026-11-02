@@ -20,6 +20,11 @@ import type {
   FileMetadata,
   FileStatusResponse,
   HealthResponse,
+  ProjectCreateInput,
+  ProjectDetail,
+  ProjectListResponse,
+  ProjectSummary,
+  ProjectUpdateInput,
   KnowledgeAnswerRequest,
   KnowledgeAnswerResponse,
   KnowledgeSearchRequest,
@@ -74,7 +79,7 @@ export function getApiBase(): string {
   }
   const raw =
     import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD ? 'https://tears-combination-soldiers-donald.trycloudflare.com' : 'http://127.0.0.1:8000');
+    (import.meta.env.PROD ? 'https://gains-trees-greetings-finds.trycloudflare.com' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 
@@ -233,9 +238,16 @@ export async function fetchProviderStatus(signal?: AbortSignal): Promise<Unified
 export async function fetchConversations(
   limit: number = 50,
   offset: number = 0,
+  projectId?: string | null,
   signal?: AbortSignal
 ): Promise<ConversationListResponse> {
-  const response = await fetch(`${API_BASE}/api/conversations?limit=${limit}&offset=${offset}`, {
+  const url = new URL(`${API_BASE}/api/conversations`);
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('offset', String(offset));
+  if (projectId) {
+    url.searchParams.set('project_id', projectId);
+  }
+  const response = await fetch(url.toString(), {
     signal,
     headers: { Accept: 'application/json' },
   });
@@ -249,8 +261,13 @@ export async function fetchConversations(
 
 export async function createConversation(
   title?: string,
+  projectId?: string | null,
   signal?: AbortSignal
 ): Promise<ConversationSummary> {
+  const payload: Record<string, unknown> = {};
+  if (title) payload.title = title;
+  if (projectId) payload.project_id = projectId;
+
   const response = await fetch(`${API_BASE}/api/conversations`, {
     method: 'POST',
     signal,
@@ -258,7 +275,7 @@ export async function createConversation(
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify(title ? { title } : {}),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -336,6 +353,165 @@ export async function searchConversations(
   }
 
   return safeParseJson<SearchResponse>(response);
+}
+
+// Project & Workspace Endpoints (Phase 2)
+
+export async function fetchProjects(
+  limit: number = 50,
+  offset: number = 0,
+  signal?: AbortSignal
+): Promise<ProjectListResponse> {
+  const response = await fetch(`${API_BASE}/api/projects?limit=${limit}&offset=${offset}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load projects: ${response.status}`);
+  }
+
+  return safeParseJson<ProjectListResponse>(response);
+}
+
+export async function fetchProject(
+  id: string,
+  signal?: AbortSignal
+): Promise<ProjectDetail> {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}`, {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load project: ${response.status}`);
+  }
+
+  return safeParseJson<ProjectDetail>(response);
+}
+
+export async function createProject(
+  payload: ProjectCreateInput,
+  signal?: AbortSignal
+): Promise<ProjectSummary> {
+  const response = await fetch(`${API_BASE}/api/projects`, {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create project: ${response.status}`);
+  }
+
+  return safeParseJson<ProjectSummary>(response);
+}
+
+export async function updateProject(
+  id: string,
+  payload: ProjectUpdateInput,
+  signal?: AbortSignal
+): Promise<ProjectSummary> {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update project: ${response.status}`);
+  }
+
+  return safeParseJson<ProjectSummary>(response);
+}
+
+export async function deleteProject(
+  id: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok && response.status !== 204) {
+    throw new Error(`Failed to delete project: ${response.status}`);
+  }
+}
+
+export async function createProjectConversation(
+  projectId: string,
+  title?: string,
+  signal?: AbortSignal
+): Promise<ConversationSummary> {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/conversations`, {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(title ? { title } : {}),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create project conversation: ${response.status}`);
+  }
+
+  return safeParseJson<ConversationSummary>(response);
+}
+
+export async function pinFileToProject(
+  projectId: string,
+  fileId: string,
+  signal?: AbortSignal
+): Promise<ProjectDetail> {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/pin-file`, {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to pin file to project: ${response.status}`);
+  }
+
+  return safeParseJson<ProjectDetail>(response);
+}
+
+export async function unpinFileFromProject(
+  projectId: string,
+  fileId: string,
+  signal?: AbortSignal
+): Promise<ProjectDetail> {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectId)}/unpin-file`, {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to unpin file from project: ${response.status}`);
+  }
+
+  return safeParseJson<ProjectDetail>(response);
 }
 
 export function getStreamUrl(): string {

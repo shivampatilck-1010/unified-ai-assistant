@@ -75,6 +75,7 @@ async def create_tables() -> None:
             "browser_tasks",
             "research_jobs",
             "workflows",
+            "projects",
         ]
 
         for tbl in retention_tables:
@@ -106,6 +107,21 @@ async def create_tables() -> None:
             except Exception:
                 # Table might not exist yet or dialect-specific
                 pass
+
+        # Check for calibration_profile in wifi_sensor_configs
+        try:
+            if "sqlite" in settings.database_url:
+                cols_res = await conn.execute(text("PRAGMA table_info(conversations)"))
+                conv_cols = {row[1] for row in cols_res.fetchall()}
+            else:
+                cols_res = await conn.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = 'conversations'")
+                )
+                conv_cols = {row[0].lower() for row in cols_res.fetchall()}
+            if conv_cols and "project_id" not in conv_cols:
+                await conn.execute(text("ALTER TABLE conversations ADD COLUMN project_id VARCHAR(36)"))
+        except Exception:
+            pass
 
         # Check for calibration_profile in wifi_sensor_configs
         try:

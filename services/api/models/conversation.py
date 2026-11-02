@@ -56,6 +56,12 @@ class Conversation(Base):
         index=True,
         comment="Automatic data deletion timestamp (72 hours after last activity)",
     )
+    project_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        nullable=True,
+        index=True,
+        comment="Optional parent project boundary",
+    )
     extra_metadata: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,

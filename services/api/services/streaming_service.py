@@ -65,8 +65,23 @@ class StreamingService:
         else:
             # Create a new conversation
             new_title = derive_title(request.message)
-            created_conv = await ConversationService.create_conversation(db, owner_id, new_title)
+            created_conv = await ConversationService.create_conversation(
+                db, owner_id, new_title, project_id=request.project_id
+            )
             conversation_id = created_conv.id
+
+        # 1b. Check if conversation is bound to a Project Workspace
+        effective_project_id = request.project_id or (conv_detail.project_id if conv_detail else None)
+        project_obj = None
+        if effective_project_id:
+            try:
+                from services.project_service import ProjectService
+                project_obj = await ProjectService.get_project(db, effective_project_id, owner_id)
+                if project_obj and project_obj.pinned_file_ids and not request.selected_file_ids:
+                    request.selected_file_ids = project_obj.pinned_file_ids
+                    request.use_knowledge = True
+            except Exception as proj_err:
+                logger.warning("Could not load project context: %s", proj_err)
 
         # 2. Persist user message
         user_msg = await ConversationService.add_message(
@@ -502,6 +517,15 @@ INTERACTION GUIDELINES:
   * NEVER claim you cannot generate or display images.
 """
             conversation_history.insert(0, {"role": "system", "content": base_system_prompt})
+
+        # Inject Project Workspace instructions if active
+        if project_obj and project_obj.system_prompt:
+            project_scope_prompt = f"""=== PROJECT WORKSPACE CONTEXT: {project_obj.name} ===
+DOMAIN INSTRUCTIONS & PROJECT GUIDANCE:
+{project_obj.system_prompt}
+===================================================
+"""
+            conversation_history.insert(0, {"role": "system", "content": project_scope_prompt})
 
         # Detect natural-language browser agent request
         browser_task_id = None

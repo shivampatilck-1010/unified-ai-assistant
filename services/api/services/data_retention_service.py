@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.browser_task import BrowserTask
 from models.conversation import Conversation
 from models.file_record import FileRecord
+from models.project import Project
 from models.research import ResearchJob
 from models.wifi_sensing import WifiSensingEvent, WifiSensorConfig
 from models.workflow import Workflow
@@ -48,6 +49,7 @@ class DataRetentionService:
             "expired_browser_tasks": 0,
             "expired_research_jobs": 0,
             "expired_workflows": 0,
+            "expired_projects": 0,
         }
 
         # 1. Expired Conversations (cascades Messages)
@@ -125,6 +127,23 @@ class DataRetentionService:
             results["expired_workflows"] = del_wf_res.rowcount or 0
         except Exception as exc:
             logger.error("Error cleaning up expired workflows: %s", exc)
+
+        # 7. Expired Projects (unbind conversations first)
+        try:
+            exp_proj_stmt = select(Project.id).where(Project.expires_at <= now)
+            exp_proj_res = await db.execute(exp_proj_stmt)
+            exp_proj_ids = [row[0] for row in exp_proj_res.fetchall()]
+            if exp_proj_ids:
+                from sqlalchemy import update
+                await db.execute(
+                    update(Conversation)
+                    .where(Conversation.project_id.in_(exp_proj_ids))
+                    .values(project_id=None)
+                )
+                del_proj_res = await db.execute(delete(Project).where(Project.id.in_(exp_proj_ids)))
+                results["expired_projects"] = del_proj_res.rowcount or 0
+        except Exception as exc:
+            logger.error("Error cleaning up expired projects: %s", exc)
 
         await db.commit()
         logger.info(

@@ -5,6 +5,7 @@ from routers.conversations import router as conversations_router
 from routers.files import router as files_router
 from routers.knowledge import router as knowledge_router
 from routers.orchestration import router as orchestration_router
+from routers.projects import router as projects_router
 from routers.providers import router as providers_router
 from routers.reminders import router as reminders_router
 from routers.research import router as research_router
@@ -17,6 +18,7 @@ __all__ = [
     "chat_router",
     "conversations_router",
     "orchestration_router",
+    "projects_router",
     "providers_router",
     "tasks_router",
     "calendar_router",

@@ -25,19 +25,23 @@ async def create_conversation(
 ) -> ConversationSummary:
     """Create a new empty conversation for the current identity."""
     title = payload.title if payload and payload.title else "New conversation"
-    return await ConversationService.create_conversation(db, owner_id=user_id, title=title)
+    project_id = payload.project_id if payload else None
+    return await ConversationService.create_conversation(
+        db, owner_id=user_id, title=title, project_id=project_id
+    )
 
 
 @router.get("", response_model=ConversationListResponse)
 async def list_conversations(
     limit: int = Query(default=50, ge=1, le=100, description="Max items to return"),
     offset: int = Query(default=0, ge=0, description="Pagination offset"),
+    project_id: Optional[str] = Query(default=None, description="Optional filter by project ID"),
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ) -> ConversationListResponse:
     """List paginated conversations belonging to the current user."""
     items, total = await ConversationService.list_conversations(
-        db, owner_id=user_id, limit=limit, offset=offset
+        db, owner_id=user_id, limit=limit, offset=offset, project_id=project_id
     )
     return ConversationListResponse(items=items, total=total, limit=limit, offset=offset)
 

@@ -1,0 +1,182 @@
+{
+  "headings": [
+    "01. Writing Complex Business Case Studies",
+    "Course Lessons",
+    "01. Developing a Comprehensive Case Study on a Business Turnaround",
+    "02. Analyzing a Failed Business Strategy",
+    "03. Comparing Two Market Leaders in a Case Study",
+    "04. Assessing the Impact of a Major Business Merger",
+    "05. Investigating a Successful Product Launch",
+    "06. Analyzing a Company�s Ethical Dilemma",
+    "07. Evaluating the Effects of Digital Transformation on an Industry",
+    "08. Writing a Case Study on Crisis Management",
+    "09. Examining a Company�s Customer Retention Strategy",
+    "10. Assessing a Corporate Social Responsibility (CSR) Initiative",
+    "11. Exploring a Business Pivot Strategy",
+    "12. Evaluating the Role of Leadership in Business Success",
+    "13. Writing a Case Study on Employee Motivation Techniques",
+    "14. Exploring the Role of Innovation in Competitive Advantage",
+    "15. Investigating the Impact of AI in Business Processes",
+    "Need Help?",
+    "Practice now unlocks in 3 steps"
+  ],
+  "buttons": [
+    {
+      "text": "2",
+      "className": "flex items-center gap-1 sm:gap-2 bg-base-200 text-base-content/70 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full border-0 cursor-pointer hover:bg-base-300 transition-colors",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "22,600\n+100",
+      "className": "flex items-center gap-1 sm:gap-2 bg-base-200 text-base-content/70 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-full border-0 cursor-pointer hover:bg-base-300 transition-colors",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "4",
+      "className": "relative flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-base-200 text-base-content/70 border-0 cursor-pointer hover:bg-base-300 transition-colors",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "My Account",
+      "className": "btn btn-ghost gap-2",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "How unlocking works",
+      "className": "fe-shine btn btn-primary rounded-full mt-4 h-10 min-h-10 pl-1.5 pr-4 gap-2 border-0 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 hover:scale-[1.03] active:scale-[0.98] transition-all duration-200 ng-star-inserted",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Unlock Now",
+      "className": "btn btn-xs btn-ghost text-base-content/50 gap-1",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Got it!",
+      "className": "btn btn-accent rounded-full px-8 font-bold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "close",
+      "className": "",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Show me how",
+      "className": "btn btn-primary border-0 shadow-md w-full max-w-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 ng-star-inserted",
+      "disabled": false,
+      "tag": "button"
+    },
+    {
+      "text": "Skip for now",
+      "className": "btn btn-ghost btn-sm text-base-content/70 ng-star-inserted",
+      "disabled": false,
+      "tag": "button"
+    }
+  ],
+  "activities": [],
+  "progress": [
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked",
+    "Locked"
+  ],
+  "options": [],
+  "inputs": []
+}

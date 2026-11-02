@@ -43,6 +43,7 @@ export interface ChatRequest {
   use_research?: boolean;
   research_depth?: 'quick' | 'standard' | 'deep' | string;
   use_orchestration?: boolean;
+  project_id?: string | null;
 }
 
 export interface HealthResponse {
@@ -97,6 +98,7 @@ export interface ConversationSummary {
   id: string;
   owner_id: string;
   title: string;
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
   message_count?: number;
@@ -113,6 +115,7 @@ export interface ConversationDetail {
   id: string;
   owner_id: string;
   title: string;
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
   messages: ChatMessage[];
@@ -122,6 +125,7 @@ export interface ConversationDetail {
 export interface Conversation {
   id: string;
   title: string;
+  project_id?: string | null;
   messages: ChatMessage[];
   createdAt?: number;
   updatedAt?: number;
@@ -145,6 +149,61 @@ export interface SearchResponse {
   total: number;
 }
 
+// Project & Workspace Types (Phase 2)
+
+export interface PinnedFileInfo {
+  id: string;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
+}
+
+export interface ProjectSummary {
+  id: string;
+  owner_id: string;
+  name: string;
+  description?: string | null;
+  system_prompt?: string | null;
+  icon: string;
+  color: string;
+  conversation_count: number;
+  pinned_file_count: number;
+  pinned_file_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  conversations: ConversationSummary[];
+  pinned_files: PinnedFileInfo[];
+}
+
+export interface ProjectListResponse {
+  items: ProjectSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ProjectCreateInput {
+  name: string;
+  description?: string;
+  system_prompt?: string;
+  icon?: string;
+  color?: string;
+  pinned_file_ids?: string[];
+}
+
+export interface ProjectUpdateInput {
+  name?: string;
+  description?: string;
+  system_prompt?: string;
+  icon?: string;
+  color?: string;
+  pinned_file_ids?: string[];
+}
+
 // Browser Agent Task & Worker Types (Phase 3)
 
 export type BrowserActionType =
@@ -152,12 +211,30 @@ export type BrowserActionType =
   | 'inspect'
   | 'read_text'
   | 'click'
+  | 'double_click'
+  | 'right_click'
+  | 'hover'
   | 'type_text'
+  | 'clear_input'
   | 'select_option'
+  | 'check_box'
+  | 'uncheck_box'
   | 'press_key'
+  | 'drag_and_drop'
   | 'scroll'
   | 'wait_for'
-  | 'screenshot';
+  | 'screenshot'
+  | 'upload_file'
+  | 'download_file'
+  | 'new_tab'
+  | 'switch_tab'
+  | 'close_tab'
+  | 'go_back'
+  | 'go_forward'
+  | 'reload'
+  | 'extract_table'
+  | 'handle_dialog'
+  | 'visual_click';
 
 export type BrowserTaskStatus =
   | 'pending'
@@ -174,12 +251,21 @@ export interface BrowserAction {
   url?: string | null;
   selector?: string | null;
   text?: string | null;
+  key?: string | null;
+  value?: string | null;
   direction?: string | null;
   amount?: number | null;
   condition?: string | null;
   timeout_ms?: number | null;
   is_consequential?: boolean;
   consequential_reason?: string | null;
+  target_selector?: string | null;
+  file_path?: string | null;
+  tab_index?: number | null;
+  coordinate_x?: number | null;
+  coordinate_y?: number | null;
+  dialog_action?: string | null;
+  element_index?: number | null;
 }
 
 export interface BrowserPlanStep {

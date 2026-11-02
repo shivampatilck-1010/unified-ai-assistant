@@ -6,10 +6,12 @@ from schemas.message import MessageResponse
 
 class ConversationCreate(BaseModel):
     title: Optional[str] = Field(default="New conversation", max_length=255, description="Initial conversation title")
+    project_id: Optional[str] = Field(default=None, max_length=36, description="Optional parent project ID")
 
 
 class ConversationUpdate(BaseModel):
     title: str = Field(min_length=1, max_length=255, description="Updated conversation title")
+    project_id: Optional[str] = Field(default=None, max_length=36, description="Optional parent project ID")
 
 
 class ConversationSummary(BaseModel):
@@ -18,6 +20,7 @@ class ConversationSummary(BaseModel):
     id: str
     owner_id: str
     title: str
+    project_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     message_count: Optional[int] = 0
@@ -29,6 +32,7 @@ class ConversationDetail(BaseModel):
     id: str
     owner_id: str
     title: str
+    project_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     messages: List[MessageResponse] = Field(default_factory=list)
