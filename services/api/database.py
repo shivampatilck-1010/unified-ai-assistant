@@ -139,3 +139,27 @@ async def create_tables() -> None:
                 )
         except Exception:
             pass
+
+        # Check for Phase 2 autonomous execution columns in browser_tasks
+        try:
+            if "sqlite" in settings.database_url:
+                cols_res = await conn.execute(text("PRAGMA table_info(browser_tasks)"))
+                bt_cols = {row[1] for row in cols_res.fetchall()}
+            else:
+                cols_res = await conn.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = 'browser_tasks'")
+                )
+                bt_cols = {row[0].lower() for row in cols_res.fetchall()}
+
+            phase2_cols = [
+                ("checkpoints", "JSON DEFAULT '[]'"),
+                ("verification_status", "VARCHAR(32) DEFAULT 'UNVERIFIED'"),
+                ("assigned_agent", "VARCHAR(64) DEFAULT 'browser_execution_agent'"),
+                ("stages", "JSON DEFAULT '[]'"),
+                ("downloaded_files", "JSON DEFAULT '[]'"),
+            ]
+            for col_name, col_def in phase2_cols:
+                if bt_cols and col_name not in bt_cols:
+                    await conn.execute(text(f"ALTER TABLE browser_tasks ADD COLUMN {col_name} {col_def}"))
+        except Exception:
+            pass

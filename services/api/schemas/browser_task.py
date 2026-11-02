@@ -66,6 +66,60 @@ class BrowserTaskEventType(str, Enum):
     TASK_PAUSED = "browser.task.paused"
     TASK_RESUMED = "browser.task.resumed"
     SESSION_CLOSED = "browser.session.closed"
+    # Phase 2 autonomous execution events
+    CHECKPOINT_CREATED = "browser.checkpoint.created"
+    SELF_CORRECTION_TRIGGERED = "browser.self_correction.triggered"
+    SELF_CORRECTION_SUCCEEDED = "browser.self_correction.succeeded"
+    FILE_DOWNLOADED = "browser.file.downloaded"
+    FILE_INSPECTED = "browser.file.inspected"
+    AGENT_ASSIGNED = "browser.agent.assigned"
+    VERIFICATION_COMPLETED = "browser.verification.completed"
+
+
+class VerificationStatus(str, Enum):
+    COMPLETED = "COMPLETED"
+    PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
+    FAILED = "FAILED"
+    WAITING_FOR_USER = "WAITING_FOR_USER"
+    UNVERIFIED = "UNVERIFIED"
+
+
+class BrowserTaskCheckpoint(BaseModel):
+    id: str
+    step_index: int
+    url: str
+    page_title: Optional[str] = None
+    dom_summary: Optional[str] = None
+    screenshot_thumbnail: Optional[str] = None
+    created_at: str
+
+
+class BrowserTaskStage(BaseModel):
+    id: str
+    name: str
+    description: str
+    status: str = "pending"  # pending, in_progress, completed, failed
+    subtasks: List[str] = Field(default_factory=list)
+
+
+class DownloadedFileMetadata(BaseModel):
+    id: str
+    filename: str
+    file_path: str
+    file_size_bytes: int
+    mime_type: str
+    summary: Optional[str] = None
+    extracted_text: Optional[str] = None
+    created_at: str
+
+
+class BrowserTaskResumeRequest(BaseModel):
+    checkpoint_id: Optional[str] = None
+    override_instruction: Optional[str] = None
+
+
+class BrowserTaskRetryRequest(BaseModel):
+    reset_to_checkpoint: bool = True
 
 
 class BrowserAction(BaseModel):
@@ -159,6 +213,13 @@ class BrowserTaskResponse(BaseModel):
     error_message: Optional[str] = None
     cancellation_reason: Optional[str] = None
     evidence: Optional[List[Dict[str, Any]]] = None
+    checkpoints: Optional[List[Dict[str, Any]]] = None
+    verification_status: Optional[str] = "UNVERIFIED"
+    assigned_agent: Optional[str] = "browser_execution_agent"
+    stages: Optional[List[Dict[str, Any]]] = None
+    downloaded_files: Optional[List[Dict[str, Any]]] = None
+    retry_count: Optional[int] = 0
+    max_retries: Optional[int] = 3
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

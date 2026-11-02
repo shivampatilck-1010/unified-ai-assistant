@@ -100,6 +100,36 @@ class BrowserTask(Base):
         default=list,
         comment="Visited URLs, observed elements, screenshots",
     )
+    checkpoints: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+        comment="Saved execution checkpoints for task resumption after interruption",
+    )
+    verification_status: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        nullable=True,
+        default="UNVERIFIED",
+        comment="COMPLETED, PARTIALLY_COMPLETED, FAILED, WAITING_FOR_USER, UNVERIFIED",
+    )
+    assigned_agent: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        default="browser_execution_agent",
+        comment="Specialized agent currently owning execution",
+    )
+    stages: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+        comment="Structured multi-stage task breakdown",
+    )
+    downloaded_files: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list,
+        comment="Metadata of files downloaded or extracted during task execution",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

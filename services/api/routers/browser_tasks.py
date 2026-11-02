@@ -24,6 +24,8 @@ from schemas.browser_task import (
     BrowserTaskEventResponse,
     BrowserTaskListResponse,
     BrowserTaskResponse,
+    BrowserTaskResumeRequest,
+    BrowserTaskRetryRequest,
     WorkerStatusResponse,
 )
 from services.browser_task_service import BrowserTaskService
@@ -161,13 +163,30 @@ async def pause_browser_task(
 @router.post("/tasks/{task_id}/resume", response_model=BrowserTaskResponse)
 async def resume_browser_task(
     task_id: str,
+    req: Optional[BrowserTaskResumeRequest] = None,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     runner: BrowserWorkerRunner = Depends(get_runner),
 ):
-    """Resumes execution of a paused browser task."""
+    """Resumes execution of a paused or interrupted browser task."""
     svc = BrowserTaskService(db=db)
     return await svc.resume_task(user_id=user_id, task_id=task_id, runner=runner)
+
+
+@router.post("/tasks/{task_id}/retry", response_model=BrowserTaskResponse)
+async def retry_browser_task(
+    task_id: str,
+    req: Optional[BrowserTaskRetryRequest] = None,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    runner: BrowserWorkerRunner = Depends(get_runner),
+):
+    """Retries a failed browser task from its last checkpoint or initial step."""
+    reset_to_ckpt = req.reset_to_checkpoint if req else True
+    svc = BrowserTaskService(db=db)
+    return await svc.retry_task(
+        user_id=user_id, task_id=task_id, runner=runner, reset_to_checkpoint=reset_to_ckpt
+    )
 
 
 @router.get("/tasks/{task_id}/screenshot")

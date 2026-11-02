@@ -30,6 +30,18 @@ from browser_session import BrowserSessionManager
 from perception import extract_page_perception
 from actions import UniversalActionExecutor
 from reasoning import UniversalReasoningEngine
+from self_correction import SelfCorrectionEngine
+from file_intelligence import FileIntelligenceEngine
+
+try:
+    from services.orchestration.multi_agent import MultiAgentOrchestrator, AgentRole, VerificationVerdict
+except ImportError:
+    import sys
+    from pathlib import Path
+    _api_dir = str(Path(__file__).resolve().parent.parent / "api" / "services")
+    if _api_dir not in sys.path:
+        sys.path.insert(0, _api_dir)
+    from orchestration.multi_agent import MultiAgentOrchestrator, AgentRole, VerificationVerdict
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +74,9 @@ class BrowserWorkerRunner:
         self.session_manager = BrowserSessionManager(headless=headless, allow_local=allow_local)
         self.action_executor = UniversalActionExecutor(allow_local=allow_local)
         self.reasoning_engine = UniversalReasoningEngine(model_gateway=self.model_gateway)
+        self.self_correction = SelfCorrectionEngine(max_retries_per_step=3)
+        self.file_intel = FileIntelligenceEngine()
+        self.orchestrator = MultiAgentOrchestrator(model_gateway=self.model_gateway)
 
         # In-memory coordination
         self.active_tasks: Set[str] = set()
@@ -86,6 +101,86 @@ class BrowserWorkerRunner:
             ev.set()
             return True
         return False
+
+    async def _create_checkpoint(self, task_id: str, step_index: int, page: Any, context: Any) -> Dict[str, Any]:
+        """Captures persistent checkpoint (DOM snippet, URL, title, cookies) for safe resumption."""
+        try:
+            current_url = page.url or ""
+            title = await page.title() if page.url else ""
+            dom_snippet = await page.evaluate("() => document.body ? document.body.innerText.slice(0, 300) : ''")
+            cookies = await context.cookies()
+            checkpoint = {
+                "id": f"ckpt_{uuid.uuid4().hex[:8]}",
+                "step_index": step_index,
+                "url": current_url,
+                "page_title": title,
+                "dom_summary": dom_snippet,
+                "cookie_count": len(cookies),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            async with async_session_factory() as session:
+                async with session.begin():
+                    t = await session.get(BrowserTask, task_id)
+                    if t:
+                        ckpts = list(t.checkpoints or [])
+                        ckpts.append(checkpoint)
+                        t.checkpoints = ckpts
+            await self.emit_event(
+                task_id=task_id,
+                event_type=BrowserTaskEventType.CHECKPOINT_CREATED,
+                message=f"Checkpoint saved at step {step_index}: {title} ({current_url})",
+                step_index=step_index,
+                payload=checkpoint,
+            )
+            return checkpoint
+        except Exception as e:
+            logger.debug("Checkpoint creation skipped: %s", e)
+            return {}
+
+    async def resume_interrupted_task(self, task_id: str, checkpoint_id: Optional[str] = None) -> bool:
+        """Resumes an interrupted or paused task from its latest valid checkpoint."""
+        async with async_session_factory() as session:
+            async with session.begin():
+                t = await session.get(BrowserTask, task_id)
+                if not t:
+                    return False
+                t.status = BrowserTaskStatus.RUNNING.value
+                t.claimed_by_worker = None
+                if checkpoint_id and t.checkpoints:
+                    target_ckpt = next((c for c in t.checkpoints if c.get("id") == checkpoint_id), None)
+                    if target_ckpt:
+                        t.current_step = target_ckpt.get("step_index", 0)
+
+        await self.emit_event(
+            task_id=task_id,
+            event_type=BrowserTaskEventType.TASK_RESUMED,
+            message=f"Task resumed from checkpoint {checkpoint_id or 'latest'}.",
+        )
+        asyncio.create_task(self.execute_task(task_id))
+        return True
+
+    async def retry_failed_task(self, task_id: str, reset_to_checkpoint: bool = True) -> bool:
+        """Retries a failed task from the last valid checkpoint."""
+        async with async_session_factory() as session:
+            async with session.begin():
+                t = await session.get(BrowserTask, task_id)
+                if not t:
+                    return False
+                t.retry_count = (t.retry_count or 0) + 1
+                t.status = BrowserTaskStatus.RUNNING.value
+                t.error_message = None
+                t.claimed_by_worker = None
+                if reset_to_checkpoint and t.checkpoints:
+                    last_ckpt = t.checkpoints[-1]
+                    t.current_step = max(0, last_ckpt.get("step_index", 0) - 1)
+
+        await self.emit_event(
+            task_id=task_id,
+            event_type=BrowserTaskEventType.TASK_STARTED,
+            message=f"Task retry attempt {t.retry_count} initiated.",
+        )
+        asyncio.create_task(self.execute_task(task_id))
+        return True
 
     def get_latest_screenshot(self, task_id: str) -> Optional[str]:
         """Returns the latest captured compressed screenshot for a task."""
@@ -329,8 +424,19 @@ class BrowserWorkerRunner:
                     message=f"Autonomous browser worker [{self.worker_id}] initiated task: '{task_description}'",
                 )
 
+                # Initialize multi-agent stages
+                stages = self.orchestrator.create_initial_stages(task_description, initial_url=plan_dict.get("initial_url"))
+                async with async_session_factory() as session:
+                    async with session.begin():
+                        t = await session.get(BrowserTask, task_id)
+                        if t:
+                            if not t.stages:
+                                t.stages = stages
+                            t.assigned_agent = AgentRole.BROWSER_EXECUTION.value
+
                 steps_data = plan_dict.get("steps", [])
                 evidence: List[Dict[str, Any]] = []
+                downloaded_files: List[Dict[str, Any]] = []
 
                 # 3. Run browser session
                 async with self.session_manager.create_session() as (browser, context, page):
@@ -340,6 +446,9 @@ class BrowserWorkerRunner:
                             step_desc = step_dict.get("description", f"Step {step_index}")
                             raw_action = step_dict.get("action", {})
                             action = BrowserAction(**raw_action)
+
+                            # Checkpoint capture prior to action
+                            await self._create_checkpoint(task_id, step_index, page, context)
 
                             # Cancellation check
                             if task_id in self.cancelled_tasks:
@@ -448,13 +557,68 @@ class BrowserWorkerRunner:
                                     if t:
                                         t.current_step = step_index
 
-                            # Execute the action in Playwright
-                            step_outcome = await self._execute_single_action(
-                                page=page,
-                                action=action,
-                                approved_scope=approved_scope,
-                                context=context,
-                            )
+                            # Execute the action in Playwright with Self-Correction
+                            try:
+                                step_outcome = await self._execute_single_action(
+                                    page=page,
+                                    action=action,
+                                    approved_scope=approved_scope,
+                                    context=context,
+                                )
+                            except Exception as action_err:
+                                if isinstance(action_err, (PolicyViolationError, ConsequentialActionError)):
+                                    raise action_err
+                                await self.emit_event(
+                                    task_id=task_id,
+                                    event_type=BrowserTaskEventType.SELF_CORRECTION_TRIGGERED,
+                                    message=f"Action '{action.action_type.value}' encountered fault: {str(action_err)[:100]}. Diagnosing browser state...",
+                                    step_index=step_index,
+                                    payload={"failed_action": action.model_dump(), "error": str(action_err)},
+                                )
+                                diagnosis, recovery_meta = await self.self_correction.diagnose_and_recover(
+                                    page=page,
+                                    failed_action=action,
+                                    error=action_err,
+                                    task_id=task_id,
+                                    step_index=step_index,
+                                )
+                                if diagnosis.suggested_alternative:
+                                    alt = diagnosis.suggested_alternative
+                                    await self.emit_event(
+                                        task_id=task_id,
+                                        event_type=BrowserTaskEventType.ACTION_STARTED,
+                                        message=f"Self-correction executing alternative '{alt.action_type.value}' ({diagnosis.reason})",
+                                        step_index=step_index,
+                                        payload={"alternative_action": alt.model_dump(), "diagnosis": diagnosis.model_dump()},
+                                    )
+                                    step_outcome = await self._execute_single_action(
+                                        page=page,
+                                        action=alt,
+                                        approved_scope=approved_scope,
+                                        context=context,
+                                    )
+                                    step_outcome["self_corrected"] = True
+                                    step_outcome["diagnosis"] = diagnosis.model_dump()
+                                    await self.emit_event(
+                                        task_id=task_id,
+                                        event_type=BrowserTaskEventType.SELF_CORRECTION_SUCCEEDED,
+                                        message=f"Self-correction recovered step {step_index} successfully.",
+                                        step_index=step_index,
+                                        payload=step_outcome,
+                                    )
+                                else:
+                                    raise action_err
+
+                            # Track any downloaded file metadata
+                            if step_outcome.get("downloaded_file"):
+                                downloaded_files.append(step_outcome["downloaded_file"])
+                                await self.emit_event(
+                                    task_id=task_id,
+                                    event_type=BrowserTaskEventType.FILE_DOWNLOADED,
+                                    message=f"File artifact captured: {step_outcome['downloaded_file'].get('filename')}",
+                                    step_index=step_index,
+                                    payload=step_outcome["downloaded_file"],
+                                )
 
                             evidence.append(step_outcome)
 
@@ -495,7 +659,16 @@ class BrowserWorkerRunner:
                             evidence=evidence,
                         )
 
-                    # Mark completed
+                    # Verification Agent audit
+                    verdict = await self.orchestrator.verify_task_completion(
+                        task_description=task_description,
+                        evidence=evidence,
+                        downloaded_files=downloaded_files,
+                        final_summary=final_summary,
+                        has_error=False,
+                    )
+
+                    # Mark completed with verification status
                     async with async_session_factory() as session:
                         async with session.begin():
                             t = await session.get(BrowserTask, task_id)
@@ -503,13 +676,23 @@ class BrowserWorkerRunner:
                                 t.status = BrowserTaskStatus.COMPLETED.value
                                 t.result_summary = final_summary
                                 t.evidence = evidence
+                                t.downloaded_files = downloaded_files
+                                t.verification_status = verdict.status
+                                t.assigned_agent = AgentRole.VERIFICATION.value
                                 t.completed_at = utc_now()
+
+                    await self.emit_event(
+                        task_id=task_id,
+                        event_type=BrowserTaskEventType.VERIFICATION_COMPLETED,
+                        message=f"Evidence verification verdict: {verdict.status} (Score: {verdict.confidence_score:.2f}) - {verdict.reasoning}",
+                        payload=verdict.model_dump(),
+                    )
 
                     await self.emit_event(
                         task_id=task_id,
                         event_type=BrowserTaskEventType.TASK_COMPLETED,
                         message=f"Task completed successfully: {final_summary}",
-                        payload={"result_summary": final_summary, "evidence_count": len(evidence)},
+                        payload={"result_summary": final_summary, "evidence_count": len(evidence), "verification": verdict.model_dump()},
                     )
 
             except PolicyViolationError as pve:
@@ -520,6 +703,17 @@ class BrowserWorkerRunner:
                     retried = await self._handle_retry_or_fail(task_id, clean_err, "TRANSIENT_EXECUTION_ERROR")
                     if retried:
                         return
+                verdict = await self.orchestrator.verify_task_completion(
+                    task_description=task_description if "task_description" in locals() else "Browser Task",
+                    evidence=evidence if "evidence" in locals() else [],
+                    has_error=True,
+                    error_message=clean_err,
+                )
+                async with async_session_factory() as session:
+                    async with session.begin():
+                        t = await session.get(BrowserTask, task_id)
+                        if t:
+                            t.verification_status = verdict.status
                 await self._handle_failure(task_id, clean_err, "EXECUTION_ERROR")
 
             finally:

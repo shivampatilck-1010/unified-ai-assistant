@@ -317,6 +317,34 @@ export interface BrowserTask {
   error_message?: string | null;
   cancellation_reason?: string | null;
   evidence?: Array<Record<string, unknown>> | null;
+  checkpoints?: Array<{
+    id: string;
+    step_index: number;
+    url: string;
+    page_title?: string;
+    dom_summary?: string;
+    created_at: string;
+  }> | null;
+  verification_status?: 'COMPLETED' | 'PARTIALLY_COMPLETED' | 'FAILED' | 'WAITING_FOR_USER' | 'UNVERIFIED';
+  assigned_agent?: string;
+  stages?: Array<{
+    id: string;
+    name: string;
+    assigned_agent: string;
+    status: string;
+    subtasks: string[];
+  }> | null;
+  downloaded_files?: Array<{
+    id: string;
+    filename: string;
+    file_path: string;
+    file_size_bytes: number;
+    mime_type: string;
+    summary?: string;
+    extracted_text?: string;
+  }> | null;
+  retry_count?: number;
+  max_retries?: number;
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;

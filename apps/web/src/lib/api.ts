@@ -676,6 +676,23 @@ export async function resumeBrowserTask(taskId: string, signal?: AbortSignal): P
   return safeParseJson<BrowserTask>(response);
 }
 
+export async function retryBrowserTask(
+  taskId: string,
+  resetToCheckpoint: boolean = true,
+  signal?: AbortSignal
+): Promise<BrowserTask> {
+  const response = await fetch(`${API_BASE}/api/browser/tasks/${encodeURIComponent(taskId)}/retry`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ reset_to_checkpoint: resetToCheckpoint }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to retry task: ${response.status}`);
+  }
+  return safeParseJson<BrowserTask>(response);
+}
+
 export async function fetchBrowserTaskScreenshot(
   taskId: string,
   signal?: AbortSignal

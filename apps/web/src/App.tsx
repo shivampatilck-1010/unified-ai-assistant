@@ -1,21 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import type { NavigationSection, UnifiedProviderStatusResponse } from './types';
 import { useConversations } from './hooks/useConversations';
 import { useHealthCheck } from './hooks/useHealthCheck';
 import { fetchProviderStatus } from './lib/api';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
-import { BrowserAgentView } from './components/browser/BrowserAgentView';
-import { CalendarTasksView } from './components/calendar/CalendarTasksView';
-import { FilesKnowledgeView } from './components/files/FilesKnowledgeView';
-import { WifiSensingView } from './components/sensing/WifiSensingView';
-import { OrchestrationView } from './components/orchestration/OrchestrationView';
-import { SettingsView } from './components/settings/SettingsView';
-import { SearchView } from './components/search/SearchView';
-import { ProjectsView } from './components/projects/ProjectsView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import './App.css';
+
+// Code-split heavy views to reduce initial bundle payload
+const BrowserAgentView = lazy(() =>
+  import('./components/browser/BrowserAgentView').then((m) => ({ default: m.BrowserAgentView }))
+);
+const CalendarTasksView = lazy(() =>
+  import('./components/calendar/CalendarTasksView').then((m) => ({ default: m.CalendarTasksView }))
+);
+const FilesKnowledgeView = lazy(() =>
+  import('./components/files/FilesKnowledgeView').then((m) => ({ default: m.FilesKnowledgeView }))
+);
+const WifiSensingView = lazy(() =>
+  import('./components/sensing/WifiSensingView').then((m) => ({ default: m.WifiSensingView }))
+);
+const OrchestrationView = lazy(() =>
+  import('./components/orchestration/OrchestrationView').then((m) => ({ default: m.OrchestrationView }))
+);
+const SettingsView = lazy(() =>
+  import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView }))
+);
+const SearchView = lazy(() =>
+  import('./components/search/SearchView').then((m) => ({ default: m.SearchView }))
+);
+const ProjectsView = lazy(() =>
+  import('./components/projects/ProjectsView').then((m) => ({ default: m.ProjectsView }))
+);
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<NavigationSection>('chat');
@@ -164,61 +182,78 @@ export default function App() {
 
         {/* Dynamic Content */}
         <div className="app-content">
-          {activeSection === 'chat' ? (
-            <ChatView
-              messages={activeConversation?.messages ?? []}
-              onSend={sendMessage}
-              onRetry={retryMessage}
-              isStreaming={isStreaming}
-              onCancel={cancelStream}
-              onNewChat={handleNewChat}
-              availableModels={effectiveProviderStatus?.available_models ?? []}
-              selectedModelId={selectedModelId ?? effectiveProviderStatus?.active_model ?? null}
-              onSelectModel={setSelectedModelId}
-            />
-          ) : activeSection === 'browser-agent' ? (
-            <BrowserAgentView />
-          ) : activeSection === 'calendar' ? (
-            <CalendarTasksView />
-          ) : activeSection === 'files' ? (
-            <FilesKnowledgeView />
-          ) : activeSection === 'wifi-sensing' ? (
-            <WifiSensingView />
-          ) : activeSection === 'orchestration' ? (
-            <OrchestrationView />
-          ) : activeSection === 'settings' ? (
-            <SettingsView
-              providerStatus={effectiveProviderStatus}
-              onRefreshConversations={() => void refreshList()}
-            />
-          ) : activeSection === 'search' ? (
-            <SearchView
-              conversations={conversations}
-              onSelectConversation={(id) => {
-                handleSelectConversation(id);
-                setActiveSection('chat');
-              }}
-              onNewChat={handleNewChat}
-            />
-          ) : activeSection === 'projects' ? (
-            <ProjectsView
-              onSelectConversation={(id) => {
-                handleSelectConversation(id);
-                setActiveSection('chat');
-              }}
-              onOpenChatInProject={(_projId, convId) => {
-                handleSelectConversation(convId);
-                setActiveSection('chat');
-              }}
-              onBackToChat={() => setActiveSection('chat')}
-            />
-          ) : (
-            <SectionPlaceholder
-              section={activeSection}
-              onBackToChat={() => setActiveSection('chat')}
-              onSelectConversation={handleSelectConversation}
-            />
-          )}
+          <Suspense
+            fallback={
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  color: '#888',
+                  fontSize: '13px',
+                }}
+              >
+                <span>Loading view...</span>
+              </div>
+            }
+          >
+            {activeSection === 'chat' ? (
+              <ChatView
+                messages={activeConversation?.messages ?? []}
+                onSend={sendMessage}
+                onRetry={retryMessage}
+                isStreaming={isStreaming}
+                onCancel={cancelStream}
+                onNewChat={handleNewChat}
+                availableModels={effectiveProviderStatus?.available_models ?? []}
+                selectedModelId={selectedModelId ?? effectiveProviderStatus?.active_model ?? null}
+                onSelectModel={setSelectedModelId}
+              />
+            ) : activeSection === 'browser-agent' ? (
+              <BrowserAgentView />
+            ) : activeSection === 'calendar' ? (
+              <CalendarTasksView />
+            ) : activeSection === 'files' ? (
+              <FilesKnowledgeView />
+            ) : activeSection === 'wifi-sensing' ? (
+              <WifiSensingView />
+            ) : activeSection === 'orchestration' ? (
+              <OrchestrationView />
+            ) : activeSection === 'settings' ? (
+              <SettingsView
+                providerStatus={effectiveProviderStatus}
+                onRefreshConversations={() => void refreshList()}
+              />
+            ) : activeSection === 'search' ? (
+              <SearchView
+                conversations={conversations}
+                onSelectConversation={(id) => {
+                  handleSelectConversation(id);
+                  setActiveSection('chat');
+                }}
+                onNewChat={handleNewChat}
+              />
+            ) : activeSection === 'projects' ? (
+              <ProjectsView
+                onSelectConversation={(id) => {
+                  handleSelectConversation(id);
+                  setActiveSection('chat');
+                }}
+                onOpenChatInProject={(_projId, convId) => {
+                  handleSelectConversation(convId);
+                  setActiveSection('chat');
+                }}
+                onBackToChat={() => setActiveSection('chat')}
+              />
+            ) : (
+              <SectionPlaceholder
+                section={activeSection}
+                onBackToChat={() => setActiveSection('chat')}
+                onSelectConversation={handleSelectConversation}
+              />
+            )}
+          </Suspense>
         </div>
       </main>
     </div>

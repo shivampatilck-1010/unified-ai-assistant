@@ -209,6 +209,26 @@ class BrowserTaskService:
         await self.db.refresh(task)
         return task
 
+    async def retry_task(
+        self, user_id: str, task_id: str, runner: BrowserWorkerRunner, reset_to_checkpoint: bool = True
+    ) -> BrowserTask:
+        """Retries a failed or cancelled task from the last valid checkpoint."""
+        task = await self.get_task(user_id, task_id)
+        task.retry_count = (task.retry_count or 0) + 1
+        task.status = BrowserTaskStatus.RUNNING.value
+        task.error_message = None
+        task.cancellation_reason = None
+        task.claimed_by_worker = None
+        if reset_to_checkpoint and task.checkpoints:
+            last_ckpt = task.checkpoints[-1]
+            task.current_step = max(0, last_ckpt.get("step_index", 0) - 1)
+        await self.db.commit()
+        await self.db.refresh(task)
+
+        # Trigger execution in runner
+        asyncio.create_task(runner.execute_task(task_id))
+        return task
+
     async def get_latest_screenshot(self, user_id: str, task_id: str, runner: BrowserWorkerRunner) -> Dict[str, Any]:
         """Retrieves the latest captured screenshot frame for a task."""
         task = await self.get_task(user_id, task_id)

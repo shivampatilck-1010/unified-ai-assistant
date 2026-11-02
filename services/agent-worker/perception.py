@@ -59,6 +59,7 @@ class PagePerception:
     visible_text_snippet: str
     screenshot_base64: Optional[str] = None
     injection_warning: Optional[str] = None
+    accessibility_snapshot: Optional[Dict[str, Any]] = None
 
     def get_element_by_index(self, index: int) -> Optional[InteractiveElement]:
         for el in self.interactive_elements:
@@ -293,6 +294,13 @@ async def extract_page_perception(page: Any, capture_screenshot: bool = False) -
         except Exception:
             pass
 
+    # Accessibility tree snapshot
+    a11y_tree = None
+    try:
+        a11y_tree = await page.accessibility.snapshot()
+    except Exception:
+        pass
+
     return PagePerception(
         url=url,
         title=title,
@@ -303,4 +311,5 @@ async def extract_page_perception(page: Any, capture_screenshot: bool = False) -
         visible_text_snippet=sanitized_text,
         screenshot_base64=screenshot_b64,
         injection_warning=inj_warn if is_inj else None,
+        accessibility_snapshot=a11y_tree,
     )

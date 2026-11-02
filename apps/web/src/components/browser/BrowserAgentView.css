@@ -628,3 +628,253 @@
   font-size: 12px;
   color: #666;
 }
+
+/* Phase 2: Task Execution Center Extensions */
+.browser-agent__filter-ribbon {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.browser-agent__filter-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.browser-agent__filter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd;
+}
+
+.browser-agent__filter-pill--active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.browser-agent__agent-pill {
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #c084fc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: capitalize;
+}
+
+.browser-agent__verif-pill, .browser-agent__verif-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.browser-agent__verif-pill--completed, .browser-agent__verif-tag--completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.browser-agent__verif-pill--partially_completed, .browser-agent__verif-tag--partially_completed {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.browser-agent__verif-pill--failed, .browser-agent__verif-tag--failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.browser-agent__stages-ribbon {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.browser-agent__stages-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.browser-agent__stages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.browser-agent__stage-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.browser-agent__stage-card--completed {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.browser-agent__stage-card--in_progress {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.browser-agent__stage-name {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ddd;
+}
+
+.browser-agent__stage-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.browser-agent__stage-agent {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.browser-agent__checkpoints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.browser-agent__checkpoint-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.browser-agent__checkpoint-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.browser-agent__checkpoint-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.browser-agent__checkpoint-url {
+  font-size: 12px;
+  color: #eee;
+  display: block;
+}
+
+.browser-agent__checkpoint-title {
+  font-size: 11px;
+  color: #888;
+}
+
+.browser-agent__checkpoint-time {
+  font-size: 11px;
+  color: #666;
+}
+
+.browser-agent__files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.browser-agent__file-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.browser-agent__file-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #60a5fa;
+}
+
+.browser-agent__file-size {
+  font-size: 11px;
+  color: #888;
+}
+
+.browser-agent__file-summary {
+  font-size: 11px;
+  color: #ccc;
+  margin: 6px 0;
+}
+
+.browser-agent__file-preview {
+  font-size: 10px;
+  color: #888;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  border-radius: 4px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.browser-agent__evidence-tag--recovered {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.browser-agent__timeline-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.browser-agent__timeline-dot--browser-checkpoint-created { background: #8b5cf6; }
+.browser-agent__timeline-dot--browser-self_correction-triggered { background: #f59e0b; }
+.browser-agent__timeline-dot--browser-self_correction-succeeded { background: #10b981; }
+.browser-agent__timeline-dot--browser-file-downloaded { background: #06b6d4; }
+.browser-agent__timeline-dot--browser-verification-completed { background: #10b981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.6); }
+
+.browser-agent__btn--confirm {
+  background: #10b981;
+  color: #fff;
+}
+.browser-agent__btn--confirm:hover {
+  background: #059669;
+}

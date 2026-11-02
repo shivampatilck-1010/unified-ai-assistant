@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 from typing import Any, Dict, List, Optional
+from file_intelligence import FileIntelligenceEngine
 from policy import PolicyViolationError, validate_url
 
 logger = logging.getLogger(__name__)
@@ -10,8 +11,9 @@ logger = logging.getLogger(__name__)
 class UniversalActionExecutor:
     """Executes general-purpose Playwright browser actions across single or multi-tab contexts."""
 
-    def __init__(self, allow_local: bool = False):
+    def __init__(self, allow_local: bool = False, file_intel: Optional[FileIntelligenceEngine] = None):
         self.allow_local = allow_local
+        self.file_intel = file_intel or FileIntelligenceEngine()
 
     async def execute(
         self,
@@ -227,6 +229,28 @@ class UniversalActionExecutor:
             await page.set_input_files(selector, file_path, timeout=timeout_ms)
             outcome["selector"] = selector
             outcome["file_path"] = file_path
+
+        elif action_type == "download_file":
+            owner_id = scope.get("owner_id", "default_user")
+            target_url = getattr(action, "url", None) or (action.get("url") if isinstance(action, dict) else None)
+            try:
+                async with page.expect_download(timeout=max(timeout_ms, 20000)) as download_info:
+                    if selector:
+                        await page.click(selector, timeout=timeout_ms)
+                    elif target_url:
+                        await page.evaluate(f"window.location.href = '{target_url}'")
+                    else:
+                        # Fallback click current active link
+                        await page.click("a[download], a[href$='.pdf'], a[href$='.csv']", timeout=timeout_ms)
+                download = await download_info.value
+                download_meta = await self.file_intel.save_downloaded_file(download, owner_id=owner_id)
+                outcome["downloaded_file"] = download_meta
+                outcome["file_id"] = download_meta["id"]
+                outcome["filename"] = download_meta["filename"]
+            except Exception as dl_err:
+                logger.warning("Download expectation failed: %s", dl_err)
+                outcome["download_error"] = str(dl_err)
+                raise dl_err
 
         # 6. Waiting & Settle
         elif action_type == "wait_for":
