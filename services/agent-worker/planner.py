@@ -39,7 +39,7 @@ def generate_deterministic_plan(task_description: str, initial_url: Optional[str
                 action=BrowserAction(
                     action_type=BrowserActionType.NAVIGATE,
                     url=target_url,
-                    timeout_ms=15000,
+                    timeout_ms=30000,
                 ),
             )
         )

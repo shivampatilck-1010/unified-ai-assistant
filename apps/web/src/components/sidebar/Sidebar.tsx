@@ -204,7 +204,7 @@ export function Sidebar({
         </nav>
 
         {/* Conversation History */}
-        {!collapsed && activeSection === 'chat' && conversations.length > 0 && (
+        {!collapsed && conversations.length > 0 && (
           <div className="sidebar__history">
             <div className="sidebar__history-label">Recent conversations</div>
             <ul className="sidebar__history-list" role="list">

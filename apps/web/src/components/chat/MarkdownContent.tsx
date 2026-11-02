@@ -204,6 +204,34 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       // Flush any active list if we hit non-list line
       flushList();
 
+      // Markdown standalone image: ![alt](url)
+      const imgMatch = line.trim().match(/^!\[(.*?)\]\((https?:\/\/[^\s)]+)\)$/);
+      if (imgMatch) {
+        nodes.push(
+          <div key={`img-${nodes.length}`} className="md-image-container" style={{ margin: '12px 0' }}>
+            <img
+              src={imgMatch[2]}
+              alt={imgMatch[1] || 'AI Generated Image'}
+              className="md-image"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '460px',
+                borderRadius: '8px',
+                border: '1px solid #334155',
+                display: 'block',
+              }}
+              loading="lazy"
+            />
+            {imgMatch[1] && (
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', display: 'block' }}>
+                {imgMatch[1]}
+              </span>
+            )}
+          </div>
+        );
+        continue;
+      }
+
       // Headers
       if (line.startsWith('### ')) {
         nodes.push(<h4 key={`h4-${nodes.length}`} className="md-h4">{formatInline(line.slice(4))}</h4>);

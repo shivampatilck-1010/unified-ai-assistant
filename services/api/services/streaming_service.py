@@ -493,6 +493,13 @@ INTERACTION GUIDELINES:
   * Direct them to switch to the 'Browser Agent' tab in the left sidebar to enter the target URL/goal, or advise them to toggle the 'Orchestrate' button ON right above the chat so the assistant can automatically plan and execute multi-step browser actions.
   * You can also formulate and suggest the step-by-step browser plan for them to execute.
   * NEVER claim you have no browser capabilities or that the application cannot browse the web.
+- When a user asks you to generate, create, or render an image (e.g. "create best random image", "generate image of X", "draw Y"):
+  * Fulfill the request directly and enthusiastically!
+  * Formulate a vivid, high-fidelity descriptive visual prompt and embed the live generated image directly in your response using markdown:
+    ![Image Caption](https://image.pollinations.ai/prompt/{url_encoded_prompt}?width=1024&height=1024&nologo=true)
+    (Ensure spaces in the prompt URL parameter are properly replaced with %20).
+  * Include an engaging scene description alongside the embedded image.
+  * NEVER claim you cannot generate or display images.
 """
             conversation_history.insert(0, {"role": "system", "content": base_system_prompt})
 

@@ -487,7 +487,30 @@ class BrowserWorkerRunner:
         outcome: Dict[str, Any] = {"action": action_type}
 
         if action_type == "navigate":
-            response = await page.goto(action.url, timeout=timeout_ms, wait_until="load")
+            nav_timeout = max(timeout_ms, 30000)
+            try:
+                # Use "domcontentloaded" so single-page apps (SPAs) and heavy portals don't hang waiting for infinite trackers
+                response = await page.goto(action.url, timeout=nav_timeout, wait_until="domcontentloaded")
+            except Exception as goto_err:
+                err_str = str(goto_err).lower()
+                if "timeout" in err_str:
+                    try:
+                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    except Exception:
+                        pass
+                    if page.url and "about:blank" not in page.url:
+                        response = None
+                    else:
+                        raise goto_err
+                else:
+                    raise goto_err
+
+            # Brief stabilization window for client-side routing & hydration
+            try:
+                await page.wait_for_timeout(1500)
+            except Exception:
+                pass
+
             # Post-navigation redirect validation!
             current_url = page.url
             validate_url(current_url, allowed_domains=approved_scope.get("allowed_domains"), allow_local=self.allow_local)
