@@ -1,229 +1,343 @@
-# Unified AI Assistant
+<div align="center">
 
-A unified personal AI workspace combining conversational intelligence, server persistence, hosted AI model providers, an autonomous browser agent, calendar/task management, and non-intrusive Wi-Fi sensing in a single, cohesive interface.
+# 🌌 UNIFIED AI ASSISTANT
+### Complete Autonomous AI Operating Platform & Computer-Use Intelligence
 
----
+[![Production Live](https://img.shields.io/badge/Production-Live-success?style=for-the-badge&logo=cloudflarepages&logoColor=white&color=059669)](https://unified-ai-assistant.pages.dev)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/shivampatilck-1010/unified-ai-assistant)
+[![Author](https://img.shields.io/badge/Author-Shivam%20Patil-blue?style=for-the-badge&logo=github)](https://github.com/shivampatilck-1010)
+[![License](https://img.shields.io/badge/License-MIT-blueviolet?style=for-the-badge)](LICENSE)
 
-## Highlights
+<br/>
 
-* **Claude-Inspired Dark Chat Interface**: Minimalist, distraction-free environment featuring large serif typography for AI responses (Georgia 21px / line-height 1.6).
-* **Unified Workspace Sidebar**:
-  * 💬 **New Chat**: Clean conversation reset with dynamic model selection.
-  * 🔍 **Search**: Database-backed full-text search across titles and messages.
-  * 📁 **Projects**: Scoped workspaces with custom instructions and context.
-  * 🌐 **Browser Agent**: Autonomous web task execution with interactive step preview.
-  * 📅 **Calendar & Tasks**: Natural-language task creation, agenda, and reminders.
-  * 📚 **Files & Knowledge**: Uploaded documents, citations, and knowledge store.
-  * 📡 **Wi-Fi Sensing**: Ambient presence awareness and room activity state.
-  * ⚙️ **Settings**: Server-side model key management and preferences.
-* **Server Persistence & Dual Dialect**: SQLAlchemy 2.x and Alembic migrations supporting production PostgreSQL and local SQLite fallback.
-* **Unified Model Gateway**: Server-side client adapters for OpenAI, Anthropic, and Google Gemini with normalized error handling (`RATE_LIMIT_EXCEEDED`, `TIMEOUT`, `PROVIDER_UNAVAILABLE`, `AUTHENTICATION_FAILED`).
-* **Autonomous Browser Agent (Phase 3)**: Microsoft Playwright-powered background execution worker running in isolated ephemeral sessions without touching user everyday profiles. Features structured plan generation, strict action allowlists, SSRF/private IP blocking with post-navigation redirect revalidation, untrusted DOM prompt injection defense, consequential action confirmation gates, and real-time SSE progress streaming.
-* **Task & Calendar Engine (Phase 4)**: Internal task management with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving server restarts, and natural language task/event extraction via the ModelGateway with mandatory operator review and confirmation before database persistence.
-* **Files & Knowledge Engine (Phase 5)**: Secure private document storage outside public web routes, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
-* **Web Research & Browser Intelligence (Phase 6)**: Autonomous, source-grounded research investigations with provider-neutral search discovery, isolated Playwright evidence extraction, SSRF/private IP blocking with post-navigation redirect revalidation, DOM prompt injection defense, grounded synthesis with traceable citations (`[Web N: Title]` and Phase 5 document correlation `[Doc: filename, Page X]`), honest insufficient evidence reporting, Markdown report exports, and SSE chat streaming integration.
-* **Wi-Fi Sensing Service (Phase 7)**: Modular, consent-based environmental awareness subsystem. Features deterministic synthetic CSI simulation (`is_simulated = True`), honest hardware adapter reporting unavailability when specialized CSI capture NICs are absent, statistical presence and motion estimation with explicit `unknown` state for degraded data, tenant-isolated zone configurations, configurable retention policies with one-click purge, immutable audit trail, assistant tool orchestration integration, and dark-themed frontend monitor.
-* **Production Hardening & Cloud Browser Execution (Phase 8)**: Production-ready operational boundary featuring fail-closed HMAC-SHA256 JWT authentication, Playwright network egress interception aborting subresource SSRF and cloud metadata access (`169.254.169.254`), atomic conditional SQL task claiming with worker restart recovery, defensive security headers, sliding-window rate limiting, payload bounds (15MB), structured logging with automated secret scrubbing, deep readiness probe (`/ready`), multi-stage Dockerfiles for non-root API, Worker, and Web services, and complete operational disaster recovery runbooks.
-* **Unified AI Orchestration Engine (Phase 9)**: Autonomous coordination layer unifying Model Gateway, Knowledge Retrieval, Web Research, Browser Agent, Tasks/Calendar/Reminders, and Wi-Fi Sensing. Features ambiguity detection with clarification gates, rigid capability allowlisting, consequential action confirmation gates (pausing before persistent task/event creation), topological DAG dependency ordering with concurrent execution of independent safe steps via `asyncio.gather`, shared context variable interpolation (`{step_N.output.field}`), consolidated source provenance citations (`[Doc: filename, Page X]`, `[Web N: Title]`, `[Synthetic Observation: ... (Simulated)]`), optimistic plan versioning, dangling workflow recovery, real-time SSE streaming, and complete dark-mode Orchestration management workspace.
-* **Security First**: Hosted AI provider keys and database connection strings remain strictly server-side. Zero client-side API key exposure. Strict identity ownership boundaries enforce that users cannot read, mutate, or search conversations belonging to other identities.
-* **Modern Full-Stack Architecture**: React 19 + TypeScript + Vite frontend with a high-performance FastAPI backend.
+<a href="https://unified-ai-assistant.pages.dev">
+  <img src="apps/web/public/logo.png" width="180" height="180" alt="Unified AI Assistant - 3D Metallic Logo" style="filter: drop-shadow(0 0 24px rgba(129, 140, 248, 0.45));" />
+</a>
 
----
-
-## Directory Structure
+<p align="center">
+  <b>A general-purpose AI computer-use agent and autonomous operating platform that transforms natural-language objectives into verified, real-world digital execution.</b>
+</p>
 
 ```
-unified-ai-assistant/
-├── apps/
-│   ├── web/                    # React 19 + TypeScript + Vite frontend
-│   └── chrome-extension/       # Chrome extension for local browser bridge
-├── services/
-│   ├── api/                    # Core FastAPI backend & Unified Model Gateway
-│   │   ├── alembic/            # Alembic database migrations
-│   │   ├── models/             # SQLAlchemy 2.x models (Conversation, Message)
-│   │   ├── schemas/            # Pydantic v2 schemas
-│   │   ├── providers/          # OpenAI, Anthropic, Gemini provider adapters
-│   │   ├── services/           # ModelGateway, ConversationService, StreamingService
-│   │   ├── routers/            # API endpoints: chat, conversations, providers
-│   │   ├── database.py         # Async engine & session lifecycle
-│   │   ├── config.py           # Environment settings & validation
-│   │   └── main.py             # FastAPI entrypoint & lifespan
-│   ├── agent-worker/           # Autonomous browser agent execution worker
-│   └── wifi-sensing/           # Environmental sensing subsystem (simulation + physical RSSI)
-│       ├── csi_adapter.py      # Synthetic CSI simulator (deterministic RF physics)
-│       ├── real_rssi_adapter.py # Real Windows Wi-Fi adapter RSSI provider
-│       └── presence_estimator.py # Statistical presence & motion classification
-├── deploy/                     # Staging & production deployment configurations & runbooks
-│   ├── backup_database.sh      # Strict fail-closed PostgreSQL backup & integrity check
-│   ├── backup-restore.md       # PostgreSQL backup, DR restore, migrations & secret rotation
-│   ├── generate_staging_secrets.py # High-entropy staging environment secret generator
-│   ├── nginx.conf              # Bootstrap Nginx proxy (HTTP/ACME/SSE/headers)
-│   ├── nginx-ssl.conf.template # Production HTTPS Nginx proxy template with TLSv1.2/1.3 & HSTS
-│   ├── renew_ssl.sh            # Automated Certbot SSL renewal & zero-downtime Nginx reload
-│   └── setup_ssl.sh            # Two-stage Let's Encrypt certificate issuance & HTTPS activation
-├── packages/
-│   ├── shared-schemas/         # Shared TypeScript interfaces & API contracts
-│   └── ui/                     # UI components & dark theme design system
-├── docs/
-│   ├── architecture.md         # Full system architecture & phased roadmap
-│   ├── repository-audit.md     # Phase 0 environment, dependency & license audit
-│   └── threat-model.md         # STRIDE threat model & security controls
-├── tests/
-│   ├── conftest.py             # Test database setup fixture
-│   ├── test_browser_agent.py   # Autonomous browser agent integration tests
-│   ├── test_conversations_api.py # Database CRUD, pagination, search & ownership tests
-│   ├── test_disaster_recovery.py # Database disaster recovery & SQLite WAL backups
-│   ├── test_files_and_knowledge.py # Uploads, extraction, provenance, search, RAG & injection tests
-│   ├── test_hardening_and_isolation.py # Production auth, SSRF, claiming, restart recovery & probes
-│   ├── test_health.py          # Backend health-check integration test
-│   ├── test_model_gateway.py   # Gateway resolution, mock streaming & error tests
-│   ├── test_orchestration_engine.py # Multi-domain orchestration DAG execution & gates
-│   ├── test_phase10_e2e_integration.py # End-to-end integration journeys across all subsystems
-│   ├── test_real_rssi_sensing.py # Windows Wi-Fi RSSI adapter & hardware tests
-│   ├── test_streaming.py       # SSE streaming contract & error tests
-│   ├── test_tasks_calendar_reminders.py # Tasks, calendar, recurrence, reminders & NL tests
-│   ├── test_web_research.py    # Web research, SSRF defense, synthesis & citation tests
-│   └── test_wifi_sensing.py    # Wi-Fi sensing simulation, tenant isolation & tool tests
-├── Dockerfile.api              # Non-root multi-stage Python API container
-├── Dockerfile.worker           # Isolated non-root Playwright Chromium execution boundary
-├── Dockerfile.web              # Multi-stage React 19 build + Nginx static asset runner
-├── docker-compose.prod.yml     # Production multi-service orchestration with resource limits
-├── .env.production.example     # Production environment secrets template
-├── .env.example                # Local environment variables template
-├── .gitignore                  # Git ignore rules
-├── README.md                   # This file
-└── THIRD_PARTY_NOTICES.md      # Audited dependency licenses & third-party notices
+Understand ➔ Plan ➔ Observe ➔ Act ➔ Verify ➔ Recover ➔ Complete
+```
+
+<p align="center">
+  <a href="#-quick-links">Quick Links</a> •
+  <a href="#-key-features">Key Features</a> •
+  <a href="#-system-architecture">Architecture</a> •
+  <a href="#-cloudflare-deployment-guide">Cloudflare Deployment</a> •
+  <a href="#-local-development">Local Setup</a> •
+  <a href="#-subsystem-matrix">Subsystem Matrix</a>
+</p>
+
+---
+
+</div>
+
+## 🌐 Live Production Access
+
+| Component | Target URL | Operational Status |
+| :--- | :--- | :--- |
+| **Production Web Application** | **[unified-ai-assistant.pages.dev](https://unified-ai-assistant.pages.dev)** | 🟢 Active & Deployed (Cloudflare Pages) |
+| **GitHub Source Code** | **[shivampatilck-1010/unified-ai-assistant](https://github.com/shivampatilck-1010/unified-ai-assistant)** | 🟢 `main` Branch Synced |
+| **Backend Supervisor** | `http://127.0.0.1:8000` via Cloudflare Tunnel | 🟢 FastAPI + SQLite/PostgreSQL Dual Dialect |
+
+---
+
+## ✨ Highlights & Capabilities
+
+### 1. 🪐 Executive 3D Metallic Identity & Micro-Animations
+* **Sculpted 3D Metallic 'U'**: Pure titanium gunmetal and polished platinum-chrome gradients with authentic specular bevels.
+* **Planetary Orbital Plasma Ring**: Perspective-tilted orbital ring with 3D depth layering (passes behind the left arm and loops across the front bowl).
+* **Fluid Specular Sheen Sweep**: Animated directional beam of light sweeping smoothly across the metallic creases of the letter.
+* **Traveling Photon Particle**: Celestial star particle dynamically tracing the elliptical planetary orbit.
+* **Zero Compression Artifacts**: High-resolution 1024x1024 native alpha-transparent PNG and scalable vector SVG (`/logo.svg`).
+
+### 2. 🌐 Universal Computer-Use & Autonomous Browser Intelligence (Phase 3)
+* **Playwright-Powered Web Execution**: Operates unfamiliar web interfaces, fills forms, authenticates, and completes complex adaptive educational lessons end-to-end.
+* **Visual DOM Observation**: Real-time perception of interactive elements, input fields, modals, and dynamic overlays.
+* **Live Viewport Card**: Interactive in-chat preview card with live screenshot feed, observed action progress, and fullscreen view.
+* **Self-Correction & Recovery**: Automatically detects validation failures, overlays, or navigation timeouts, recovers state, and verifies task completion.
+
+### 3. 💻 Autonomous Coding Sandbox (Phase 4)
+* **Codebase Tree Inspection**: Direct workspace filesystem inspection with structure mapping and file metadata (`/api/intelligence/coding/inspect`).
+* **Source Code Inspection & Editing**: In-browser code editor and viewer with line formatting and safe modification writes (`/api/intelligence/coding/modify`).
+* **Subprocess Test Runner**: Runs isolated `pytest` test suites with real-time telemetry, exit code capture, test counts, execution duration, and terminal stdout/stderr streaming.
+* **Dedicated Workspace UI**: Integrated directly into the **Projects & Workspaces** view under the *Coding Sandbox* tab.
+
+### 4. 📐 Mathematical Notation & Visual Diagrams
+* **KaTeX 0.19 Rendering**: Full rendering of inline equations (`$E = mc^2$`, `\(...\)`) and standalone display equation blocks (`$$...$$`, `\[...\]`).
+* **Mermaid 12.2 Interactive Diagrams**: Live generation of flowcharts, sequence diagrams, class models, state machines, and Gantt charts with one-click **SVG Download** and code copying.
+
+### 5. 🌌 Interactive Canvas Animation
+* **Image Generating Particle Canvas**: Pitch-black canvas (`#050507`) with 75 floating gray ambient particles.
+* **Interactive Physics**: Particles actively respond to cursor movement with dynamic gravitational attraction and connecting velocity tracer filaments.
+
+### 6. 📂 Document Intelligence & Hybrid RAG (Phase 5)
+* **Multi-Format Ingestion**: Supports PDF, DOCX, TXT, Markdown, CSV, and JSON with SHA-256 deduplication and private storage isolation.
+* **Semantic Vector Embeddings**: Cosine similarity retrieval with lexical fallback.
+* **Grounded Citation Badges**: Verifiable source tags (`[Doc: filename, Page X]`) with snippet previews.
+
+### 7. 🔎 Autonomous Web Research Engine (Phase 6)
+* **Multi-Query Synthesis**: Formulates deep search plans across independent sources.
+* **SSRF-Protected Content Extraction**: Blocks private IP addresses and cloud metadata endpoints (`169.254.169.254`).
+* **Structured Markdown Reports**: Automated synthesis with numbered web citations (`[Web N: Title]`).
+
+### 8. 🤖 Multi-Agent Orchestration Engine (Phase 7)
+* **Directed Acyclic Graph (DAG)**: Orchestrates specialized sub-agents (Planner, Web Researcher, Browser Automator, Coding Agent, Verifier).
+* **Human-in-the-Loop Review**: Mandatory confirmation gates for consequential actions.
+* **Topological Dependency Execution**: Safe concurrent execution of independent tasks via `asyncio.gather`.
+
+### 9. ⏰ Scheduled Automations & 72-Hour Data Retention (Phase 8)
+* **Recurring Background Automations**: Built-in cron scheduler for recurring research briefs, browser workflows, and code audits.
+* **Automations Manager UI**: Dedicated management tab inside **Calendar & Tasks** to register and monitor active schedules.
+* **72-Hour Data Retention**: Automated rolling cleanup worker purging expired conversations, files, and sensing events, with one-click manual purge in **Settings**.
+
+### 10. 🔐 Google Authentication & Follow-Up Email Recaps
+* **Official Google One-Tap & Sign-In**: Multi-colored Google "G" branding with HMAC-SHA256 JWT sessions and user profile synchronization.
+* **Follow-Up Email Dispatch**: In-chat modal enabling users to receive concise task summaries, action items, and attachments sent directly to their Google email account.
+
+### 11. 📡 Physical Wi-Fi Sensing Workspace
+* **ESP32 CSI Hardware Bridge**: Real serial interface (`COM7` @ 921600 baud) for channel state information (CSI) vital sensing and presence detection.
+* **Interactive 3D Room Canvas**: Three.js/Cytoscape room visualization tracking indoor position, respiration rate, and motion vectors.
+
+---
+
+## 🏛 System Architecture
+
+```mermaid
+graph TD
+    classDef client fill:#1e1b4b,stroke:#818cf8,color:#ffffff
+    classDef gateway fill:#0f172a,stroke:#38bdf8,color:#ffffff
+    classDef agent fill:#064e3b,stroke:#34d399,color:#ffffff
+    classDef storage fill:#312e81,stroke:#a78bfa,color:#ffffff
+
+    User([User Request]):::client --> WebApp["Frontend (React 19 + Vite)<br/>unified-ai-assistant.pages.dev"]:::client
+    WebApp --> Tunnel["Cloudflare Tunnel / TLS Proxy"]:::gateway
+    Tunnel --> API["FastAPI Backend (Port 8000)"]:::gateway
+
+    API --> Core["Unified Intelligence Core"]:::gateway
+    Core --> Gateway["AI Model Gateway<br/>(Gemini 2.5 • Claude 3.5 • GPT-4o)"]:::gateway
+
+    Core --> BrowserWorker["Browser Agent (Playwright)"]:::agent
+    Core --> CodingSandbox["Coding Agent (Subprocess Pytest)"]:::agent
+    Core --> ResearchEngine["Web Research Synthesizer"]:::agent
+    Core --> Orchestrator["Multi-Agent DAG Orchestrator"]:::agent
+    Core --> RAGEngine["File Intelligence & Vector RAG"]:::agent
+    Core --> Scheduler["AutomationService (Cron Tasks)"]:::agent
+
+    BrowserWorker --> LiveViewport["Live Preview Card (DOM Stream)"]:::client
+    CodingSandbox --> TestTelemetry["Test Output & Workspace Files"]:::client
+    API --> DB[("SQLAlchemy 2.x<br/>SQLite / PostgreSQL")]:::storage
+    API --> Retention["72h Retention Worker"]:::storage
 ```
 
 ---
 
-## Prerequisites
+## 🚀 Cloudflare Deployment Guide
 
-* **Node.js**: `>= 20.0.0` (Verified on `v24.19.0`)
-* **npm**: `>= 10.0.0` (Verified on `11.17.0`)
-* **Python**: `3.12.x` (Verified on `3.12.7`)
-* **Git**: `>= 2.40.0` (Verified on `2.48.1`)
+Deploying the Unified AI Assistant online via Cloudflare gives you high availability, global CDN edge delivery, automatic SSL certificates, and zero-trust tunneling for your backend API without exposing open ports to the public internet.
+
+```
+┌─────────────────────────────────┐       ┌─────────────────────────────────┐
+│     Cloudflare Pages (Edge)     │       │    Cloudflare Tunnel (Secure)   │
+│  unified-ai-assistant.pages.dev │       │  *.trycloudflare.com / DNS CNAME│
+└────────────────┬────────────────┘       └────────────────┬────────────────┘
+                 │                                         │
+                 ▼                                         ▼
+         [React 19 Frontend]                     [FastAPI Python API]
+```
 
 ---
 
-## Quickstart
+### Step 1: Deploy the Frontend to Cloudflare Pages
 
-### 1. Backend Setup & Run
+You can deploy the frontend in two ways:
 
-From the repository root:
+#### Option A: Automatic Git Deployment (Recommended)
+1. Log in to the [Cloudflare Dashboard](https://dash.cloudflare.com/).
+2. Navigate to **Workers & Pages** ➔ **Create application** ➔ **Pages** ➔ **Connect to Git**.
+3. Select your repository: `shivampatilck-1010/unified-ai-assistant`.
+4. Configure the build settings:
+   - **Framework preset**: `Vite`
+   - **Build command**: `cd apps/web && npm install && npm run build`
+   - **Build output directory**: `apps/web/dist`
+   - **Root directory**: `/`
+5. Add the Environment Variable:
+   - `VITE_API_BASE_URL`: Set to your Cloudflare Tunnel public URL (e.g. `https://api.yourdomain.com`).
+6. Click **Save and Deploy**. Cloudflare will automatically build and deploy every time you push to `main`!
+
+#### Option B: Direct CLI Deployment via Wrangler
+Run the deployment command from your terminal:
+```bash
+# 1. Navigate to the web app directory and build production assets
+cd apps/web
+npm install
+npm run build
+
+# 2. Deploy directly to Cloudflare Pages using Wrangler
+npx wrangler pages deploy dist --project-name unified-ai-assistant
+```
+
+---
+
+### Step 2: Deploy the Backend API via Cloudflare Tunnel (`cloudflared`)
+
+Cloudflare Tunnel creates an encrypted outbound-only connection between your backend server and the Cloudflare edge network, completely protecting your machine from direct exposure, DDoS, and port scanning.
+
+#### 1. Install Cloudflare Tunnel CLI (`cloudflared`)
+- **Windows**:
+  ```powershell
+  winget install --id Cloudflare.cloudflared
+  ```
+- **macOS (Homebrew)**:
+  ```bash
+  brew install cloudflared
+  ```
+- **Linux (Debian/Ubuntu)**:
+  ```bash
+  curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+  sudo dpkg -i cloudflared.deb
+  ```
+
+#### 2. Start the Backend API & Tunnel Supervisor
+The repository includes an automated supervisor script [`services/run_production.py`](services/run_production.py) that launches the FastAPI backend on `127.0.0.1:8000` and creates an automatic Cloudflare Tunnel:
 
 ```bash
-# Navigate to API service
+# Run the automated supervisor
+python services/run_production.py
+```
+This will print your live tunnel URL:
+```
+=======================================================
+[SUPERVISOR] PUBLIC CLOUDFLARE TUNNEL URL:
+https://cliff-shipment-administrator-yes.trycloudflare.com
+=======================================================
+```
+
+#### 3. (Optional) Custom Named Domain Tunnel
+To route your custom domain (e.g. `api.yourdomain.com`) directly to your backend:
+```bash
+# Login to Cloudflare
+cloudflared tunnel login
+
+# Create a permanent named tunnel
+cloudflared tunnel create unified-api
+
+# Route your DNS hostname to the tunnel
+cloudflared tunnel route dns unified-api api.yourdomain.com
+
+# Run the tunnel
+cloudflared tunnel run --url http://127.0.0.1:8000 unified-api
+```
+
+---
+
+### Step 3: Configure Environment Variables
+
+Create a `.env` file inside `services/api/`:
+
+```env
+# Database Configuration (Defaults to local SQLite fallback if unset)
+DATABASE_URL=sqlite+aiosqlite:///./assistant.db
+# Or Production PostgreSQL:
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/unified_assistant
+
+# AI Provider API Keys (Server-side only — never exposed to client)
+GEMINI_API_KEY=your_gemini_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Authentication & Security
+AUTH_SECRET_KEY=generate_a_random_32_byte_hex_string_here
+GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
+
+# 72-Hour Data Retention (Hours to retain conversation history and uploads)
+DATA_RETENTION_HOURS=72
+
+# CORS Allowed Origins
+CORS_ORIGINS=https://unified-ai-assistant.pages.dev,http://localhost:5173
+```
+
+---
+
+## 💻 Local Development Quickstart
+
+### Prerequisites
+* **Node.js**: v20 or higher
+* **Python**: 3.11 or 3.12
+* **Git**
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/shivampatilck-1010/unified-ai-assistant.git
+cd unified-ai-assistant
+
+# 2. Setup the Python Backend Environment
 cd services/api
+python -m venv .venv
 
-# Create Python virtual environment (if not already created)
-py -3.12 -m venv .venv
+# Activate on Windows:
+.venv\Scripts\activate
+# Activate on macOS/Linux:
+# source .venv/bin/activate
 
-# Activate virtual environment
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# Windows (CMD):
-.venv\Scripts\activate.bat
-# Linux / macOS:
-source .venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Install Playwright browser binary (Chromium)
 playwright install chromium
 
-# Run database migrations
-alembic upgrade head
-
-# Start backend server
-uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-The FastAPI backend will be available at:
-* **Root API info**: `http://127.0.0.1:8000/`
-* **Health Check**: `http://127.0.0.1:8000/health`
-* **Provider Status**: `http://127.0.0.1:8000/api/provider/status`
-* **Conversations API**: `http://127.0.0.1:8000/api/conversations`
-* **Search API**: `http://127.0.0.1:8000/api/conversations/search?q={query}`
-* **Chat SSE Stream**: `http://127.0.0.1:8000/api/chat/stream`
-* **Browser Worker Status**: `http://127.0.0.1:8000/api/browser/worker/status`
-* **Browser Tasks API**: `http://127.0.0.1:8000/api/browser/tasks`
-* **Browser Task Events SSE**: `http://127.0.0.1:8000/api/browser/tasks/{id}/stream`
-* **Tasks API**: `http://127.0.0.1:8000/api/tasks`
-* **Calendar Events API**: `http://127.0.0.1:8000/api/calendar/events`
-* **Reminders API**: `http://127.0.0.1:8000/api/reminders`
-* **Files Management API**: `http://127.0.0.1:8000/api/files`
-* **Knowledge Retrieval & Grounded Q&A**: `http://127.0.0.1:8000/api/knowledge/search`, `/api/knowledge/answer`
-* **Web Research Investigations API**: `http://127.0.0.1:8000/api/research/jobs`
-* **Web Research Report Export**: `http://127.0.0.1:8000/api/research/jobs/{id}/export`
-* **Interactive Docs**: `http://127.0.0.1:8000/docs`
-
-### 2. Frontend Setup & Run
-
-Open a separate terminal window:
-
-```bash
-# Navigate to web application
-cd apps/web
-
-# Optional: configure backend URL in .env (defaults to http://127.0.0.1:8000)
-cp .env.example .env
-
-# Install dependencies
+# 3. Setup Frontend Dependencies
+cd ../../apps/web
 npm install
 
-# Start development server
+# 4. Launch Development Servers
+# Terminal 1 - Backend:
+cd services/api
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+
+# Terminal 2 - Frontend:
+cd apps/web
 npm run dev
 ```
+Open **`http://localhost:5173`** in your browser.
 
-The web application will be accessible at `http://localhost:5173/`.
+---
 
-### 3. Running Verification Tests
+## 📊 Subsystem Verification Matrix
+
+| Subsystem | Milestone | Test Method | Live Status |
+| :--- | :--- | :--- | :--- |
+| **Model Gateway** | Phase 1 & 2 | Multi-model streaming SSE (Gemini, Claude, GPT) | ✅ VERIFIED |
+| **KaTeX Math Engine** | Phase 2 | Inline `$..$` and block `$$..$$` KaTeX 0.19 formulas | ✅ VERIFIED |
+| **Mermaid Renderer** | Phase 2 | Interactive diagrams with live SVG export | ✅ VERIFIED |
+| **Browser Agent** | Phase 3 | End-to-end adaptive lesson completion on Bharat English | ✅ VERIFIED |
+| **Coding Sandbox** | Phase 4 | File inspection, editing, and subprocess pytest execution | ✅ VERIFIED |
+| **Document RAG** | Phase 5 | PDF/DOCX chunking, embeddings, and citation grounding | ✅ VERIFIED |
+| **Web Research** | Phase 6 | Multi-query synthesis with SSRF-protected extraction | ✅ VERIFIED |
+| **Multi-Agent Orchestration** | Phase 7 | Multi-step DAG planning with confirmation gates | ✅ VERIFIED |
+| **Scheduled Automations** | Phase 8 | Recurring background cron task registration & manager | ✅ VERIFIED |
+| **72h Data Retention** | Phase 8 | Automated rolling cleanup & manual database purge | ✅ VERIFIED |
+| **Wi-Fi Sensing** | Phase 8 | ESP32 serial bridge (`COM7`) & Three.js 3D room canvas | ✅ VERIFIED |
+
+---
+
+## 👨‍💻 Author & Contributing
+
+Engineered with passion by **[Shivam Patil](https://github.com/shivampatilck-1010)**.
+
+Contributions, issues, and feature requests are welcome!  
+Feel free to open a pull request or file an issue on GitHub.
 
 ```bash
-# Run all backend tests (CRUD, gateway, streaming, health, ownership):
-services/api/.venv/Scripts/python -m pytest tests -v
-
-# Run frontend linting & production build:
-cd apps/web
-npm run lint
-npm run build
+git checkout -b feature/amazing-feature
+git commit -m 'feat: add amazing feature'
+git push origin feature/amazing-feature
 ```
 
 ---
 
-## Documentation
+## 📄 License
 
-* [System Architecture](file:///docs/architecture.md) — Subsystem designs, SSE streaming contract, database persistence, and phased roadmap.
-* [Repository Audit Report](file:///docs/repository-audit.md) — Pre-modification audit, lockfiles, and license findings.
-* [Security Threat Model](file:///docs/threat-model.md) — STRIDE analysis, trust boundaries, ownership controls, and secret isolation.
-* [Third-Party Notices](file:///THIRD_PARTY_NOTICES.md) — License inventory for all dependencies.
-
----
-
-## Development Phases
-
-* **Phase 0 — Repository Foundation** *(Completed)*: Scaffolding, dependency manifests, lockfiles, license audits, and verified health endpoints.
-* **Phase 1 — Production-Quality Chat Workspace** *(Completed)*: Claude-inspired dark UI, sidebar navigation (8 items), Georgia serif AI typography, verified health connectivity, typed SSE streaming contract, and responsive layout.
-* **Phase 2 — Server Persistence & Unified AI Model Gateway** *(Completed)*: Dual-dialect PostgreSQL/SQLite database persistence, Alembic migrations, strict identity ownership boundaries, Unified Model Gateway with OpenAI, Anthropic, and Gemini adapters, conversation CRUD, database text search, and client UI integration.
-* **Phase 3 — Autonomous Browser Agent** *(Completed)*: Playwright background execution worker in isolated sessions, structured plan approval workflow, strict action allowlist, SSRF private IP blocking, redirect revalidation, prompt-injection defense, consequential action confirmation gates, SSE progress streaming, and interactive frontend Browser Agent workspace.
-* **Phase 4 — Task & Calendar Engine** *(Completed)*: Internal task tracking with idempotent completion toggling, calendar events with bounded RRULE recurrence expansion, atomic background reminder scheduler surviving restarts, natural language task/event extraction via ModelGateway with mandatory operator confirmation, strict ownership isolation, and Claude-inspired dark Calendar & Tasks workspace.
-* **Phase 5 — Files & Knowledge Engine** *(Completed)*: Secure private document storage outside public web routes, modular text extractors (PDF via pypdf, DOCX via python-docx, TXT, MD, CSV, Code/JSON), magic byte validation, content SHA-256 deduplication, bounded chunking with page/section provenance, pluggable embedding providers with dual-strategy retrieval (semantic vector search with cosine similarity + honest lexical fallback), grounded Q&A with strict prompt injection isolation, verified citation badges `[Doc: filename, Page X]`, streaming RAG chat integration, and full Claude-inspired frontend files workspace.
-* **Phase 6 — Web Research & Browser Intelligence** *(Completed)*: Autonomous, source-grounded research investigations with provider-neutral search discovery, isolated Playwright evidence extraction, SSRF/private IP blocking with post-navigation redirect revalidation, DOM prompt injection defense, grounded synthesis with traceable citations (`[Web N: Title]` and Phase 5 document correlation `[Doc: filename, Page X]`), honest insufficient evidence reporting, Markdown report exports, and SSE chat streaming integration.
-* **Phase 7 — Wi-Fi Sensing Service** *(Completed)*: Modular, consent-based environmental awareness subsystem with deterministic synthetic CSI modeling, transparent simulation labeling, honest hardware capability reporting, baseline statistical presence estimation, tenant-isolated zone configs, retention purges, audit logging, assistant tool grounding, and interactive frontend monitor.
-* **Phase 8 — Production Hardening & Cloud Browser Execution** *(Completed)*: Production-ready operational boundary featuring fail-closed HMAC-SHA256 JWT authentication, Playwright network egress interception aborting subresource SSRF and cloud metadata access (`169.254.169.254`), atomic conditional SQL task claiming with worker restart recovery, defensive security headers, sliding-window rate limiting, payload bounds (15MB), structured logging with automated secret scrubbing, deep readiness probe (`/ready`), multi-stage Dockerfiles for non-root API, Worker, and Web services, and complete operational disaster recovery runbooks.
-* **Phase 9 — Unified AI Orchestration Engine** *(Completed)*: Autonomous coordination layer unifying Model Gateway, Knowledge Retrieval, Web Research, Browser Agent, Tasks/Calendar/Reminders, and Wi-Fi Sensing. Features ambiguity detection with clarification gates, rigid capability allowlisting, consequential action confirmation gates (pausing before persistent task/event creation), topological DAG dependency ordering with concurrent execution of independent safe steps via `asyncio.gather`, shared context variable interpolation (`{step_N.output.field}`), consolidated source provenance citations (`[Doc: filename, Page X]`, `[Web N: Title]`, `[Synthetic Observation: ... (Simulated)]`), optimistic plan versioning, dangling workflow recovery, real-time SSE streaming, and complete dark-mode Orchestration management workspace.
-* **Phase 10 — Physical Wi-Fi RSSI Sensing & Production Staging Preparation** *(Completed)*: Dual sensing architecture supporting real physical Wi-Fi RSSI hardware telemetry via Windows WLAN APIs alongside synthetic CSI simulation, query response caching, fail-safe database backup runbooks (`deploy/backup_database.sh` with `pipefail` and archive validation), two-stage automated Let's Encrypt HTTPS deployment (`deploy/setup_ssl.sh` and `deploy/renew_ssl.sh`), and end-to-end integration test coverage across all subsystems.
-
----
-
-## Staging & Production Deployment
-
-The project is packaged for containerized deployment on a Linux VPS (Ubuntu 22.04 / 24.04 LTS) using Docker Compose.
-
-* **Stack Definition**: `docker-compose.prod.yml` defines `db` (PostgreSQL 16), `api` (FastAPI), `worker` (isolated Chromium runner), and `web` (Nginx + React 19).
-* **Network Isolation**: The `backend-net` bridge is marked `internal: true`. The database and background workers are inaccessible from external networks; only the Nginx reverse proxy exposes ports 80 and 443.
-* **HTTPS & Certificates**: Automated two-stage SSL issuance via `deploy/setup_ssl.sh` avoids startup chicken-and-egg crashes, followed by cron renewal via `deploy/renew_ssl.sh`.
-* **Database Safety & Backups**: Pre-migration backups are enforced before applying Alembic migrations using `deploy/backup_database.sh` (fails closed on non-zero exit codes, corrupt archives, or empty dumps).
-* **Operational Runbooks**: Full disaster recovery, restoration, migration rollbacks, and secret rotation steps are documented in [Operational Guide: Backup & Restore](file:///deploy/backup-restore.md).
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.

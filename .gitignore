@@ -71,6 +71,8 @@ services/api/data/
 data/
 temp/
 tmp/
+scratch/
+scripts/
 .cache/
 .parcel-cache/
 
