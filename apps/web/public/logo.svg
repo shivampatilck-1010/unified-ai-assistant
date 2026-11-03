@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <!-- Background glow filter -->
+    <filter id="logoGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Metallic Titanium Gradient for Letter U Base -->
+    <linearGradient id="gradUBase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#474b57" />
+      <stop offset="35%" stop-color="#2a2d36" />
+      <stop offset="70%" stop-color="#181a20" />
+      <stop offset="100%" stop-color="#0f1115" />
+    </linearGradient>
+
+    <!-- Platinum Chrome Gradient for Top & Right Stalk -->
+    <linearGradient id="gradUHighlight" x1="0%" y1="0%" x2="60%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="30%" stop-color="#cbd5e1" />
+      <stop offset="65%" stop-color="#64748b" />
+      <stop offset="100%" stop-color="#334155" />
+    </linearGradient>
+
+    <!-- Lower-left 3D Facet Bevel Gradient -->
+    <linearGradient id="gradUFacet" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#14161c" />
+      <stop offset="40%" stop-color="#242731" />
+      <stop offset="80%" stop-color="#4f5564" />
+      <stop offset="100%" stop-color="#94a3b8" />
+    </linearGradient>
+
+    <!-- Planetary Orbital Ring Gradient: Platinum Chrome with Cosmic Hue -->
+    <linearGradient id="gradRing" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#64748b" />
+      <stop offset="25%" stop-color="#cbd5e1" />
+      <stop offset="50%" stop-color="#ffffff" />
+      <stop offset="75%" stop-color="#94a3b8" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+
+    <!-- Sheen Gradient -->
+    <linearGradient id="gradSheen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0)" />
+      <stop offset="50%" stop-color="rgba(255,255,255,0.7)" />
+      <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+    </linearGradient>
+  </defs>
+
+  <!-- Ambient Glow -->
+  <circle cx="256" cy="256" r="180" fill="url(#gradRing)" opacity="0.06" filter="url(#logoGlow)" />
+
+  <!-- 1. Planetary Orbital Ring - Back Segment (Behind the U) -->
+  <path
+    d="M 120 310 C 90 280, 80 230, 160 180 C 230 140, 360 145, 420 190 C 445 210, 440 240, 400 270"
+    stroke="url(#gradRing)"
+    stroke-width="12"
+    stroke-linecap="round"
+    opacity="0.65"
+  />
+
+  <!-- 2. Sculpted Letter U - Base Body -->
+  <!-- Left stalk: x=145 to 215, Right stalk: x=297 to 367, Bottom curve: y=130 down to 395 -->
+  <path
+    d="M 145 130
+       L 215 130
+       L 215 285
+       C 215 320, 235 340, 256 340
+       C 277 340, 297 320, 297 285
+       L 297 130
+       L 367 130
+       L 367 285
+       C 367 360, 320 405, 256 405
+       C 192 405, 145 360, 145 285
+       Z"
+    fill="url(#gradUBase)"
+  />
+
+  <!-- 3. Sculpted Right Stalk High-Gloss Metallic Overlay -->
+  <path
+    d="M 297 130
+       L 367 130
+       L 367 285
+       C 367 330, 345 370, 310 390
+       C 315 365, 315 305, 315 285
+       L 315 170
+       C 315 150, 305 135, 297 130
+       Z"
+    fill="url(#gradUHighlight)"
+    opacity="0.9"
+  />
+
+  <!-- 4. Lower-Left 3D Curved Bevel Crease Facet -->
+  <path
+    d="M 145 240
+       C 170 290, 205 325, 256 340
+       C 235 340, 215 320, 215 285
+       L 215 240
+       C 180 255, 155 250, 145 240
+       Z"
+    fill="url(#gradUFacet)"
+  />
+
+  <!-- Specular Rim Glint on Top Edges -->
+  <rect x="145" y="130" width="70" height="4" rx="2" fill="#ffffff" opacity="0.8" />
+  <rect x="297" y="130" width="70" height="4" rx="2" fill="#ffffff" opacity="0.95" />
+
+  <!-- 5. Planetary Orbital Ring - Front Swoop Segment (Passing across front of the U) -->
+  <path
+    d="M 105 330
+       C 130 365, 185 390, 256 385
+       C 335 380, 405 335, 435 270
+       C 440 260, 425 250, 415 260
+       C 385 310, 325 355, 256 360
+       C 195 365, 145 345, 120 315
+       Z"
+    fill="url(#gradRing)"
+    filter="url(#logoGlow)"
+  />
+</svg>

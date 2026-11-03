@@ -16,6 +16,12 @@ import {
   pinFileToProject,
   unpinFileFromProject,
   fetchFiles,
+  inspectCodeWorkspace,
+  readSourceFile,
+  modifySourceFile,
+  executeCodeTests,
+  type WorkspaceFileItem,
+  type TestExecutionResponse,
 } from '../../lib/api';
 import './ProjectsView.css';
 
@@ -71,7 +77,75 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'conversations' | 'guidance' | 'files'>('conversations');
+  const [activeTab, setActiveTab] = useState<'conversations' | 'guidance' | 'files' | 'code'>('conversations');
+
+  // Phase 4: Coding Sandbox State
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileItem[]>([]);
+  const [codeFilter, setCodeFilter] = useState('');
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [selectedFileContent, setSelectedFileContent] = useState<string>('');
+  const [fileReading, setFileReading] = useState(false);
+  const [fileSaving, setFileSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [testCommand, setTestCommand] = useState('pytest tests/test_health.py');
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState<TestExecutionResponse | null>(null);
+
+  const loadWorkspaceFiles = useCallback(async () => {
+    try {
+      setCodeLoading(true);
+      const res = await inspectCodeWorkspace(undefined, 100);
+      setWorkspaceFiles(res.files);
+    } catch (err: unknown) {
+      console.error('Failed to inspect workspace:', err);
+    } finally {
+      setCodeLoading(false);
+    }
+  }, []);
+
+  const handleSelectFile = async (item: WorkspaceFileItem) => {
+    if (item.is_directory) return;
+    try {
+      setSelectedFilePath(item.relative_path);
+      setFileReading(true);
+      setSaveStatus(null);
+      const res = await readSourceFile(item.relative_path, 800);
+      setSelectedFileContent(res.content);
+    } catch (err: unknown) {
+      console.error('Failed to read file:', err);
+    } finally {
+      setFileReading(false);
+    }
+  };
+
+  const handleSaveFile = async () => {
+    if (!selectedFilePath) return;
+    try {
+      setFileSaving(true);
+      setSaveStatus(null);
+      await modifySourceFile(selectedFilePath, selectedFileContent);
+      setSaveStatus('Modifications successfully written');
+      setTimeout(() => setSaveStatus(null), 3500);
+    } catch (err: unknown) {
+      setSaveStatus(err instanceof Error ? err.message : 'Failed to write modification');
+    } finally {
+      setFileSaving(false);
+    }
+  };
+
+  const handleRunTests = async () => {
+    try {
+      setTestRunning(true);
+      setTestResult(null);
+      const res = await executeCodeTests(undefined, testCommand, 45);
+      setTestResult(res);
+    } catch (err: unknown) {
+      console.error('Failed to run tests:', err);
+    } finally {
+      setTestRunning(false);
+    }
+  };
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -410,6 +484,21 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 <span>Pinned Knowledge</span>
                 <span className="pv-tab__badge">{projectDetail.pinned_files.length}</span>
               </button>
+
+              <button
+                className={`pv-tab ${activeTab === 'code' ? 'pv-tab--active' : ''}`}
+                onClick={() => {
+                  setActiveTab('code');
+                  if (workspaceFiles.length === 0) void loadWorkspaceFiles();
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+                <span>Coding Sandbox</span>
+                <span className="pv-tab__badge">{workspaceFiles.length > 0 ? workspaceFiles.length : 'Phase 4'}</span>
+              </button>
             </div>
           </div>
 
@@ -542,7 +631,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : activeTab === 'files' ? (
               /* Pinned Files Tab */
               <div className="pv-section">
                 <div className="pv-section__header">
@@ -602,6 +691,173 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+            ) : (
+              /* Phase 4: Autonomous Coding Sandbox */
+              <div className="pv-section pv-coding-sandbox">
+                <div className="pv-section__header">
+                  <div>
+                    <h2 className="pv-section__title">Autonomous Coding Sandbox</h2>
+                    <p className="pv-section__subtitle">
+                      Inspect codebase structure, inspect and edit source code safely, and execute test suites with real-time telemetry.
+                    </p>
+                  </div>
+                  <div className="pv-sandbox__header-actions">
+                    <button
+                      className="pv-btn pv-btn--secondary"
+                      onClick={() => void loadWorkspaceFiles()}
+                      disabled={codeLoading}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M23 4v6h-6M1 20v-6h6" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>{codeLoading ? 'Scanning...' : 'Refresh Workspace'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Test Runner Command Bar */}
+                <div className="pv-sandbox__testbar">
+                  <div className="pv-sandbox__test-input-box">
+                    <span className="pv-sandbox__test-prefix">$</span>
+                    <input
+                      type="text"
+                      className="pv-sandbox__test-input"
+                      value={testCommand}
+                      onChange={(e) => setTestCommand(e.target.value)}
+                      placeholder="e.g. pytest tests/test_health.py"
+                      disabled={testRunning}
+                    />
+                  </div>
+                  <button
+                    className="pv-btn pv-btn--primary pv-sandbox__run-btn"
+                    onClick={() => void handleRunTests()}
+                    disabled={testRunning}
+                  >
+                    {testRunning ? (
+                      <>
+                        <span className="pv-spinner-sm" />
+                        <span>Running Tests...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                        <span>Execute Test Suite</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Test Results Output Banner if Available */}
+                {testResult && (
+                  <div className={`pv-sandbox__test-results ${testResult.passed ? 'pv-sandbox__test-results--passed' : 'pv-sandbox__test-results--failed'}`}>
+                    <div className="pv-sandbox__result-header">
+                      <span className="pv-sandbox__result-badge">
+                        {testResult.passed ? 'TESTS PASSED' : `TESTS FAILED (Exit ${testResult.exit_code})`}
+                      </span>
+                      <span className="pv-sandbox__result-meta">
+                        {testResult.tests_run} test{testResult.tests_run !== 1 ? 's' : ''} run • {testResult.duration_seconds}s execution time
+                      </span>
+                    </div>
+                    {testResult.stdout && (
+                      <pre className="pv-sandbox__terminal">{testResult.stdout}</pre>
+                    )}
+                    {testResult.stderr && (
+                      <pre className="pv-sandbox__terminal pv-sandbox__terminal--err">{testResult.stderr}</pre>
+                    )}
+                  </div>
+                )}
+
+                {/* Code Workspace Split View */}
+                <div className="pv-sandbox__workspace">
+                  {/* Left Column: File Explorer */}
+                  <div className="pv-sandbox__explorer">
+                    <div className="pv-sandbox__explorer-header">
+                      <span>Files ({workspaceFiles.length})</span>
+                      <input
+                        type="text"
+                        className="pv-sandbox__file-search"
+                        placeholder="Filter files..."
+                        value={codeFilter}
+                        onChange={(e) => setCodeFilter(e.target.value)}
+                      />
+                    </div>
+                    <div className="pv-sandbox__file-list">
+                      {codeLoading && workspaceFiles.length === 0 ? (
+                        <div className="pv-sandbox__file-empty">Scanning workspace...</div>
+                      ) : workspaceFiles.length === 0 ? (
+                        <div className="pv-sandbox__file-empty">
+                          No files found. Click "Refresh Workspace".
+                        </div>
+                      ) : (
+                        workspaceFiles
+                          .filter((f) => !codeFilter || f.relative_path.toLowerCase().includes(codeFilter.toLowerCase()))
+                          .map((f) => (
+                            <div
+                              key={f.path}
+                              className={`pv-sandbox__file-item ${selectedFilePath === f.relative_path ? 'pv-sandbox__file-item--active' : ''} ${f.is_directory ? 'pv-sandbox__file-item--dir' : ''}`}
+                              onClick={() => void handleSelectFile(f)}
+                            >
+                              <span className="pv-sandbox__file-icon">
+                                {f.is_directory ? '📁' : '📄'}
+                              </span>
+                              <span className="pv-sandbox__file-name" title={f.relative_path}>
+                                {f.relative_path}
+                              </span>
+                              {!f.is_directory && (
+                                <span className="pv-sandbox__file-size">
+                                  {(f.size_bytes / 1024).toFixed(1)}k
+                                </span>
+                              )}
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Code Editor / Viewer */}
+                  <div className="pv-sandbox__editor">
+                    <div className="pv-sandbox__editor-header">
+                      <span className="pv-sandbox__current-file">
+                        {selectedFilePath || 'Select a file to inspect and edit'}
+                      </span>
+                      {selectedFilePath && (
+                        <div className="pv-sandbox__editor-actions">
+                          {saveStatus && (
+                            <span className="pv-sandbox__save-feedback">{saveStatus}</span>
+                          )}
+                          <button
+                            className="pv-btn pv-btn--primary pv-btn--sm"
+                            onClick={() => void handleSaveFile()}
+                            disabled={fileSaving || fileReading}
+                          >
+                            {fileSaving ? 'Writing...' : 'Save Modifications'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pv-sandbox__editor-body">
+                      {fileReading ? (
+                        <div className="pv-sandbox__editor-placeholder">Reading source content...</div>
+                      ) : selectedFilePath ? (
+                        <textarea
+                          className="pv-sandbox__textarea"
+                          value={selectedFileContent}
+                          onChange={(e) => setSelectedFileContent(e.target.value)}
+                          spellCheck={false}
+                        />
+                      ) : (
+                        <div className="pv-sandbox__editor-placeholder">
+                          Select any source file on the left to inspect, edit, and apply modifications.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

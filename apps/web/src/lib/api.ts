@@ -1830,3 +1830,161 @@ export async function clearEsp32Calibration(signal?: AbortSignal): Promise<Esp32
   }
   return safeParseJson<Esp32HardwareStatus>(response);
 }
+
+// --- Phase 4 & Phase 8: Autonomous Coding Sandbox & Intelligence APIs ---
+
+export interface WorkspaceFileItem {
+  path: string;
+  relative_path: string;
+  size_bytes: number;
+  is_directory: boolean;
+}
+
+export interface WorkspaceInspectResponse {
+  files: WorkspaceFileItem[];
+  total_count: number;
+}
+
+export interface CodeReadResponse {
+  file_path: string;
+  content: string;
+}
+
+export interface CodeModifyResponse {
+  file_path: string;
+  status: string;
+  lines_added: number;
+  lines_removed: number;
+  diff_summary: string;
+  error?: string | null;
+}
+
+export interface TestExecutionResponse {
+  passed: boolean;
+  exit_code: number;
+  tests_run: number;
+  tests_failed: number;
+  duration_seconds: number;
+  stdout: string;
+  stderr: string;
+}
+
+export interface AutomationItem {
+  id: string;
+  name: string;
+  task_goal: string;
+  capability: string;
+  schedule_cron?: string | null;
+  interval_hours?: number | null;
+  enabled: boolean;
+  last_run_at?: string | null;
+  next_run_at?: string | null;
+}
+
+export async function inspectCodeWorkspace(
+  workspacePath?: string,
+  maxFiles = 50,
+  signal?: AbortSignal
+): Promise<WorkspaceInspectResponse> {
+  const response = await fetch(`${API_BASE}/api/intelligence/coding/inspect`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ workspace_path: workspacePath, max_files: maxFiles }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to inspect workspace: ${response.status}`);
+  }
+  return safeParseJson<WorkspaceInspectResponse>(response);
+}
+
+export async function readSourceFile(
+  filePath: string,
+  maxLines = 500,
+  signal?: AbortSignal
+): Promise<CodeReadResponse> {
+  const response = await fetch(`${API_BASE}/api/intelligence/coding/read`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ file_path: filePath, max_lines: maxLines }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to read source file: ${response.status}`);
+  }
+  return safeParseJson<CodeReadResponse>(response);
+}
+
+export async function modifySourceFile(
+  filePath: string,
+  newContent: string,
+  signal?: AbortSignal
+): Promise<CodeModifyResponse> {
+  const response = await fetch(`${API_BASE}/api/intelligence/coding/modify`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ file_path: filePath, new_content: newContent }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to modify source file: ${response.status}`);
+  }
+  return safeParseJson<CodeModifyResponse>(response);
+}
+
+export async function executeCodeTests(
+  workspacePath?: string,
+  testCommand?: string,
+  timeoutSeconds = 30,
+  signal?: AbortSignal
+): Promise<TestExecutionResponse> {
+  const response = await fetch(`${API_BASE}/api/intelligence/coding/test`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      workspace_path: workspacePath,
+      test_command: testCommand,
+      timeout_seconds: timeoutSeconds,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to execute tests: ${response.status}`);
+  }
+  return safeParseJson<TestExecutionResponse>(response);
+}
+
+export async function fetchAutomations(signal?: AbortSignal): Promise<AutomationItem[]> {
+  const response = await fetch(`${API_BASE}/api/intelligence/automations`, {
+    method: 'GET',
+    signal,
+    headers: getBaseHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch automations: ${response.status}`);
+  }
+  return safeParseJson<AutomationItem[]>(response);
+}
+
+export async function createAutomation(
+  payload: {
+    name: string;
+    task_goal: string;
+    capability?: string;
+    schedule_cron?: string;
+    interval_hours?: number;
+  },
+  signal?: AbortSignal
+): Promise<AutomationItem> {
+  const response = await fetch(`${API_BASE}/api/intelligence/automations`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to create automation: ${response.status}`);
+  }
+  return safeParseJson<AutomationItem>(response);
+}
+

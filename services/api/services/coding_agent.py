@@ -40,7 +40,7 @@ class CodingAgent:
     """Autonomous software engineering agent for inspecting, modifying, testing, and verifying code."""
 
     def __init__(self, default_workspace: Optional[str] = None):
-        self.default_workspace = Path(default_workspace or Path(__file__).resolve().parent.parent.parent).resolve()
+        self.default_workspace = Path(default_workspace or Path(__file__).resolve().parents[3]).resolve()
 
     def _validate_path(self, target: Path) -> Path:
         resolved = target.resolve()
@@ -118,7 +118,12 @@ class CodingAgent:
         """Executes automated test suites within the workspace in an isolated subprocess."""
         root = Path(workspace_path).resolve() if workspace_path else self.default_workspace
         root = self._validate_path(root)
-        cmd = test_command or f'"{sys.executable}" -m pytest -q --tb=short'
+        if test_command:
+            cmd = test_command
+            if cmd.strip().startswith("pytest"):
+                cmd = f'"{sys.executable}" -m ' + cmd.strip()
+        else:
+            cmd = f'"{sys.executable}" -m pytest -q --tb=short'
 
         start_time = asyncio.get_event_loop().time()
         try:

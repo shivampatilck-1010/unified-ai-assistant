@@ -21,10 +21,13 @@ import {
   fetchReminders,
   dismissReminder,
   extractTasksAndEvents,
+  fetchAutomations,
+  createAutomation,
+  type AutomationItem,
 } from '../../lib/api';
 import './CalendarTasksView.css';
 
-type ActiveTab = 'tasks' | 'calendar' | 'reminders';
+type ActiveTab = 'tasks' | 'calendar' | 'reminders' | 'automations';
 
 export function CalendarTasksView() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('tasks');
@@ -74,6 +77,46 @@ export function CalendarTasksView() {
   const [confirmedReminders, setConfirmedReminders] = useState<ExtractedReminderProposal[]>([]);
   const [isSavingConfirmed, setIsSavingConfirmed] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Phase 8: Automations State
+  const [automations, setAutomations] = useState<AutomationItem[]>([]);
+  const [automationsLoading, setAutomationsLoading] = useState(false);
+  const [showNewAutomationModal, setShowNewAutomationModal] = useState(false);
+  const [newAutoName, setNewAutoName] = useState('');
+  const [newAutoGoal, setNewAutoGoal] = useState('');
+  const [newAutoCapability, setNewAutoCapability] = useState('report');
+  const [newAutoInterval, setNewAutoInterval] = useState(24);
+
+  const loadAutomations = useCallback(async () => {
+    try {
+      setAutomationsLoading(true);
+      const res = await fetchAutomations();
+      setAutomations(res);
+    } catch (err: unknown) {
+      console.error('Failed to load automations:', err);
+    } finally {
+      setAutomationsLoading(false);
+    }
+  }, []);
+
+  const handleCreateAutomation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAutoName.trim() || !newAutoGoal.trim()) return;
+    try {
+      await createAutomation({
+        name: newAutoName.trim(),
+        task_goal: newAutoGoal.trim(),
+        capability: newAutoCapability,
+        interval_hours: newAutoInterval,
+      });
+      setShowNewAutomationModal(false);
+      setNewAutoName('');
+      setNewAutoGoal('');
+      await loadAutomations();
+    } catch (err: unknown) {
+      console.error('Failed to create automation:', err);
+    }
+  };
 
   // 1. Load tasks
   const loadTasks = useCallback(async () => {
@@ -351,6 +394,16 @@ export function CalendarTasksView() {
             onClick={() => setActiveTab('reminders')}
           >
             Reminders ({reminders.length})
+          </button>
+          <button
+            type="button"
+            className={`caltasks-tab ${activeTab === 'automations' ? 'caltasks-tab--active' : ''}`}
+            onClick={() => {
+              setActiveTab('automations');
+              if (automations.length === 0) void loadAutomations();
+            }}
+          >
+            Automations ({automations.length > 0 ? automations.length : 'Phase 8'})
           </button>
         </nav>
       </div>
@@ -687,6 +740,144 @@ export function CalendarTasksView() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 4: SCHEDULED AUTOMATIONS (PHASE 8) */}
+      {activeTab === 'automations' && (
+        <div className="caltasks-tab-content">
+          <div className="caltasks-controls-bar">
+            <div className="caltasks-filters">
+              <span className="caltasks-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+                Autonomous Recurring Background Tasks
+              </span>
+            </div>
+
+            <div className="caltasks-actions">
+              <button
+                type="button"
+                className="caltasks-btn caltasks-btn--primary"
+                onClick={() => setShowNewAutomationModal(true)}
+              >
+                + Register Automation
+              </button>
+            </div>
+          </div>
+
+          {automationsLoading ? (
+            <div className="caltasks-loading">Loading scheduled automations...</div>
+          ) : automations.length === 0 ? (
+            <div className="caltasks-empty-state">
+              <p>No recurring automations registered yet.</p>
+              <button
+                type="button"
+                className="caltasks-btn caltasks-btn--primary"
+                onClick={() => setShowNewAutomationModal(true)}
+              >
+                Create First Automation
+              </button>
+            </div>
+          ) : (
+            <div className="caltasks-grid">
+              {automations.map((auto) => (
+                <div key={auto.id} className="caltasks-card">
+                  <div className="caltasks-card__main">
+                    <div className="caltasks-card__header">
+                      <h4 className="caltasks-card__title">{auto.name}</h4>
+                      <span className="caltasks-tag caltasks-tag--priority-high">
+                        Every {auto.interval_hours || 24}h
+                      </span>
+                    </div>
+                    <p className="caltasks-card__desc">{auto.task_goal}</p>
+                    <div className="caltasks-card__meta">
+                      <div className="caltasks-card__meta-item">
+                        <span>Capability: <strong>{auto.capability}</strong></span>
+                      </div>
+                      <div className="caltasks-card__meta-item">
+                        <span>Status: <strong style={{ color: '#10b981' }}>{auto.enabled ? 'ACTIVE' : 'PAUSED'}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal: New Automation */}
+      {showNewAutomationModal && (
+        <div className="caltasks-modal-overlay">
+          <div className="caltasks-modal">
+            <h3>Register Scheduled Automation (Phase 8)</h3>
+            <form onSubmit={handleCreateAutomation}>
+              <div className="caltasks-field">
+                <label>Automation Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newAutoName}
+                  onChange={(e) => setNewAutoName(e.target.value)}
+                  className="caltasks-input"
+                  placeholder="e.g. Daily Tech & Security Briefing"
+                />
+              </div>
+
+              <div className="caltasks-field">
+                <label>Objective & Instructions *</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={newAutoGoal}
+                  onChange={(e) => setNewAutoGoal(e.target.value)}
+                  className="caltasks-textarea"
+                  placeholder="e.g. Research top 3 cloud security breakthroughs and prepare a synthesis report."
+                />
+              </div>
+
+              <div className="caltasks-row">
+                <div className="caltasks-field">
+                  <label>Capability Engine</label>
+                  <select
+                    value={newAutoCapability}
+                    onChange={(e) => setNewAutoCapability(e.target.value)}
+                    className="caltasks-select"
+                  >
+                    <option value="report">Autonomous Research & Report</option>
+                    <option value="browser">Autonomous Browser Task</option>
+                    <option value="code_audit">Coding Sandbox Audit</option>
+                    <option value="summary">File Intelligence Digest</option>
+                  </select>
+                </div>
+
+                <div className="caltasks-field">
+                  <label>Interval (Hours)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={newAutoInterval}
+                    onChange={(e) => setNewAutoInterval(Number(e.target.value))}
+                    className="caltasks-input"
+                  />
+                </div>
+              </div>
+
+              <div className="caltasks-modal-actions">
+                <button
+                  type="button"
+                  className="caltasks-btn"
+                  onClick={() => setShowNewAutomationModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="caltasks-btn caltasks-btn--primary">
+                  Save & Enable Schedule
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

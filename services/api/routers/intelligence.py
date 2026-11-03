@@ -28,6 +28,16 @@ class CodingInspectRequest(BaseModel):
     max_files: int = 50
 
 
+class CodingReadRequest(BaseModel):
+    file_path: str
+    max_lines: int = 500
+
+
+class CodingModifyRequest(BaseModel):
+    file_path: str
+    new_content: str
+
+
 class CodingTestRequest(BaseModel):
     workspace_path: Optional[str] = None
     test_command: Optional[str] = None
@@ -100,6 +110,30 @@ async def inspect_code_workspace(req: CodingInspectRequest):
     try:
         files = agent.inspect_workspace(req.workspace_path, max_files=req.max_files)
         return {"files": [f.model_dump() for f in files], "total_count": len(files)}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+
+
+@router.post("/coding/read")
+async def read_code_file(req: CodingReadRequest):
+    """Reads source file content within authorized project workspace."""
+    agent = CodingAgent()
+    try:
+        content = agent.read_source_file(req.file_path, max_lines=req.max_lines)
+        return {"file_path": req.file_path, "content": content}
+    except FileNotFoundError as fe:
+        raise HTTPException(status_code=404, detail=str(fe))
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+
+
+@router.post("/coding/modify")
+async def modify_code_file(req: CodingModifyRequest):
+    """Safely writes or updates source file in authorized project workspace."""
+    agent = CodingAgent()
+    try:
+        result = agent.apply_modification(req.file_path, req.new_content)
+        return result.model_dump()
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
 
