@@ -1,0 +1,369 @@
+/* ==========================================================================
+   Image Generation Card & Loading Animation
+   ========================================================================== */
+
+.img-gen-card {
+  margin: 16px 0;
+  width: 100%;
+  max-width: 540px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #141721;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  position: relative;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.img-gen-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* --- Generating Skeleton / Placeholder Container --- */
+.img-gen-card__loading-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #1e2638 0%, #0d1117 75%);
+  overflow: hidden;
+}
+
+/* Animated Aurora Shimmer */
+.img-gen-card__shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(147, 51, 234, 0.08) 35%,
+    rgba(56, 189, 248, 0.14) 50%,
+    rgba(234, 179, 8, 0.08) 65%,
+    transparent 80%
+  );
+  background-size: 250% 250%;
+  animation: auroraShimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes auroraShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Pulsing Laser Scan Line */
+.img-gen-card__scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #38bdf8, #a855f7, #38bdf8, transparent);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.8), 0 0 8px rgba(168, 85, 247, 0.6);
+  animation: scanLine 3.2s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes scanLine {
+  0% {
+    top: 5%;
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    top: 92%;
+    opacity: 0.2;
+  }
+}
+
+/* Center Pulse Icon */
+.img-gen-card__center-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  z-index: 2;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.img-gen-card__icon-wrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #38bdf8;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.25);
+  animation: badgeFloat 2.6s ease-in-out infinite alternate;
+}
+
+.img-gen-card__icon-glow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 24px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4) 0%, transparent 70%);
+  animation: auraPulse 2s ease-in-out infinite alternate;
+  z-index: -1;
+}
+
+@keyframes badgeFloat {
+  0% {
+    transform: translateY(0px) scale(1);
+  }
+  100% {
+    transform: translateY(-6px) scale(1.03);
+  }
+}
+
+@keyframes auraPulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1.15);
+  }
+}
+
+/* Live Dynamic Milestone Message */
+.img-gen-card__status-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #f1f5f9;
+  letter-spacing: -0.01em;
+  margin: 0;
+  animation: textFade 0.35s ease;
+}
+
+.img-gen-card__sub-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.img-gen-card__sub-hint-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  animation: blinkDot 1.2s infinite;
+}
+
+@keyframes blinkDot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes textFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Indeterminate Bottom Progress Bar */
+.img-gen-card__progress-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.img-gen-card__progress-bar {
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #a855f7, #ec4899);
+  border-radius: 2px;
+  animation: progressBarFlow 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes progressBarFlow {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* --- Loaded Image State --- */
+.img-gen-card__image-container {
+  position: relative;
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  background: #000000;
+}
+
+.img-gen-card__img {
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.4s ease-out;
+}
+
+.img-gen-card:hover .img-gen-card__img {
+  transform: scale(1.015);
+}
+
+/* Hover Action Overlay */
+.img-gen-card__overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 5;
+}
+
+.img-gen-card:hover .img-gen-card__overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.img-gen-card__action-btn {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.img-gen-card__action-btn:hover {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+/* Caption Footer */
+.img-gen-card__footer {
+  padding: 10px 14px;
+  background: #181d29;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.img-gen-card__caption {
+  font-size: 12.5px;
+  color: #cbd5e1;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.img-gen-card__badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  flex-shrink: 0;
+}
+
+/* Lightbox Modal */
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: lightboxFade 0.2s ease-out;
+}
+
+@keyframes lightboxFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.img-lightbox__content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.img-lightbox__img {
+  max-width: 100%;
+  max-height: 82vh;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.img-lightbox__close {
+  position: absolute;
+  top: -42px;
+  right: 0;
+  background: transparent;
+  border: none;
+  color: #f8fafc;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.img-lightbox__close:hover {
+  opacity: 1;
+}

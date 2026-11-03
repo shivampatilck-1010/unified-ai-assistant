@@ -76,10 +76,13 @@ export function getApiBase(): string {
     if (custom && custom.trim()) {
       return custom.trim().replace(/\/+$/, '');
     }
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://127.0.0.1:8000';
+    }
   }
   const raw =
     import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD ? 'https://juan-concluded-thousands-biographies.trycloudflare.com' : 'http://127.0.0.1:8000');
+    (import.meta.env.PROD ? 'https://scoring-entertainment-then-constitutes.trycloudflare.com' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 

@@ -569,6 +569,11 @@ INTERACTION GUIDELINES:
     (Ensure spaces in the prompt URL parameter are properly replaced with %20).
   * Include an engaging scene description alongside the embedded image.
   * NEVER claim you cannot generate or display images.
+- When a user asks you to export the chat, compile a conversation, or generate a document file (e.g. "Export complete chat in one file", "save as markdown", "export notes"):
+  * Fulfill the request immediately and provide a clean, helpful executive summary.
+  * State the export file name clearly (e.g. "Your chat is exported in INT335_P24_chat_export.md.").
+  * Offer subsequent actions (e.g. "I can turn it into a PDF or Word file if you want.").
+  * The frontend automatically renders the interactive document attachment card matching the reference design.
 """
             conversation_history.insert(0, {"role": "system", "content": base_system_prompt})
 

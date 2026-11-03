@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { ImageGenerationCard } from './ImageGenerationCard';
+import { FileAttachmentCard } from './FileAttachmentCard';
 import './MarkdownContent.css';
 
 interface MarkdownContentProps {
@@ -96,7 +98,6 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       }
 
       // Format bold and italics inside this segment
-      // Format **bold**
       const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
       return (
         <React.Fragment key={pIdx}>
@@ -132,6 +133,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     let codeLines: string[] = [];
     let listItems: string[] = [];
     let isOrderedList = false;
+    let autoDetectedFile: string | null = null;
 
     const flushList = () => {
       if (listItems.length === 0) return;
@@ -154,6 +156,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       }
       listItems = [];
     };
+
+    // Check for auto-detected file mentions like "exported in INT335_P24_chat_export.md" or "saved to report.md"
+    const fileMentionMatch = text.match(/(?:exported\s+(?:in|to)|saved\s+(?:in|to)|created\s+(?:file|doc(?:ument)?)|file:?)\s+([a-zA-Z0-9_\-\.]+\.(?:md|pdf|docx|csv|xlsx|txt|py|json|html))\b/i);
+    if (fileMentionMatch && !text.includes('file-card:')) {
+      autoDetectedFile = fileMentionMatch[1];
+    }
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -204,30 +212,57 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       // Flush any active list if we hit non-list line
       flushList();
 
-      // Markdown standalone image: ![alt](url)
+      // Explicit File card comment: <!-- file-card: filename | type | url -->
+      const fileCardMatch = line.trim().match(/<!--\s*file-card:\s*([^|]+)(?:\|([^|]*))?(?:\|(.*))?\s*-->/);
+      if (fileCardMatch) {
+        nodes.push(
+          <FileAttachmentCard
+            key={`file-${nodes.length}`}
+            filename={fileCardMatch[1].trim()}
+            filetype={fileCardMatch[2]?.trim()}
+            downloadUrl={fileCardMatch[3]?.trim()}
+          />
+        );
+        autoDetectedFile = null; // Suppress auto detection if explicit card exists
+        continue;
+      }
+
+      // Standalone file link line: [filename.ext](url)
+      const fileLinkMatch = line.trim().match(/^\[([a-zA-Z0-9_\-\s]+\.(?:md|pdf|docx|csv|xlsx|txt|json))\]\(([^\s)]+)\)$/i);
+      if (fileLinkMatch) {
+        nodes.push(
+          <FileAttachmentCard
+            key={`file-${nodes.length}`}
+            filename={fileLinkMatch[1].trim()}
+            downloadUrl={fileLinkMatch[2].trim()}
+          />
+        );
+        autoDetectedFile = null;
+        continue;
+      }
+
+      // Markdown standalone image: ![alt](url) -> rendered via high-end ImageGenerationCard
       const imgMatch = line.trim().match(/^!\[(.*?)\]\((https?:\/\/[^\s)]+)\)$/);
       if (imgMatch) {
         nodes.push(
-          <div key={`img-${nodes.length}`} className="md-image-container" style={{ margin: '12px 0' }}>
-            <img
-              src={imgMatch[2]}
-              alt={imgMatch[1] || 'AI Generated Image'}
-              className="md-image"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '460px',
-                borderRadius: '8px',
-                border: '1px solid #334155',
-                display: 'block',
-              }}
-              loading="lazy"
-            />
-            {imgMatch[1] && (
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', display: 'block' }}>
-                {imgMatch[1]}
-              </span>
-            )}
-          </div>
+          <ImageGenerationCard
+            key={`img-${nodes.length}`}
+            src={imgMatch[2]}
+            alt={imgMatch[1] || 'AI Generated Image'}
+          />
+        );
+        continue;
+      }
+
+      // Inline image inside line
+      const inlineImgMatch = line.match(/!\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
+      if (inlineImgMatch && line.trim().startsWith('![')) {
+        nodes.push(
+          <ImageGenerationCard
+            key={`img-${nodes.length}`}
+            src={inlineImgMatch[2]}
+            alt={inlineImgMatch[1] || 'AI Generated Image'}
+          />
         );
         continue;
       }
@@ -246,7 +281,6 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
           </blockquote>
         );
       } else if (line.trim() === '') {
-        // Space / line break
         nodes.push(<div key={`br-${nodes.length}`} className="md-spacer" />);
       } else {
         nodes.push(
@@ -257,7 +291,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       }
     }
 
-    // Flush any remaining
+    // Flush any remaining code blocks or lists
     if (inCodeBlock) {
       nodes.push(
         <CodeBlock
@@ -268,6 +302,16 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       );
     }
     flushList();
+
+    // If an exported/shared file was mentioned in the text, append the matching FileAttachmentCard at the bottom
+    if (autoDetectedFile) {
+      nodes.push(
+        <FileAttachmentCard
+          key={`autofile-${nodes.length}`}
+          filename={autoDetectedFile}
+        />
+      );
+    }
 
     return nodes;
   };

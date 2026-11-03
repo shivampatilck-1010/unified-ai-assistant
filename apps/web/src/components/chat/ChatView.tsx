@@ -41,6 +41,11 @@ export function ChatView({
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
 
+  // States for interactive toolbar actions
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [ratings, setRatings] = useState<Record<string, 'up' | 'down'>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   // Detect if user has scrolled up
   const handleScroll = () => {
     const el = containerRef.current;
@@ -57,6 +62,15 @@ export function ChatView({
     }
   }, [messages]);
 
+  // Clean up speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const isEmpty = messages.length === 0;
 
   const [useResearch, setUseResearch] = useState(false);
@@ -65,6 +79,67 @@ export function ChatView({
 
   const handleSend = (text: string) => {
     onSend(text, currentModel?.provider, currentModel?.id, false, undefined, useResearch, 'standard', useOrchestration);
+  };
+
+  const handleCopy = (msgId: string, text: string) => {
+    void navigator.clipboard.writeText(text);
+    setCopiedId(msgId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleToggleSpeak = (msgId: string, text: string) => {
+    if (!('speechSynthesis' in window)) return;
+
+    if (speakingId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    // Clean markdown before speaking
+    const cleanText = text
+      .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/```[\s\S]*?```/g, 'Code block omitted.')
+      .replace(/[#*`_~]/g, '')
+      .trim();
+
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+    setSpeakingId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleRating = (msgId: string, type: 'up' | 'down') => {
+    setRatings((prev) => ({
+      ...prev,
+      [msgId]: prev[msgId] === type ? (undefined as unknown as 'up') : type,
+    }));
+  };
+
+  const getActionBadge = (content: string, hasCitations: boolean, browserTaskId: string | null) => {
+    if (
+      content.includes('INT335_P24_chat_export.md') ||
+      content.includes('file-card:') ||
+      /(?:exported|saved|created)\s+(?:a\s+)?(?:file|doc)/i.test(content)
+    ) {
+      return 'Created a file, shared files ▸';
+    }
+    if (/!\[.*?\]\(https?:\/\//.test(content) || /generating image/i.test(content)) {
+      return 'Created image artwork ▸';
+    }
+    if (browserTaskId) {
+      return 'Automated browser execution ▸';
+    }
+    if (hasCitations) {
+      return 'Searched web & documents ▸';
+    }
+    return null;
   };
 
   return (
@@ -220,7 +295,7 @@ export function ChatView({
           </div>
         ) : (
           <div className="chat-view__message-list">
-            {messages.map((msg, idx) => {
+            {messages.map((msg) => {
               const isQuotaOrRawError = Boolean(
                 msg.content && (
                   msg.content.includes('RESOURCE_EXHAUSTED') ||
@@ -230,133 +305,196 @@ export function ChatView({
               );
               const isError = msg.isError || msg.status === 'error' || isQuotaOrRawError;
 
-              return (
-              <div
-                key={msg.id}
-                className={`chat-message chat-message--${msg.role} ${
-                  isError ? 'chat-message--error' : ''
-                } ${msg.isStreaming || msg.status === 'streaming' ? 'chat-message--streaming' : ''}`}
-              >
-                {msg.role === 'assistant' && (
-                  <div className="chat-message__avatar" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                      <rect x="2" y="2" width="14" height="14" rx="4" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M6 9h6M9 6v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                )}
-                <div className="chat-message__content">
-                  {msg.isStreaming && !msg.content ? (
-                    <span className="chat-message__thinking">Thinking…</span>
-                  ) : isError ? (
-                    <div className="chat-message__error-container">
-                      <div className="chat-message__error-header">
-                        <svg className="chat-message__error-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-                          <path d="M8 4.5v4.5M8 11.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                        </svg>
-                        <span className="chat-message__error-title">
-                          {msg.error_category === 'daily_quota_exhausted' || isQuotaOrRawError
-                            ? 'Daily Quota Limit Reached'
-                            : msg.error_code === 'RATE_LIMIT_EXCEEDED'
-                            ? 'Usage Limit Reached'
-                            : msg.error_code === 'AUTHENTICATION_FAILED'
-                            ? 'Authentication Error'
-                            : 'Generation Error'}
-                        </span>
-                      </div>
-                      <div className="chat-message__error-text">
-                        <MarkdownContent content={msg.content} isError />
-                      </div>
-                      <div className="chat-message__error-actions">
-                        {onRetry && (
-                          <button
-                            type="button"
-                            className="chat-message__retry-btn"
-                            disabled={isStreaming}
-                            onClick={() => onRetry(msg.id, currentModel?.provider, selectedModelId)}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                              <path d="M2.5 8a5.5 5.5 0 109.9-3.3M12.5 2.5v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            Retry
-                          </button>
-                        )}
-                        {availableModels.length > 1 && (
-                          <span className="chat-message__switch-hint">
-                            Switch models in the dropdown above to continue.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : msg.role === 'assistant' ? (
-                    (() => {
-                      const browserTaskMatch = msg.content?.match(/<!--\s*browser-task:\s*([a-zA-Z0-9_-]+)\s*-->/);
-                      const browserTaskId = browserTaskMatch ? browserTaskMatch[1] : null;
-                      const cleanContent = msg.content ? msg.content.replace(/<!--\s*browser-task:\s*[a-zA-Z0-9_-]+\s*-->/g, '').trim() : '';
+              const browserTaskMatch = msg.content?.match(/<!--\s*browser-task:\s*([a-zA-Z0-9_-]+)\s*-->/);
+              const browserTaskId = browserTaskMatch ? browserTaskMatch[1] : null;
+              const cleanContent = msg.content
+                ? msg.content.replace(/<!--\s*browser-task:\s*[a-zA-Z0-9_-]+\s*-->/g, '').trim()
+                : '';
 
-                      return (
-                        <>
-                          {browserTaskId && (
-                            <BrowserLivePreviewCard taskId={browserTaskId} compact />
-                          )}
-                          <MarkdownContent content={cleanContent} />
-                        </>
-                      );
-                    })()
-                  ) : (
-                    <span>{msg.content}</span>
-                  )}
-                  {msg.isStreaming && (
-                    <span className="chat-message__cursor" aria-hidden="true" />
-                  )}
-                  {msg.citations && msg.citations.length > 0 && (
-                    <div className="chat-message__citations">
-                      <div className="chat-message__citations-header">Sources & Citations:</div>
-                      <div className="chat-message__citations-list">
-                        {msg.citations.map((c, i) => (
-                          <span key={i} className="chat-message__citation-pill" title={c.snippet}>
-                            [Doc: {c.filename}{c.page_number ? `, Page ${c.page_number}` : ''}]
-                          </span>
-                        ))}
+              const actionBadge = msg.role === 'assistant'
+                ? getActionBadge(msg.content || '', Boolean(msg.citations && msg.citations.length > 0), browserTaskId)
+                : null;
+
+              return (
+                <div
+                  key={msg.id}
+                  className={`chat-message chat-message--${msg.role} ${
+                    isError ? 'chat-message--error' : ''
+                  } ${msg.isStreaming || msg.status === 'streaming' ? 'chat-message--streaming' : ''}`}
+                >
+                  <div className="chat-message__content">
+                    {/* Collapsible Action/Tool Summary Badge (Claude/ChatGPT style) */}
+                    {actionBadge && (
+                      <div className="chat-message__action-badge" title="Action summary">
+                        <span>{actionBadge}</span>
                       </div>
-                    </div>
-                  )}
-                  {!isError && (
-                    <div className="chat-message__footer">
-                      {msg.model && (
-                        <div className="chat-message__meta">
-                          Generated via {msg.model}
+                    )}
+
+                    {msg.isStreaming && !msg.content ? (
+                      <span className="chat-message__thinking">Thinking…</span>
+                    ) : isError ? (
+                      <div className="chat-message__error-container">
+                        <div className="chat-message__error-header">
+                          <svg className="chat-message__error-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                            <path d="M8 4.5v4.5M8 11.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
+                          <span className="chat-message__error-title">
+                            {msg.error_category === 'daily_quota_exhausted' || isQuotaOrRawError
+                              ? 'Daily Quota Limit Reached'
+                              : msg.error_code === 'RATE_LIMIT_EXCEEDED'
+                              ? 'Usage Limit Reached'
+                              : msg.error_code === 'AUTHENTICATION_FAILED'
+                              ? 'Authentication Error'
+                              : 'Generation Error'}
+                          </span>
                         </div>
-                      )}
-                      {msg.role === 'assistant' && !msg.isStreaming && (
-                        <div className="chat-message__actions">
-                          <button
-                            type="button"
-                            className="chat-message__action-btn"
-                            title="Copy response to clipboard"
-                            onClick={() => void navigator.clipboard.writeText(msg.content)}
-                          >
-                            Copy
-                          </button>
-                          {onRetry && idx === messages.length - 1 && (
+                        <div className="chat-message__error-text">
+                          <MarkdownContent content={msg.content} isError />
+                        </div>
+                        <div className="chat-message__error-actions">
+                          {onRetry && (
                             <button
                               type="button"
-                              className="chat-message__action-btn"
-                              title="Regenerate this response"
+                              className="chat-message__retry-btn"
                               disabled={isStreaming}
                               onClick={() => onRetry(msg.id, currentModel?.provider, selectedModelId)}
                             >
-                              Regenerate
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                                <path d="M2.5 8a5.5 5.5 0 109.9-3.3M12.5 2.5v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              Retry
+                            </button>
+                          )}
+                          {availableModels.length > 1 && (
+                            <span className="chat-message__switch-hint">
+                              Switch models in the dropdown above to continue.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : msg.role === 'assistant' ? (
+                      <>
+                        {browserTaskId && (
+                          <BrowserLivePreviewCard taskId={browserTaskId} compact />
+                        )}
+                        <MarkdownContent content={cleanContent} />
+                      </>
+                    ) : (
+                      <span>{msg.content}</span>
+                    )}
+
+                    {msg.isStreaming && (
+                      <span className="chat-message__cursor" aria-hidden="true" />
+                    )}
+
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="chat-message__citations">
+                        <div className="chat-message__citations-header">Sources & Citations:</div>
+                        <div className="chat-message__citations-list">
+                          {msg.citations.map((c, i) => (
+                            <span key={i} className="chat-message__citation-pill" title={c.snippet}>
+                              [Doc: {c.filename}{c.page_number ? `, Page ${c.page_number}` : ''}]
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sleek Action Footer matching reference design */}
+                    {!isError && msg.role === 'assistant' && !msg.isStreaming && (
+                      <div className="chat-message__footer">
+                        {/* Minimalist Action Toolbar: Copy, Speaker, Thumbs Up, Thumbs Down, Regenerate */}
+                        <div className="chat-message__toolbar">
+                          {/* 1. Copy Icon */}
+                          <button
+                            type="button"
+                            className="chat-message__tool-btn"
+                            title={copiedId === msg.id ? 'Copied to clipboard!' : 'Copy response'}
+                            onClick={() => handleCopy(msg.id, cleanContent || msg.content)}
+                          >
+                            {copiedId === msg.id ? (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2">
+                                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                            )}
+                          </button>
+
+                          {/* 2. Read Aloud / Speaker Icon */}
+                          <button
+                            type="button"
+                            className={`chat-message__tool-btn ${speakingId === msg.id ? 'chat-message__tool-btn--speaking' : ''}`}
+                            title={speakingId === msg.id ? 'Stop speaking' : 'Read aloud'}
+                            onClick={() => handleToggleSpeak(msg.id, cleanContent || msg.content)}
+                          >
+                            {speakingId === msg.id ? (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+                              </svg>
+                            ) : (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                              </svg>
+                            )}
+                          </button>
+
+                          {/* 3. Thumbs Up */}
+                          <button
+                            type="button"
+                            className={`chat-message__tool-btn ${ratings[msg.id] === 'up' ? 'chat-message__tool-btn--active' : ''}`}
+                            title="Good response"
+                            onClick={() => handleRating(msg.id, 'up')}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                            </svg>
+                          </button>
+
+                          {/* 4. Thumbs Down */}
+                          <button
+                            type="button"
+                            className={`chat-message__tool-btn ${ratings[msg.id] === 'down' ? 'chat-message__tool-btn--active' : ''}`}
+                            title="Bad response"
+                            onClick={() => handleRating(msg.id, 'down')}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+                            </svg>
+                          </button>
+
+                          {/* 5. Regenerate */}
+                          {onRetry && (
+                            <button
+                              type="button"
+                              className="chat-message__tool-btn"
+                              title="Regenerate response"
+                              disabled={isStreaming}
+                              onClick={() => onRetry(msg.id, currentModel?.provider, selectedModelId)}
+                            >
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
                             </button>
                           )}
                         </div>
-                      )}
-                    </div>
-                  )}
+
+                        {msg.model && (
+                          <div className="chat-message__meta">
+                            {msg.model}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
+              );
             })}
             <div ref={messagesEndRef} />
           </div>
