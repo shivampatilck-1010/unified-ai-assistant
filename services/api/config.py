@@ -65,7 +65,7 @@ class Settings:
             or os.getenv("IS_PRODUCTION", "false").lower() in ("true", "1", "yes")
         )
         self.auth_mode: str = os.getenv("AUTH_MODE", "jwt" if self.is_production else "dev_fallback")
-        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
+        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY", "unified-ai-assistant-super-secure-production-signing-key-32chars")
         self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
         self.jwt_issuer: str = os.getenv("JWT_ISSUER", "unified-ai-assistant")
         self.jwt_audience: str = os.getenv("JWT_AUDIENCE", "unified-ai-assistant-api")

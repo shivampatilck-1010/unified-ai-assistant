@@ -3,6 +3,8 @@ import type { ChatMessage, ModelInfo } from '../../types';
 import { Composer } from '../composer/Composer';
 import { MarkdownContent } from './MarkdownContent';
 import { BrowserLivePreviewCard } from '../browser/BrowserLivePreviewCard';
+import { UnifiedLogo } from '../brand/UnifiedLogo';
+import { FollowupEmailModal } from './FollowupEmailModal';
 import './ChatView.css';
 
 interface ChatViewProps {
@@ -24,6 +26,8 @@ interface ChatViewProps {
   availableModels?: ModelInfo[];
   selectedModelId?: string | null;
   onSelectModel?: (modelId: string) => void;
+  conversationId?: string | null;
+  conversationTitle?: string;
 }
 
 export function ChatView({
@@ -36,6 +40,8 @@ export function ChatView({
   availableModels = [],
   selectedModelId,
   onSelectModel,
+  conversationId,
+  conversationTitle,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,22 +51,37 @@ export function ChatView({
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<string, 'up' | 'down'>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState<boolean>(false);
+  const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
 
   // Detect if user has scrolled up
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
-    const threshold = 100;
+    const threshold = 120;
     const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
     userScrolledUp.current = !isAtBottom;
+    setShowScrollBottomBtn(!isAtBottom);
   };
 
-  // Auto-scroll on new messages, unless user scrolled up
+  const scrollToBottom = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    userScrolledUp.current = false;
+    setShowScrollBottomBtn(false);
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
+
+  // High-performance auto-scroll follow-up during streaming and on new messages
   useEffect(() => {
-    if (!userScrolledUp.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!userScrolledUp.current && containerRef.current) {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      });
     }
-  }, [messages]);
+  }, [messages, isStreaming]);
 
   // Clean up speech synthesis on unmount
   useEffect(() => {
@@ -204,6 +225,32 @@ export function ChatView({
             <span style={{ fontSize: '10px', fontWeight: 600 }}>{useResearch ? 'ON' : 'OFF'}</span>
           </button>
 
+          <button
+            className="chat-view__email-followup-btn"
+            onClick={() => setShowEmailModal(true)}
+            title="Dispatch conversation summary & takeaways via email"
+            type="button"
+            style={{
+              background: '#1c2438',
+              border: '1px solid #3b82f6',
+              color: '#93c5fd',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 500,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
+            <span>Follow-up Email</span>
+          </button>
+
           {availableModels.length > 0 ? (
             <div className="chat-view__model-selector">
               <select
@@ -235,11 +282,8 @@ export function ChatView({
       >
         {isEmpty ? (
           <div className="chat-view__empty">
-            <div className="chat-view__empty-icon" aria-hidden="true">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                <rect x="4" y="4" width="40" height="40" rx="12" stroke="currentColor" strokeWidth="2" />
-                <path d="M16 24h16M24 16v16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+            <div className="chat-view__empty-icon" aria-hidden="true" style={{ width: '68px', height: '68px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+              <UnifiedLogo size={68} animated />
             </div>
             <h2 className="chat-view__empty-title">Unified AI Assistant</h2>
             <p className="chat-view__empty-desc">
@@ -499,6 +543,22 @@ export function ChatView({
             <div ref={messagesEndRef} />
           </div>
         )}
+
+        {/* Floating Scroll to Bottom Button */}
+        {showScrollBottomBtn && (
+          <button
+            type="button"
+            className="chat-view__scroll-bottom-btn"
+            onClick={scrollToBottom}
+            aria-label="Scroll to bottom"
+            title="Scroll to bottom"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M12 5v14M19 12l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>Scroll to bottom</span>
+          </button>
+        )}
       </div>
 
       {/* Composer */}
@@ -506,6 +566,14 @@ export function ChatView({
         onSend={handleSend}
         isStreaming={isStreaming}
         onCancel={onCancel}
+      />
+
+      {/* Follow-up Email Modal */}
+      <FollowupEmailModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        conversationId={conversationId ?? null}
+        conversationTitle={conversationTitle}
       />
     </div>
   );

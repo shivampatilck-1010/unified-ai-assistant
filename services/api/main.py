@@ -31,6 +31,7 @@ from middleware import (
     SecurityHeadersMiddleware,
 )
 from routers import (
+    auth_router,
     browser_tasks_router,
     calendar_router,
     chat_router,
@@ -115,6 +116,7 @@ app.add_middleware(
 )
 
 # Mount modular routers
+app.include_router(auth_router)
 app.include_router(conversations_router)
 app.include_router(projects_router)
 app.include_router(chat_router)

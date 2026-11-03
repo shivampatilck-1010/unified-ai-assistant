@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -108,3 +109,49 @@ async def delete_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found or access denied.",
         )
+
+
+class FollowupEmailRequest(BaseModel):
+    recipient_email: str = Field(..., description="Destination recipient email address")
+    subject: Optional[str] = Field(default=None, description="Custom email subject line")
+    custom_notes: Optional[str] = Field(default=None, description="Additional author notes or message")
+    include_transcript: bool = Field(default=True, description="Whether to include conversation excerpt")
+
+
+@router.post("/{conversation_id}/followup-email")
+async def send_conversation_followup_email(
+    conversation_id: str,
+    payload: FollowupEmailRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
+    """Dispatches an executive follow-up email summary of the conversation."""
+    conv = await ConversationService.get_conversation(db, conversation_id=conversation_id, owner_id=user_id)
+    if not conv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found or access denied.",
+        )
+
+    messages_dicts = [
+        {"role": m.role, "content": m.content, "created_at": str(getattr(m, "created_at", ""))}
+        for m in getattr(conv, "messages", [])
+    ]
+
+    try:
+        from services.email_service import EmailService
+        result = await EmailService.send_followup_email(
+            recipient_email=payload.recipient_email,
+            conversation_title=conv.title,
+            messages=messages_dicts,
+            subject=payload.subject,
+            custom_notes=payload.custom_notes,
+            include_transcript=payload.include_transcript,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to dispatch follow-up email: {str(e)}",
+        )
+

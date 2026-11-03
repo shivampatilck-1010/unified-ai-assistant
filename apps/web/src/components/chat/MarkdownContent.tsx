@@ -1,19 +1,185 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import mermaid from 'mermaid';
 import { ImageGenerationCard } from './ImageGenerationCard';
 import { FileAttachmentCard } from './FileAttachmentCard';
 import './MarkdownContent.css';
+
+// Initialize Mermaid once with dark theme
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'loose',
+  themeVariables: {
+    darkMode: true,
+    background: '#13151c',
+    primaryColor: '#3b82f6',
+    primaryTextColor: '#f3f4f6',
+    primaryBorderColor: '#60a5fa',
+    lineColor: '#94a3b8',
+    secondaryColor: '#1e222d',
+    tertiaryColor: '#181b24',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+});
 
 interface MarkdownContentProps {
   content: string;
   isError?: boolean;
 }
 
+// Mermaid Diagram Component with Live Render & Action Controls
+const MermaidDiagram: React.FC<{ code: string }> = ({ code }) => {
+  const [svgHtml, setSvgHtml] = useState<string>('');
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<boolean>(false);
+  const containerId = useRef<string>(`mermaid-${Math.random().toString(36).slice(2, 9)}`);
+
+  useEffect(() => {
+    let isMounted = true;
+    const renderChart = async () => {
+      try {
+        const cleanChart = code.trim();
+        const { svg } = await mermaid.render(containerId.current, cleanChart);
+        if (isMounted) {
+          setSvgHtml(svg);
+          setRenderError(null);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setRenderError(err instanceof Error ? err.message : 'Invalid Mermaid syntax');
+        }
+      }
+    };
+    void renderChart();
+    return () => {
+      isMounted = false;
+    };
+  }, [code]);
+
+  const handleCopyCode = () => {
+    void navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadSvg = () => {
+    if (!svgHtml) return;
+    const blob = new Blob([svgHtml], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `diagram-${containerId.current}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  if (renderError) {
+    return (
+      <div className="code-block-container">
+        <div className="code-block-header">
+          <span className="code-block-lang">diagram (syntax fallback)</span>
+          <button type="button" className="code-copy-btn" onClick={handleCopyCode}>
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <pre className="code-block-pre">
+          <code>{code}</code>
+        </pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mermaid-diagram-container">
+      <div className="mermaid-diagram-header">
+        <div className="mermaid-diagram-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg>
+          <span>DIAGRAM</span>
+        </div>
+        <div className="mermaid-diagram-actions">
+          <button type="button" className="mermaid-tool-btn" onClick={handleDownloadSvg} title="Download SVG">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            <span>SVG</span>
+          </button>
+          <button type="button" className="mermaid-tool-btn" onClick={handleCopyCode} title="Copy diagram code">
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      </div>
+      <div
+        className="mermaid-svg-viewport"
+        dangerouslySetInnerHTML={{ __html: svgHtml }}
+      />
+    </div>
+  );
+};
+
+// KaTeX Block Math Component
+const KaTeXBlock: React.FC<{ math: string }> = ({ math }) => {
+  const html = React.useMemo(() => {
+    try {
+      return katex.renderToString(math.trim(), {
+        displayMode: true,
+        throwOnError: false,
+      });
+    } catch {
+      return null;
+    }
+  }, [math]);
+
+  if (!html) {
+    return <div className="katex-fallback"><code>{math}</code></div>;
+  }
+
+  return (
+    <div
+      className="katex-display-container"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+};
+
+// KaTeX Inline Math Component
+const KaTeXInline: React.FC<{ math: string }> = ({ math }) => {
+  const html = React.useMemo(() => {
+    try {
+      return katex.renderToString(math.trim(), {
+        displayMode: false,
+        throwOnError: false,
+      });
+    } catch {
+      return null;
+    }
+  }, [math]);
+
+  if (!html) {
+    return <code className="inline-code">{math}</code>;
+  }
+
+  return (
+    <span
+      className="katex-inline-container"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+};
+
 export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isError }) => {
-  // If this message content is an unsanitized raw Python/JSON error payload, clean it up
+  // Clean raw quota errors
   const cleanContent = React.useMemo(() => {
     if (!content) return '';
 
-    // Detect raw Google API / RPC resource exhausted dictionary
     if (
       content.includes('RESOURCE_EXHAUSTED') ||
       content.includes("'status': 'RESOURCE_EXHAUSTED'") ||
@@ -46,6 +212,10 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
   // Code Block Component with Copy Button
   const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, code }) => {
     const [copied, setCopied] = useState<boolean>(false);
+
+    if (language.toLowerCase() === 'mermaid') {
+      return <MermaidDiagram code={code} />;
+    }
 
     const handleCopy = () => {
       void navigator.clipboard.writeText(code);
@@ -83,56 +253,86 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     );
   };
 
-  // Helper to format inline markdown (bold, italic, inline code, links)
+  // Helper to format inline markdown, including KaTeX inline math ($...$ and \(...\))
   const formatInline = (text: string): React.ReactNode[] => {
-    // Split by inline code first: `code`
-    const parts = text.split(/(`[^`]+`)/g);
+    // 1. Split by inline math: $...$ (ensure not double $$ and not currency like $100)
+    // or \( ... \)
+    const mathTokenRegex = /(\\\([\s\S]+?\\\)|(?<!\$)\$(?!\$)(?:[^\$\n]|\\\$)+?(?<!\$)\$(?!\$))/g;
+    const mathSegments = text.split(mathTokenRegex);
 
-    return parts.map((part, pIdx) => {
-      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-        return (
-          <code key={pIdx} className="inline-code">
-            {part.slice(1, -1)}
-          </code>
-        );
+    return mathSegments.map((segment, sIdx) => {
+      if (!segment) return null;
+
+      // Check if this segment is inline math
+      if (segment.startsWith('\\(') && segment.endsWith('\\)')) {
+        return <KaTeXInline key={`math-${sIdx}`} math={segment.slice(2, -2)} />;
+      }
+      if (
+        segment.startsWith('$') &&
+        segment.endsWith('$') &&
+        segment.length > 2 &&
+        !/^\$\d+[\d,.]*$/.test(segment)
+      ) {
+        return <KaTeXInline key={`math-${sIdx}`} math={segment.slice(1, -1)} />;
       }
 
-      // Format bold and italics inside this segment
-      const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
-      return (
-        <React.Fragment key={pIdx}>
-          {boldParts.map((bPart, bIdx) => {
-            if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length > 4) {
-              return <strong key={bIdx}>{bPart.slice(2, -2)}</strong>;
-            }
+      // 2. Split by inline code: `code`
+      const parts = segment.split(/(`[^`]+`)/g);
 
-            // Format *italic*
-            const italicParts = bPart.split(/(\*[^*]+\*)/g);
-            return (
-              <React.Fragment key={bIdx}>
-                {italicParts.map((iPart, iIdx) => {
-                  if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length > 2) {
-                    return <em key={iIdx}>{iPart.slice(1, -1)}</em>;
-                  }
-                  return iPart;
-                })}
-              </React.Fragment>
-            );
-          })}
-        </React.Fragment>
-      );
+      return parts.map((part, pIdx) => {
+        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+          return (
+            <code key={`code-${sIdx}-${pIdx}`} className="inline-code">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+
+        // 3. Format bold: **bold**
+        const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+        return (
+          <React.Fragment key={`bold-${sIdx}-${pIdx}`}>
+            {boldParts.map((bPart, bIdx) => {
+              if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length > 4) {
+                return <strong key={bIdx}>{bPart.slice(2, -2)}</strong>;
+              }
+
+              // 4. Format *italic*
+              const italicParts = bPart.split(/(\*[^*]+\*)/g);
+              return (
+                <React.Fragment key={bIdx}>
+                  {italicParts.map((iPart, iIdx) => {
+                    if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length > 2) {
+                      return <em key={iIdx}>{iPart.slice(1, -1)}</em>;
+                    }
+                    return iPart;
+                  })}
+                </React.Fragment>
+              );
+            })}
+          </React.Fragment>
+        );
+      });
     });
   };
 
-  // Parse lines into blocks
+  // Parse lines into blocks: KaTeX display math, Mermaid diagrams, Tables, and standard elements
   const parseBlocks = (text: string): React.ReactNode[] => {
     const lines = text.split('\n');
     const nodes: React.ReactNode[] = [];
     let inCodeBlock = false;
     let codeLanguage = '';
     let codeLines: string[] = [];
+
+    let inMathBlock = false;
+    let mathLines: string[] = [];
+
     let listItems: string[] = [];
     let isOrderedList = false;
+
+    let inTable = false;
+    let tableLines: string[] = [];
+
     let autoDetectedFile: string | null = null;
 
     const flushList = () => {
@@ -157,8 +357,53 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       listItems = [];
     };
 
-    // Check for auto-detected file mentions like "exported in INT335_P24_chat_export.md" or "saved to report.md"
-    const fileMentionMatch = text.match(/(?:exported\s+(?:in|to)|saved\s+(?:in|to)|created\s+(?:file|doc(?:ument)?)|file:?)\s+([a-zA-Z0-9_\-\.]+\.(?:md|pdf|docx|csv|xlsx|txt|py|json|html))\b/i);
+    const flushTable = () => {
+      if (tableLines.length === 0) return;
+      const rows = tableLines.map((row) =>
+        row
+          .trim()
+          .replace(/^\|/, '')
+          .replace(/\|$/, '')
+          .split('|')
+          .map((c) => c.trim())
+      );
+
+      // Verify at least header and divider rows
+      if (rows.length >= 2) {
+        const headerCells = rows[0];
+        const bodyRows = rows.slice(2);
+
+        nodes.push(
+          <div key={`table-wrapper-${nodes.length}`} className="md-table-container">
+            <table className="md-table">
+              <thead>
+                <tr>
+                  {headerCells.map((h, hIdx) => (
+                    <th key={hIdx}>{formatInline(h)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((r, rIdx) => (
+                  <tr key={rIdx}>
+                    {r.map((cell, cIdx) => (
+                      <td key={cIdx}>{formatInline(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      tableLines = [];
+      inTable = false;
+    };
+
+    // Check for auto-detected file mentions
+    const fileMentionMatch = text.match(
+      /(?:exported\s+(?:in|to)|saved\s+(?:in|to)|created\s+(?:file|doc(?:ument)?)|file:?)\s+([a-zA-Z0-9_\-\.]+\.(?:md|pdf|docx|csv|xlsx|txt|py|json|html))\b/i
+    );
     if (fileMentionMatch && !text.includes('file-card:')) {
       autoDetectedFile = fileMentionMatch[1];
     }
@@ -166,10 +411,55 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Code block start / end
+      // 1. Math Display Block: $$ or \[
+      if (line.trim().startsWith('$$') || line.trim().startsWith('\\[')) {
+        flushList();
+        flushTable();
+        // Single-line block math: $$ formula $$
+        if (
+          (line.trim().startsWith('$$') && line.trim().endsWith('$$') && line.trim().length > 4) ||
+          (line.trim().startsWith('\\[') && line.trim().endsWith('\\]') && line.trim().length > 4)
+        ) {
+          const formula = line
+            .trim()
+            .replace(/^\$\$/, '')
+            .replace(/\$\$$/, '')
+            .replace(/^\\\[/, '')
+            .replace(/\\\]$/, '');
+          nodes.push(<KaTeXBlock key={`katex-${nodes.length}`} math={formula} />);
+          continue;
+        }
+
+        if (!inMathBlock) {
+          inMathBlock = true;
+          mathLines = [line.trim().replace(/^(\$\$|\\\[)/, '')];
+          continue;
+        } else {
+          inMathBlock = false;
+          mathLines.push(line.trim().replace(/(\$\$|\\\])$/, ''));
+          nodes.push(<KaTeXBlock key={`katex-${nodes.length}`} math={mathLines.join('\n')} />);
+          mathLines = [];
+          continue;
+        }
+      }
+
+      if (inMathBlock) {
+        if (line.trim().endsWith('$$') || line.trim().endsWith('\\]')) {
+          inMathBlock = false;
+          mathLines.push(line.trim().replace(/(\$\$|\\\])$/, ''));
+          nodes.push(<KaTeXBlock key={`katex-${nodes.length}`} math={mathLines.join('\n')} />);
+          mathLines = [];
+        } else {
+          mathLines.push(line);
+        }
+        continue;
+      }
+
+      // 2. Code Block: ```
       if (line.trim().startsWith('```')) {
+        flushList();
+        flushTable();
         if (!inCodeBlock) {
-          flushList();
           inCodeBlock = true;
           codeLanguage = line.trim().slice(3).trim();
           codeLines = [];
@@ -192,7 +482,17 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         continue;
       }
 
-      // Check lists
+      // 3. Markdown Table rows: | col | col |
+      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+        flushList();
+        inTable = true;
+        tableLines.push(line);
+        continue;
+      } else if (inTable) {
+        flushTable();
+      }
+
+      // 4. Lists
       const bulletMatch = line.match(/^\s*[-*]\s+(.*)$/);
       if (bulletMatch) {
         if (isOrderedList) flushList();
@@ -209,10 +509,9 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         continue;
       }
 
-      // Flush any active list if we hit non-list line
       flushList();
 
-      // Explicit File card comment: <!-- file-card: filename | type | url -->
+      // 5. File Card Comment: <!-- file-card: ... -->
       const fileCardMatch = line.trim().match(/<!--\s*file-card:\s*([^|]+)(?:\|([^|]*))?(?:\|(.*))?\s*-->/);
       if (fileCardMatch) {
         nodes.push(
@@ -223,11 +522,11 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
             downloadUrl={fileCardMatch[3]?.trim()}
           />
         );
-        autoDetectedFile = null; // Suppress auto detection if explicit card exists
+        autoDetectedFile = null;
         continue;
       }
 
-      // Standalone file link line: [filename.ext](url)
+      // 6. Standalone File Link: [file.ext](url)
       const fileLinkMatch = line.trim().match(/^\[([a-zA-Z0-9_\-\s]+\.(?:md|pdf|docx|csv|xlsx|txt|json))\]\(([^\s)]+)\)$/i);
       if (fileLinkMatch) {
         nodes.push(
@@ -241,7 +540,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         continue;
       }
 
-      // Markdown standalone image: ![alt](url) -> rendered via high-end ImageGenerationCard
+      // 7. Image Generation Card: ![alt](url)
       const imgMatch = line.trim().match(/^!\[(.*?)\]\((https?:\/\/[^\s)]+)\)$/);
       if (imgMatch) {
         nodes.push(
@@ -254,7 +553,6 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         continue;
       }
 
-      // Inline image inside line
       const inlineImgMatch = line.match(/!\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
       if (inlineImgMatch && line.trim().startsWith('![')) {
         nodes.push(
@@ -267,8 +565,10 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         continue;
       }
 
-      // Headers
-      if (line.startsWith('### ')) {
+      // 8. Headers & Typography
+      if (line.startsWith('#### ')) {
+        nodes.push(<h5 key={`h5-${nodes.length}`} className="md-h5">{formatInline(line.slice(5))}</h5>);
+      } else if (line.startsWith('### ')) {
         nodes.push(<h4 key={`h4-${nodes.length}`} className="md-h4">{formatInline(line.slice(4))}</h4>);
       } else if (line.startsWith('## ')) {
         nodes.push(<h3 key={`h3-${nodes.length}`} className="md-h3">{formatInline(line.slice(3))}</h3>);
@@ -291,7 +591,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       }
     }
 
-    // Flush any remaining code blocks or lists
+    // Flush any pending blocks
     if (inCodeBlock) {
       nodes.push(
         <CodeBlock
@@ -301,9 +601,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         />
       );
     }
+    if (inMathBlock && mathLines.length > 0) {
+      nodes.push(<KaTeXBlock key={`katex-${nodes.length}`} math={mathLines.join('\n')} />);
+    }
+    flushTable();
     flushList();
 
-    // If an exported/shared file was mentioned in the text, append the matching FileAttachmentCard at the bottom
     if (autoDetectedFile) {
       nodes.push(
         <FileAttachmentCard

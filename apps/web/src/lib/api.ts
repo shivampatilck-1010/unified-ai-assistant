@@ -82,7 +82,7 @@ export function getApiBase(): string {
   }
   const raw =
     import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD ? 'https://scoring-entertainment-then-constitutes.trycloudflare.com' : 'http://127.0.0.1:8000');
+    (import.meta.env.PROD ? 'https://like-employed-donald-producer.trycloudflare.com' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 
@@ -115,6 +115,34 @@ function buildUrl(path: string): URL {
 let currentAuthToken: string | null =
   typeof window !== 'undefined' ? localStorage.getItem('unified_ai_auth_token') : null;
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  provider: string;
+}
+
+export function getStoredUser(): UserProfile | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('unified_ai_user');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: UserProfile | null): void {
+  if (typeof window === 'undefined') return;
+  if (user) {
+    localStorage.setItem('unified_ai_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('unified_ai_user');
+  }
+}
+
 export function setAuthToken(token: string | null): void {
   currentAuthToken = token;
   if (typeof window !== 'undefined') {
@@ -127,16 +155,106 @@ export function setAuthToken(token: string | null): void {
 }
 
 export function getAuthToken(): string | null {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('unified_ai_auth_token');
+    if (stored) return stored;
+  }
   return currentAuthToken;
 }
 
+export async function loginWithGoogle(payload: {
+  credential?: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+  sub?: string;
+}): Promise<{ access_token: string; token_type: string; user: UserProfile }> {
+  const url = buildUrl('/api/auth/google');
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Google sign-in failed (${response.status}): ${await response.text()}`);
+  }
+  const data = await safeParseJson<{ access_token: string; token_type: string; user: UserProfile }>(response);
+  setAuthToken(data.access_token);
+  setStoredUser(data.user);
+  return data;
+}
+
+export async function getCurrentUser(): Promise<UserProfile> {
+  const url = buildUrl('/api/auth/me');
+  const response = await fetch(url.toString(), {
+    headers: getBaseHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch current user profile: ${response.status}`);
+  }
+  const user = await safeParseJson<UserProfile>(response);
+  setStoredUser(user);
+  return user;
+}
+
+export async function logoutUser(): Promise<void> {
+  try {
+    const url = buildUrl('/api/auth/logout');
+    await fetch(url.toString(), {
+      method: 'POST',
+      headers: getBaseHeaders(),
+    });
+  } catch {
+    // Continue with client-side cleanup
+  }
+  setAuthToken(null);
+  setStoredUser(null);
+}
+
+export interface FollowupEmailPayload {
+  recipient_email: string;
+  subject?: string;
+  custom_notes?: string;
+  include_transcript?: boolean;
+}
+
+export interface FollowupEmailResult {
+  status: string;
+  delivered: boolean;
+  delivery_mode: string;
+  recipient: string;
+  subject: string;
+  summary_points_count: number;
+  files_referenced: string[];
+  html_preview_url?: string;
+  message: string;
+}
+
+export async function sendFollowupEmail(
+  conversationId: string,
+  payload: FollowupEmailPayload
+): Promise<FollowupEmailResult> {
+  const url = buildUrl(`/api/conversations/${conversationId}/followup-email`);
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to send follow-up email (${response.status}): ${errorText}`);
+  }
+  return safeParseJson<FollowupEmailResult>(response);
+}
+
 export function getBaseHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token = getAuthToken();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...extra,
   };
-  if (currentAuthToken) {
-    headers['Authorization'] = `Bearer ${currentAuthToken}`;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 }
@@ -252,7 +370,7 @@ export async function fetchConversations(
   }
   const response = await fetch(url.toString(), {
     signal,
-    headers: { Accept: 'application/json' },
+    headers: getBaseHeaders(),
   });
 
   if (!response.ok) {
@@ -274,10 +392,9 @@ export async function createConversation(
   const response = await fetch(`${API_BASE}/api/conversations`, {
     method: 'POST',
     signal,
-    headers: {
+    headers: getBaseHeaders({
       'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -294,7 +411,7 @@ export async function fetchConversation(
 ): Promise<ConversationDetail> {
   const response = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(id)}`, {
     signal,
-    headers: { Accept: 'application/json' },
+    headers: getBaseHeaders(),
   });
 
   if (!response.ok) {
@@ -312,10 +429,9 @@ export async function renameConversation(
   const response = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     signal,
-    headers: {
+    headers: getBaseHeaders({
       'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
+    }),
     body: JSON.stringify({ title }),
   });
 
@@ -333,6 +449,7 @@ export async function deleteConversation(
   const response = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     signal,
+    headers: getBaseHeaders(),
   });
 
   if (!response.ok && response.status !== 404) {
@@ -348,7 +465,7 @@ export async function searchConversations(
   const url = `${API_BASE}/api/conversations/search?q=${encodeURIComponent(query)}&limit=${limit}`;
   const response = await fetch(url, {
     signal,
-    headers: { Accept: 'application/json' },
+    headers: getBaseHeaders(),
   });
 
   if (!response.ok) {

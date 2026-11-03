@@ -1,3 +1,4 @@
+from routers.auth import router as auth_router
 from routers.browser_tasks import router as browser_tasks_router
 from routers.calendar import router as calendar_router
 from routers.chat import router as chat_router
@@ -15,6 +16,7 @@ from routers.retention import router as retention_router
 from routers.intelligence import router as intelligence_router
 
 __all__ = [
+    "auth_router",
     "browser_tasks_router",
     "chat_router",
     "conversations_router",

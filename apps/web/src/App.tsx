@@ -209,6 +209,8 @@ export default function App() {
                 availableModels={effectiveProviderStatus?.available_models ?? []}
                 selectedModelId={selectedModelId ?? effectiveProviderStatus?.active_model ?? null}
                 onSelectModel={setSelectedModelId}
+                conversationId={activeConversation?.id ?? null}
+                conversationTitle={activeConversation?.title ?? 'Conversation'}
               />
             ) : activeSection === 'browser-agent' ? (
               <BrowserAgentView />

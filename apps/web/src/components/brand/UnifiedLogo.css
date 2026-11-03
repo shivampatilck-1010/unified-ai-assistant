@@ -1,0 +1,109 @@
+/* ==========================================================================
+   Unified AI Logo & Planetary Orbital Animation
+   ========================================================================== */
+
+.unified-logo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.unified-logo:hover {
+  transform: scale(1.06);
+}
+
+/* Image container with mask & blend for dark background */
+.unified-logo__img-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  overflow: visible;
+}
+
+.unified-logo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  /* Filter: dark U on white background -> crisp metallic platinum on dark theme */
+  filter: invert(1) brightness(1.2) contrast(1.15);
+  mix-blend-mode: screen;
+  transition: filter 0.3s ease;
+}
+
+.unified-logo:hover .unified-logo__img {
+  filter: invert(1) brightness(1.35) contrast(1.25) drop-shadow(0 0 10px rgba(255, 255, 255, 0.35));
+}
+
+/* Diagonal metallic light sheen sweep across the letter U */
+.unified-logo--animated .unified-logo__sheen {
+  position: absolute;
+  inset: -15%;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 80%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  animation: logoSheenSweep 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+@keyframes logoSheenSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  35%, 100% {
+    transform: translateX(200%) skewX(-20deg);
+  }
+}
+
+/* Glowing orbital ring pulse */
+.unified-logo--animated .unified-logo__orbit-glow {
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.15), inset 0 0 8px rgba(255, 255, 255, 0.1);
+  transform: rotateX(68deg) rotateY(15deg);
+  animation: orbitRingPulse 3s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes orbitRingPulse {
+  0% {
+    opacity: 0.4;
+    transform: rotateX(68deg) rotateY(15deg) scale(0.96);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  100% {
+    opacity: 0.9;
+    transform: rotateX(68deg) rotateY(15deg) scale(1.05);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
+  }
+}
+
+/* Subtle cosmic aura */
+.unified-logo__ambient-aura {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+  animation: auraBreathe 4s ease-in-out infinite alternate;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes auraBreathe {
+  0% { transform: scale(0.9); opacity: 0.3; }
+  100% { transform: scale(1.15); opacity: 0.7; }
+}

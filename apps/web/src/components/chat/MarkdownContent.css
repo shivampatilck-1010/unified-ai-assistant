@@ -168,3 +168,155 @@
   font-family: inherit;
   color: inherit;
 }
+
+/* ==========================================================================
+   KaTeX Math Equation Styling
+   ========================================================================== */
+
+.katex-display-container {
+  margin: 18px 0;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow-x: auto;
+  text-align: center;
+  color: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.katex-display-container .katex-display {
+  margin: 0 !important;
+}
+
+.katex-inline-container {
+  display: inline-block;
+  padding: 0 3px;
+  color: #e2e8f0;
+}
+
+.katex-fallback {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  margin: 10px 0;
+}
+
+/* ==========================================================================
+   Mermaid Diagrams Styling
+   ========================================================================== */
+
+.mermaid-diagram-container {
+  margin: 18px 0;
+  background: #11141b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.mermaid-diagram-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #181d28;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mermaid-diagram-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #60a5fa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.mermaid-diagram-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mermaid-tool-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.mermaid-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.mermaid-svg-viewport {
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+  background: #0d1017;
+}
+
+.mermaid-svg-viewport svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* ==========================================================================
+   Markdown Responsive Data Tables
+   ========================================================================== */
+
+.md-table-container {
+  margin: 18px 0;
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+  background: #12141a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.md-table th {
+  background: #1a1e28;
+  color: #f1f5f9;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.md-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #d1d5db;
+}
+
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
+.md-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+

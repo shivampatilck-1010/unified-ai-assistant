@@ -352,3 +352,37 @@
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }
 }
+
+/* Floating Scroll To Bottom Button */
+.chat-view__scroll-bottom-btn {
+  position: absolute;
+  bottom: 24px;
+  right: 28px;
+  background: #1e222d;
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  z-index: 50;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideUpFade 0.25s ease-out;
+}
+
+.chat-view__scroll-bottom-btn:hover {
+  background: #282e3d;
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
