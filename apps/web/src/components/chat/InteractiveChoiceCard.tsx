@@ -15,17 +15,18 @@ export interface InteractiveChoiceCardProps {
 export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
   question,
   options = [],
-  category = 'Clarification & Choice',
-  typeBadge = 'MCQ',
+  category = 'General',
+  typeBadge = 'LINK',
   summary,
   branches: customBranches,
   onSelectChoice,
 }) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState<boolean>(false);
-  const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
-  const [hoveredBranchId, setHoveredBranchId] = useState<string | null>(null);
-  const [copiedBranchId, setCopiedBranchId] = useState<string | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState<boolean>(false);
+  const [activeBranchIdx, setActiveBranchIdx] = useState<number>(0);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+  const [isDeleted, setIsDeleted] = useState<boolean>(false);
   const svgId = useId();
 
   // Resolve 3 explanation branches (custom or intelligently inferred)
@@ -36,7 +37,7 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
     return inferExplanationBranches(question, options, category);
   }, [customBranches, question, options, category]);
 
-  const activeBranch = branches.find((b) => b.id === activeBranchId) || null;
+  const activeBranch = branches[activeBranchIdx] || branches[0];
 
   const handleSelectOption = (idx: number, opt: string) => {
     if (submitted) return;
@@ -48,58 +49,83 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
     }
   };
 
-  const handleBranchClick = (branch: ExplanationBranch) => {
-    if (activeBranchId === branch.id) {
-      setActiveBranchId(null);
-    } else {
-      setActiveBranchId(branch.id);
+  const handleViewToggle = () => {
+    setIsViewOpen((prev) => !prev);
+  };
+
+  const handleDownload = () => {
+    const content = `=== ${question} ===\n${summary ? summary + '\n\n' : ''}${
+      options.length > 0 ? 'OPTIONS:\n' + options.map((o, i) => `[${String.fromCharCode(65 + i)}] ${o}`).join('\n') + '\n\n' : ''
+    }EXPLANATION BRANCHES:\n` +
+      branches
+        .map(
+          (b, i) =>
+            `${i + 1}. ${b.title} [${b.badge || 'CORE'}]\nSummary: ${b.summary}\n${b.formula ? `Formula: ${b.formula}\n` : ''}${
+              b.deepDive ? `Notes: ${b.deepDive}\n` : ''
+            }`
+        )
+        .join('\n\n');
+
+    navigator.clipboard.writeText(content);
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 2500);
+
+    if (onSelectChoice) {
+      onSelectChoice(`Download resource for: ${question.slice(0, 60)}`);
     }
   };
 
-  const handleBranchAction = (promptText: string) => {
-    if (onSelectChoice && promptText) {
-      onSelectChoice(promptText);
-    }
+  const handleDelete = () => {
+    setSelectedIndex(null);
+    setSubmitted(false);
+    setIsViewOpen(false);
+    setIsDeleted(true);
+    setTimeout(() => setIsDeleted(false), 2000);
   };
 
-  const handleCopyBranch = (branch: ExplanationBranch) => {
-    const textToCopy = `${branch.title}\n${branch.summary}${branch.formula ? `\nFormula: ${branch.formula}` : ''}\n${branch.deepDive || ''}`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopiedBranchId(branch.id);
-    setTimeout(() => setCopiedBranchId(null), 2000);
+  const handleAddResource = () => {
+    if (onSelectChoice) {
+      onSelectChoice(`Add resource and reference materials for: ${question.slice(0, 60)}`);
+    }
   };
 
   const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
   return (
-    <div className="choice-card-container">
-      {/* Top Outer Layout: Main Card + Right Branching Explanation Tree */}
-      <div className="choice-card-layout">
-        {/* Main Card with Cyan Boundary (#38bdf8) */}
-        <div className="choice-card-main">
-          <div className="choice-card__glow-line" />
-          
-          <div className="choice-card__header">
-            <div className="choice-card__badge-row">
-              <span className="choice-card__badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-                {typeBadge ? typeBadge.toUpperCase() : category.toUpperCase()}
-              </span>
-              <span className="choice-card__category-tag">{category}</span>
-            </div>
-            
-            <h4 className="choice-card__question">{question}</h4>
-            
-            {summary && (
-              <p className="choice-card__summary-text">{summary}</p>
-            )}
+    <div className="cortex-canvas-container">
+      {/* Top Header Row with "+ Add Resource" button matching reference */}
+      <div className="cortex-top-action-row">
+        <div className="cortex-top-section-title">
+          <span className="cortex-top-title-icon">✦</span>
+          <span>Interactive Resource & Knowledge Module</span>
+        </div>
+        <button
+          type="button"
+          className="cortex-add-resource-btn"
+          onClick={handleAddResource}
+          title="Add related resource to classroom"
+        >
+          <span className="cortex-add-plus">+</span>
+          <span>Add Resource</span>
+        </button>
+      </div>
+
+      {/* Main Layout: Main Cyan Card + SVG Circuit Tree + Chamfered Action Nodes */}
+      <div className="cortex-card-layout">
+        {/* Main Card with Neon Cyan Border (#00e5ff) */}
+        <div className="cortex-card-main">
+          <div className="cortex-card-header">
+            <span className="cortex-badge">{typeBadge.toUpperCase()}</span>
+            <span className="cortex-category">{category}</span>
           </div>
+
+          <h4 className="cortex-card-title">{question}</h4>
+
+          {summary && <p className="cortex-card-summary">{summary}</p>}
 
           {/* Options List (if provided) */}
           {options.length > 0 && (
-            <div className="choice-card__options">
+            <div className="cortex-options-list">
               {options.map((opt, idx) => {
                 const isSelected = selectedIndex === idx;
                 const letter = optionLetters[idx % optionLetters.length];
@@ -108,21 +134,19 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
                   <button
                     key={idx}
                     type="button"
-                    className={`choice-card__option-btn ${isSelected ? 'choice-card__option-btn--selected' : ''} ${
-                      submitted && !isSelected ? 'choice-card__option-btn--dimmed' : ''
+                    className={`cortex-option-btn ${isSelected ? 'cortex-option-btn--selected' : ''} ${
+                      submitted && !isSelected ? 'cortex-option-btn--dimmed' : ''
                     }`}
                     onClick={() => handleSelectOption(idx, opt)}
                     disabled={submitted}
                   >
-                    <div className="choice-card__letter-badge">{letter}</div>
-                    <span className="choice-card__option-text">{opt}</span>
-                    <div className="choice-card__radio-indicator">
+                    <div className="cortex-option-letter">{letter}</div>
+                    <span className="cortex-option-text">{opt}</span>
+                    <div className="cortex-option-radio">
                       {isSelected ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="3">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
+                        <div className="cortex-radio-checked" />
                       ) : (
-                        <div className="choice-card__radio-empty" />
+                        <div className="cortex-radio-empty" />
                       )}
                     </div>
                   </button>
@@ -132,8 +156,8 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
           )}
 
           {submitted && selectedIndex !== null && (
-            <div className="choice-card__submitted-banner">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5">
+            <div className="cortex-submitted-banner">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" strokeWidth="2.5">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
@@ -142,162 +166,194 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
               </span>
             </div>
           )}
+
+          {downloadSuccess && (
+            <div className="cortex-submitted-banner cortex-submitted-banner--download">
+              <span>✓ Resource & Study Notes downloaded to clipboard!</span>
+            </div>
+          )}
+
+          {isDeleted && (
+            <div className="cortex-submitted-banner cortex-submitted-banner--delete">
+              <span>✓ Selection cleared and reset.</span>
+            </div>
+          )}
         </div>
 
-        {/* Tree Branching Connector (SVG Curves) */}
-        {branches.length > 0 && (
-          <div className="choice-card-tree-connector" aria-hidden="true">
-            <svg viewBox="0 0 46 130" className="choice-card-tree-svg" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id={`${svgId}-cyan-grad`} x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#00d2ff" stopOpacity="0.9" />
-                </linearGradient>
-                <filter id={`${svgId}-glow`} x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="2.5" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
+        {/* SVG Circuit Connector Tree (Matching Reference Exact Geometry) */}
+        <div className="cortex-tree-connector" aria-hidden="true">
+          <svg
+            width="60"
+            height="132"
+            viewBox="0 0 60 132"
+            className="cortex-tree-svg"
+          >
+            <defs>
+              <filter id={`${svgId}-cyanGlow`} x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id={`${svgId}-roseGlow`} x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-              {/* Branch 0: Curves up */}
-              <path
-                d="M 2 65 C 20 65, 20 20, 44 20"
-                fill="none"
-                className={`choice-card-tree-path ${
-                  activeBranchId === branches[0]?.id || hoveredBranchId === branches[0]?.id
-                    ? 'choice-card-tree-path--active'
-                    : ''
-                }`}
-              />
-              {/* Branch 1: Straight middle */}
-              <path
-                d="M 2 65 L 44 65"
-                fill="none"
-                className={`choice-card-tree-path ${
-                  activeBranchId === branches[1]?.id || hoveredBranchId === branches[1]?.id
-                    ? 'choice-card-tree-path--active'
-                    : ''
-                }`}
-              />
-              {/* Branch 2: Curves down */}
-              <path
-                d="M 2 65 C 20 65, 20 110, 44 110"
-                fill="none"
-                className={`choice-card-tree-path ${
-                  activeBranchId === branches[2]?.id || hoveredBranchId === branches[2]?.id
-                    ? 'choice-card-tree-path--active'
-                    : ''
-                }`}
-              />
+            {/* Trunk */}
+            <line x1="0" y1="66" x2="16" y2="66" stroke="#00e5ff" strokeWidth="1.8" filter={`url(#${svgId}-cyanGlow)`} />
 
-              {/* Origin anchor dot */}
-              <circle cx="2" cy="65" r="3.5" fill="#38bdf8" filter={`url(#${svgId}-glow)`} />
-              {/* Branch destination dots */}
-              <circle cx="43" cy="20" r="2.5" fill="#00d2ff" />
-              <circle cx="43" cy="65" r="2.5" fill="#00d2ff" />
-              <circle cx="43" cy="110" r="2.5" fill="#00d2ff" />
+            {/* Branch 1: Curves UP to VIEW button */}
+            <path
+              d="M 16,66 C 36,66 36,18 60,18"
+              fill="none"
+              stroke="#00e5ff"
+              strokeWidth="1.8"
+              filter={`url(#${svgId}-cyanGlow)`}
+              className={isViewOpen ? 'cortex-path--active' : ''}
+            />
+
+            {/* Branch 2: Straight horizontal to DOWNLOAD button */}
+            <path
+              d="M 16,66 L 60,66"
+              fill="none"
+              stroke="#00e5ff"
+              strokeWidth="1.8"
+              filter={`url(#${svgId}-cyanGlow)`}
+            />
+
+            {/* Branch 3: Curves DOWN to DELETE button */}
+            <path
+              d="M 16,66 C 36,66 36,114 60,114"
+              fill="none"
+              stroke="#f43f5e"
+              strokeWidth="1.8"
+              filter={`url(#${svgId}-roseGlow)`}
+            />
+
+            {/* Origin Junction Dot */}
+            <circle cx="2" cy="66" r="2.5" fill="#00e5ff" />
+
+            {/* End Dots attaching to node edges */}
+            <circle cx="58" cy="18" r="2" fill="#00e5ff" />
+            <circle cx="58" cy="66" r="2" fill="#00e5ff" />
+            <circle cx="58" cy="114" r="2" fill="#f43f5e" />
+          </svg>
+        </div>
+
+        {/* 3 Chamfered Tech Action Nodes (VIEW, DOWNLOAD, DELETE) */}
+        <div className="cortex-nodes-column">
+          {/* Node 1: VIEW */}
+          <button
+            type="button"
+            className={`cortex-action-node cortex-action-node--view ${isViewOpen ? 'cortex-action-node--active' : ''}`}
+            onClick={handleViewToggle}
+            title="Click to view full interactive explanation"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
             </svg>
-          </div>
-        )}
+            <span>{isViewOpen ? 'CLOSE' : 'VIEW'}</span>
+          </button>
 
-        {/* Right-Side Interactive Explanation Branches Column ("Here we can use it For Explaniti.") */}
-        {branches.length > 0 && (
-          <div className="choice-card-branches">
-            <div className="choice-card-branches__header">
-              <span className="choice-card-branches__sparkle">✦</span>
-              <span className="choice-card-branches__title">INTERACTIVE EXPLANATION</span>
-            </div>
+          {/* Node 2: DOWNLOAD */}
+          <button
+            type="button"
+            className="cortex-action-node cortex-action-node--download"
+            onClick={handleDownload}
+            title="Download / Copy reference notes"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>DOWNLOAD</span>
+          </button>
 
-            <div className="choice-card-branches__list">
-              {branches.map((branch) => {
-                const isActive = activeBranchId === branch.id;
-                return (
-                  <button
-                    key={branch.id}
-                    type="button"
-                    className={`choice-card-branch-pill ${isActive ? 'choice-card-branch-pill--active' : ''}`}
-                    onClick={() => handleBranchClick(branch)}
-                    onMouseEnter={() => setHoveredBranchId(branch.id)}
-                    onMouseLeave={() => setHoveredBranchId(null)}
-                    title={`Click to explore explanation: ${branch.title}`}
-                  >
-                    <div className="choice-card-branch-pill__icon">{branch.icon || '💡'}</div>
-                    <div className="choice-card-branch-pill__body">
-                      <span className="choice-card-branch-pill__title">{branch.title}</span>
-                      {branch.badge && (
-                        <span className="choice-card-branch-pill__badge">{branch.badge}</span>
-                      )}
-                    </div>
-                    <div className="choice-card-branch-pill__chevron">
-                      {isActive ? '▼' : '›'}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+          {/* Node 3: DELETE */}
+          <button
+            type="button"
+            className="cortex-action-node cortex-action-node--delete"
+            onClick={handleDelete}
+            title="Reset or clear selection"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            <span>DELETE</span>
+          </button>
+        </div>
       </div>
 
-      {/* Interactive Explanation Drawer / Drill-Down Panel (Revealed on Branch Click) */}
-      {activeBranch && (
-        <div className="choice-card-explanation-panel" role="region" aria-label="Interactive Explanation">
-          <div className="choice-card-explanation-panel__top-accent" />
-          
-          <div className="choice-card-explanation-panel__header">
-            <div className="choice-card-explanation-panel__title-group">
-              <span className="choice-card-explanation-panel__icon">{activeBranch.icon || '💡'}</span>
+      {/* Interactive Explanation View (Revealed when VIEW is clicked) */}
+      {isViewOpen && (
+        <div className="cortex-view-drawer">
+          <div className="cortex-drawer-header">
+            <div className="cortex-drawer-title-group">
+              <span className="cortex-drawer-icon">👁</span>
               <div>
-                <div className="choice-card-explanation-panel__tag-row">
-                  <span className="choice-card-explanation-panel__badge">
-                    {activeBranch.badge || 'DEEP DIVE EXPLANATION'}
-                  </span>
-                  <span className="choice-card-explanation-panel__hint">Interactive Concept Explorer</span>
-                </div>
-                <h5 className="choice-card-explanation-panel__title">{activeBranch.title}</h5>
+                <span className="cortex-drawer-sub">INTERACTIVE EXPLANATION VIEWER</span>
+                <h5 className="cortex-drawer-title">{activeBranch.title}</h5>
               </div>
             </div>
-
             <button
               type="button"
-              className="choice-card-explanation-panel__close-btn"
-              onClick={() => setActiveBranchId(null)}
-              title="Close explanation panel"
+              className="cortex-drawer-close"
+              onClick={() => setIsViewOpen(false)}
             >
               ✕
             </button>
           </div>
 
-          <div className="choice-card-explanation-panel__body">
-            <p className="choice-card-explanation-panel__summary">{activeBranch.summary}</p>
+          {/* Branch Sub-concept Tabs */}
+          <div className="cortex-branch-tabs">
+            {branches.map((b, idx) => (
+              <button
+                key={b.id || idx}
+                type="button"
+                className={`cortex-branch-tab ${activeBranchIdx === idx ? 'cortex-branch-tab--active' : ''}`}
+                onClick={() => setActiveBranchIdx(idx)}
+              >
+                <span>{b.icon || '✦'}</span>
+                <span>{b.title}</span>
+                {b.badge && <span className="cortex-tab-badge">{b.badge}</span>}
+              </button>
+            ))}
+          </div>
+
+          <div className="cortex-drawer-body">
+            <p className="cortex-drawer-summary">{activeBranch.summary}</p>
 
             {activeBranch.formula && (
-              <div className="choice-card-explanation-panel__formula-box">
-                <div className="choice-card-explanation-panel__formula-label">KEY EQUATION / MECHANISM:</div>
-                <div className="choice-card-explanation-panel__formula-text">{activeBranch.formula}</div>
+              <div className="cortex-formula-box">
+                <div className="cortex-formula-label">GOVERNING EQUATION / MECHANISM:</div>
+                <div className="cortex-formula-code">{activeBranch.formula}</div>
               </div>
             )}
 
             {activeBranch.deepDive && (
-              <div className="choice-card-explanation-panel__deep-dive">
-                <strong>Mechanism Note:</strong> {activeBranch.deepDive}
+              <div className="cortex-deep-dive">
+                <strong>Mechanism Insight:</strong> {activeBranch.deepDive}
               </div>
             )}
           </div>
 
-          {/* Action Toolbar */}
-          <div className="choice-card-explanation-panel__actions">
+          <div className="cortex-drawer-actions">
             {activeBranch.interactiveSimType && (
               <button
                 type="button"
-                className="choice-card-explanation-panel__action-btn choice-card-explanation-panel__action-btn--sim"
+                className="cortex-btn-action cortex-btn-action--sim"
                 onClick={() =>
-                  handleBranchAction(
-                    `Show interactive simulation for ${activeBranch.title} with live visuals and step-by-step breakdown.`
-                  )
+                  onSelectChoice &&
+                  onSelectChoice(`Show interactive simulation for ${activeBranch.title} with live controls`)
                 }
               >
                 <span>⚛️</span>
@@ -307,24 +363,19 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
 
             <button
               type="button"
-              className="choice-card-explanation-panel__action-btn"
+              className="cortex-btn-action"
               onClick={() =>
-                handleBranchAction(
-                  activeBranch.actionPrompt || `Explain the detailed mechanism of ${activeBranch.title} in depth.`
-                )
+                onSelectChoice &&
+                onSelectChoice(activeBranch.actionPrompt || `Explain the mechanism of ${activeBranch.title} in detail.`)
               }
             >
               <span>💬</span>
               <span>Ask AI Deeper</span>
             </button>
 
-            <button
-              type="button"
-              className="choice-card-explanation-panel__action-btn"
-              onClick={() => handleCopyBranch(activeBranch)}
-            >
-              <span>{copiedBranchId === activeBranch.id ? '✓' : '📋'}</span>
-              <span>{copiedBranchId === activeBranch.id ? 'Copied!' : 'Copy Note'}</span>
+            <button type="button" className="cortex-btn-action" onClick={handleDownload}>
+              <span>📋</span>
+              <span>Copy Notes</span>
             </button>
           </div>
         </div>

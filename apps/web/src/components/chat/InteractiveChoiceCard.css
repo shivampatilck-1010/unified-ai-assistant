@@ -1,384 +1,390 @@
 /* ==========================================================================
-   InteractiveChoiceCard.css — Sleek Neon Cyan Boundary (#38bdf8 / #070709)
-   With Interactive Explanation Branching Tree ("Here we can use it For Explaniti.")
+   InteractiveChoiceCard.css — Pixel-Perfect Cortex Classroom UI Style
+   Matching reference image: Dot Matrix Canvas + Neon Cyan Card (#00e5ff) +
+   SVG Circuit Tree + Chamfered Action Nodes [VIEW], [DOWNLOAD], [DELETE]
    ========================================================================== */
 
-.choice-card-container {
-  margin: 20px 0 26px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Outer Dot-Matrix Canvas Container (Exactly matching reference screenshot) */
+.cortex-canvas-container {
+  margin: 22px 0 28px 0;
+  padding: 20px 22px;
+  background-color: #07090e;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.11) 1.2px, transparent 1.2px);
+  background-size: 18px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  position: relative;
+  overflow: hidden;
 }
 
-/* Outer layout: Main Card on left + SVG Tree Connector + Branch Pills on right */
-.choice-card-layout {
+/* --- Top Action Row with "+ Add Resource" Button --- */
+.cortex-top-action-row {
   display: flex;
-  align-items: stretch;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+.cortex-top-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.cortex-top-title-icon {
+  color: #00e5ff;
+}
+
+.cortex-add-resource-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.cortex-add-resource-btn:hover {
+  background: rgba(0, 229, 255, 0.06);
+  border-color: rgba(0, 229, 255, 0.5);
+  color: #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+}
+
+.cortex-add-plus {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* --- Main Layout: Card on Left + SVG Circuit Tree + Action Nodes on Right --- */
+.cortex-card-layout {
+  display: flex;
+  align-items: center;
   gap: 0;
   position: relative;
   width: 100%;
 }
 
-/* --- Main Card: Neon Cyan Boundary (#38bdf8) & Obsidian Background (#070709) --- */
-.choice-card-main {
+/* --- Main Card: Neon Cyan Border (#00e5ff) --- */
+.cortex-card-main {
   flex: 1;
   min-width: 0;
-  position: relative;
-  background: #070709;
-  border: 1.5px solid #38bdf8;
+  background: #090e17;
+  border: 1.5px solid #00e5ff;
   border-radius: 12px;
-  padding: 18px 20px;
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.65), 0 0 18px rgba(56, 189, 248, 0.22), inset 0 0 12px rgba(56, 189, 248, 0.04);
-  overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 16px 20px;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.18), inset 0 0 14px rgba(0, 229, 255, 0.02);
+  position: relative;
+  transition: all 0.2s ease;
   z-index: 2;
 }
 
-.choice-card-main:hover {
-  border-color: #00d2ff;
-  box-shadow: 0 8px 34px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 210, 255, 0.35);
+.cortex-card-main:hover {
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.28), inset 0 0 18px rgba(0, 229, 255, 0.04);
 }
 
-/* Top Neon Animated Electric Line */
-.choice-card__glow-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #00d2ff, #38bdf8, #818cf8, #00d2ff);
-  background-size: 200% 100%;
-  animation: cyanGlowSlide 3.5s linear infinite;
-}
-
-@keyframes cyanGlowSlide {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-
-.choice-card__header {
-  margin-bottom: 14px;
-}
-
-.choice-card__badge-row {
+.cortex-card-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 8px;
-}
-
-.choice-card__badge {
-  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: rgba(56, 189, 248, 0.14);
-  color: #38bdf8;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  padding: 2.5px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  margin-bottom: 8px;
 }
 
-.choice-card__category-tag {
+.cortex-badge {
+  background: #141b26;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 2.5px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #cbd5e1;
+  text-transform: uppercase;
+}
+
+.cortex-category {
   font-size: 11px;
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
 
-.choice-card__question {
+.cortex-card-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #f8fafc;
-  line-height: 1.45;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.42;
 }
 
-.choice-card__summary-text {
-  margin: 8px 0 0 0;
-  font-size: 13px;
-  color: #cbd5e1;
+.cortex-card-summary {
+  margin: 6px 0 0 0;
+  font-size: 12px;
+  color: #94a3b8;
   line-height: 1.5;
 }
 
-/* --- Options List --- */
-.choice-card__options {
+/* --- Options List (MCQ) --- */
+.cortex-options-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 7px;
+  margin-top: 12px;
 }
 
-.choice-card__option-btn {
+.cortex-option-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 8px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
   color: #e2e8f0;
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: left;
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all 0.15s ease;
 }
 
-.choice-card__option-btn:hover:not(:disabled) {
-  background: rgba(56, 189, 248, 0.09);
-  border-color: rgba(56, 189, 248, 0.45);
+.cortex-option-btn:hover:not(:disabled) {
+  background: rgba(0, 229, 255, 0.07);
+  border-color: rgba(0, 229, 255, 0.4);
   transform: translateX(2px);
 }
 
-.choice-card__option-btn--selected {
-  background: rgba(56, 189, 248, 0.18) !important;
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.28);
+.cortex-option-btn--selected {
+  background: rgba(0, 229, 255, 0.15) !important;
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
 }
 
-.choice-card__option-btn--dimmed {
+.cortex-option-btn--dimmed {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-.choice-card__letter-badge {
+.cortex-option-letter {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #cbd5e1;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
-  transition: all 0.16s ease;
 }
 
-.choice-card__option-btn:hover:not(:disabled) .choice-card__letter-badge {
-  border-color: #38bdf8;
-  color: #38bdf8;
+.cortex-option-btn--selected .cortex-option-letter {
+  background: #00e5ff;
+  color: #07090e;
+  border-color: #00e5ff;
 }
 
-.choice-card__option-btn--selected .choice-card__letter-badge {
-  background: #38bdf8;
-  color: #070709;
-  border-color: #38bdf8;
-  font-weight: 800;
-}
-
-.choice-card__option-text {
+.cortex-option-text {
   flex: 1;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
-.choice-card__radio-indicator {
+.cortex-option-radio {
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
   flex-shrink: 0;
 }
 
-.choice-card__radio-empty {
-  width: 14px;
-  height: 14px;
+.cortex-radio-empty {
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.25);
-  transition: border-color 0.15s ease;
 }
 
-.choice-card__option-btn:hover:not(:disabled) .choice-card__radio-empty {
-  border-color: #38bdf8;
+.cortex-option-btn:hover:not(:disabled) .cortex-radio-empty {
+  border-color: #00e5ff;
 }
 
-.choice-card__submitted-banner {
+.cortex-radio-checked {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid #00e5ff;
+  background: #00e5ff;
+  box-shadow: 0 0 8px #00e5ff;
+}
+
+.cortex-submitted-banner {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 14px;
-  padding: 9px 13px;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.28);
   border-radius: 6px;
-  color: #38bdf8;
-  font-size: 12.5px;
+  color: #00e5ff;
+  font-size: 12px;
+}
+
+.cortex-submitted-banner--download {
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: #4ade80;
+}
+
+.cortex-submitted-banner--delete {
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.3);
+  color: #f43f5e;
 }
 
 /* ==========================================================================
-   SVG Tree Connector
+   SVG Circuit Tree Connector (Exact 60px x 132px Vector Trace)
    ========================================================================== */
-.choice-card-tree-connector {
-  width: 44px;
+.cortex-tree-connector {
+  width: 60px;
+  height: 132px;
   flex-shrink: 0;
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.choice-card-tree-svg {
-  width: 100%;
-  height: 100%;
-  min-height: 130px;
+  position: relative;
   overflow: visible;
 }
 
-.choice-card-tree-path {
-  stroke: rgba(56, 189, 248, 0.35);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-  transition: all 0.25s ease;
+.cortex-tree-svg {
+  width: 60px;
+  height: 132px;
+  overflow: visible;
 }
 
-.choice-card-tree-path--active {
-  stroke: #00d2ff;
-  stroke-width: 2.5;
-  stroke-dasharray: none;
-  filter: drop-shadow(0 0 6px #00d2ff);
-  animation: branchPulse 1.8s ease-in-out infinite alternate;
-}
-
-@keyframes branchPulse {
-  0% { stroke: #38bdf8; filter: drop-shadow(0 0 4px #38bdf8); }
-  100% { stroke: #00ffff; filter: drop-shadow(0 0 9px #00ffff); }
+.cortex-path--active {
+  stroke-width: 2.4 !important;
+  filter: drop-shadow(0 0 6px #00e5ff) !important;
 }
 
 /* ==========================================================================
-   Right-Side Explanation Branches ("Here we can use it For Explaniti.")
+   Chamfered Action Nodes (VIEW, DOWNLOAD, DELETE)
    ========================================================================== */
-.choice-card-branches {
-  width: 240px;
+.cortex-nodes-column {
+  width: 140px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  height: 132px;
+  justify-content: space-between;
+}
+
+.cortex-action-node {
+  position: relative;
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 4px 0;
-}
-
-.choice-card-branches__header {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding-left: 4px;
-  margin-bottom: 2px;
-}
-
-.choice-card-branches__sparkle {
-  color: #38bdf8;
+  width: 100%;
+  height: 36px;
+  background: #090e17;
+  color: #ffffff;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   font-size: 11px;
-}
-
-.choice-card-branches__title {
-  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #7dd3fc;
   text-transform: uppercase;
-}
-
-.choice-card-branches__list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.choice-card-branch-pill {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 9px 12px;
-  background: #0a0d14;
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 9px;
-  color: #e2e8f0;
   cursor: pointer;
-  text-align: left;
   transition: all 0.18s ease;
-  position: relative;
-  overflow: hidden;
+  user-select: none;
+  /* Chamfered cut corners on top-left and bottom-right matching reference */
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+  border: 1px solid rgba(0, 229, 255, 0.35);
 }
 
-.choice-card-branch-pill:hover {
-  background: rgba(56, 189, 248, 0.09);
-  border-color: #38bdf8;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
-  transform: translateX(2px);
+.cortex-action-node::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent);
+  pointer-events: none;
 }
 
-.choice-card-branch-pill--active {
-  background: rgba(56, 189, 248, 0.16) !important;
-  border-color: #00d2ff !important;
-  box-shadow: 0 0 18px rgba(0, 210, 255, 0.35) !important;
+.cortex-action-node--view {
+  border-color: rgba(0, 229, 255, 0.4);
 }
 
-.choice-card-branch-pill__icon {
-  font-size: 15px;
-  line-height: 1;
-  flex-shrink: 0;
+.cortex-action-node--view:hover,
+.cortex-action-node--active {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
 }
 
-.choice-card-branch-pill__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.cortex-action-node--download {
+  border-color: rgba(0, 229, 255, 0.3);
 }
 
-.choice-card-branch-pill__title {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #f1f5f9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.cortex-action-node--download:hover {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
 }
 
-.choice-card-branch-pill__badge {
-  font-size: 9px;
-  font-weight: 700;
-  color: #38bdf8;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.cortex-action-node--delete {
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #f43f5e;
 }
 
-.choice-card-branch-pill__chevron {
-  font-size: 13px;
-  color: #38bdf8;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.choice-card-branch-pill--active .choice-card-branch-pill__chevron {
-  opacity: 1;
-  color: #00d2ff;
+.cortex-action-node--delete:hover {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: #f43f5e;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.4);
+  color: #ff6b81;
 }
 
 /* ==========================================================================
-   Interactive Explanation Drawer / Deep Dive Panel
+   Interactive Explanation Drawer (Triggered on VIEW click)
    ========================================================================== */
-.choice-card-explanation-panel {
-  background: #090c12;
-  border: 1.5px solid #00d2ff;
+.cortex-view-drawer {
+  margin-top: 14px;
+  background: #090e17;
+  border: 1.5px solid #00e5ff;
   border-radius: 10px;
   padding: 16px 18px;
-  position: relative;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 210, 255, 0.22);
-  animation: panelSlideDown 0.25s ease-out;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 229, 255, 0.22);
+  animation: cortexDrawerSlide 0.22s ease-out;
 }
 
-@keyframes panelSlideDown {
+@keyframes cortexDrawerSlide {
   from {
     opacity: 0;
     transform: translateY(-8px);
@@ -389,65 +395,41 @@
   }
 }
 
-.choice-card-explanation-panel__top-accent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #00d2ff, #38bdf8, #818cf8);
-}
-
-.choice-card-explanation-panel__header {
+.cortex-drawer-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 12px;
-  gap: 12px;
 }
 
-.choice-card-explanation-panel__title-group {
+.cortex-drawer-title-group {
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
-.choice-card-explanation-panel__icon {
-  font-size: 20px;
+.cortex-drawer-icon {
+  font-size: 18px;
   line-height: 1.2;
 }
 
-.choice-card-explanation-panel__tag-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 3px;
-}
-
-.choice-card-explanation-panel__badge {
+.cortex-drawer-sub {
   font-size: 9.5px;
   font-weight: 700;
-  color: #00d2ff;
-  background: rgba(0, 210, 255, 0.12);
-  border: 1px solid rgba(0, 210, 255, 0.35);
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  color: #00e5ff;
+  text-transform: uppercase;
+  display: block;
 }
 
-.choice-card-explanation-panel__hint {
-  font-size: 11px;
-  color: #94a3b8;
+.cortex-drawer-title {
+  margin: 2px 0 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
 }
 
-.choice-card-explanation-panel__title {
-  margin: 0;
-  font-size: 14.5px;
-  font-weight: 600;
-  color: #f8fafc;
-}
-
-.choice-card-explanation-panel__close-btn {
+.cortex-drawer-close {
   background: transparent;
   border: none;
   color: #94a3b8;
@@ -455,16 +437,62 @@
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.cortex-drawer-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Concept Sub-tabs */
+.cortex-branch-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.cortex-branch-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 
-.choice-card-explanation-panel__close-btn:hover {
-  color: #f1f5f9;
-  background: rgba(255, 255, 255, 0.08);
+.cortex-branch-tab:hover {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: rgba(0, 229, 255, 0.35);
+  color: #ffffff;
 }
 
-.choice-card-explanation-panel__body {
-  font-size: 13px;
+.cortex-branch-tab--active {
+  background: rgba(0, 229, 255, 0.16) !important;
+  border-color: #00e5ff !important;
+  color: #00e5ff !important;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+}
+
+.cortex-tab-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.cortex-drawer-body {
+  font-size: 12.5px;
   color: #e2e8f0;
   line-height: 1.55;
   display: flex;
@@ -472,106 +500,100 @@
   gap: 10px;
 }
 
-.choice-card-explanation-panel__summary {
+.cortex-drawer-summary {
   margin: 0;
 }
 
-.choice-card-explanation-panel__formula-box {
-  background: #05070a;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+.cortex-formula-box {
+  background: #05070c;
+  border: 1px solid rgba(0, 229, 255, 0.3);
   border-radius: 6px;
-  padding: 9px 12px;
+  padding: 8px 12px;
 }
 
-.choice-card-explanation-panel__formula-label {
-  font-size: 10px;
+.cortex-formula-label {
+  font-size: 9.5px;
   font-weight: 700;
-  color: #38bdf8;
   letter-spacing: 0.06em;
-  margin-bottom: 4px;
+  color: #00e5ff;
+  margin-bottom: 3px;
 }
 
-.choice-card-explanation-panel__formula-text {
-  font-family: var(--font-mono, 'Fira Code', Menlo, monospace);
-  font-size: 12.5px;
+.cortex-formula-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
   color: #7dd3fc;
   font-weight: 500;
 }
 
-.choice-card-explanation-panel__deep-dive {
-  font-size: 12px;
+.cortex-deep-dive {
+  font-size: 11.5px;
   color: #94a3b8;
   line-height: 1.45;
   background: rgba(255, 255, 255, 0.02);
   padding: 8px 10px;
   border-radius: 5px;
-  border-left: 2px solid #38bdf8;
+  border-left: 2px solid #00e5ff;
 }
 
-/* Action Toolbar */
-.choice-card-explanation-panel__actions {
+.cortex-drawer-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   flex-wrap: wrap;
 }
 
-.choice-card-explanation-panel__action-btn {
+.cortex-btn-action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #e2e8f0;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   padding: 5px 11px;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.choice-card-explanation-panel__action-btn:hover {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: #38bdf8;
-  color: #38bdf8;
+.cortex-btn-action:hover {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: #00e5ff;
+  color: #00e5ff;
 }
 
-.choice-card-explanation-panel__action-btn--sim {
-  background: rgba(56, 189, 248, 0.14);
-  border-color: rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
-}
-
-.choice-card-explanation-panel__action-btn--sim:hover {
-  background: rgba(56, 189, 248, 0.22);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+.cortex-btn-action--sim {
+  background: rgba(0, 229, 255, 0.14);
+  border-color: rgba(0, 229, 255, 0.4);
+  color: #00e5ff;
 }
 
 /* ==========================================================================
    Responsive Adaptations
    ========================================================================== */
-@media (max-width: 860px) {
-  .choice-card-layout {
+@media (max-width: 768px) {
+  .cortex-card-layout {
     flex-direction: column;
     gap: 12px;
   }
 
-  .choice-card-tree-connector {
+  .cortex-tree-connector {
     display: none;
   }
 
-  .choice-card-branches {
+  .cortex-nodes-column {
     width: 100%;
-    padding: 0;
+    height: auto;
+    flex-direction: row;
+    gap: 8px;
   }
 
-  .choice-card-branches__list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 8px;
+  .cortex-action-node {
+    flex: 1;
   }
 }
