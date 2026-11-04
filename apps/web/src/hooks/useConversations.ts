@@ -233,11 +233,30 @@ export function useConversations(backendConnected: boolean = true) {
       abortRef.current = controller;
       setIsStreaming(true);
 
+      // Build complete conversation history so the model follows prior context
+      const priorHistory: Array<{ role: string; content: string }> = (
+        activeConversation?.messages || []
+      )
+        .filter(
+          (m) =>
+            !m.isError &&
+            Boolean(m.content && m.content.trim()) &&
+            m.id !== assistantMsgId &&
+            m.id !== userMsg.id
+        )
+        .map((m) => ({
+          role: m.role,
+          content: m.content.trim(),
+        }));
+
+      const fullHistory = [...priorHistory, { role: 'user', content: content.trim() }];
+
       try {
         await streamChat(
           {
             conversation_id: effectiveConvId,
             message: content,
+            messages: fullHistory,
             provider: provider || undefined,
             model: model || undefined,
             use_knowledge: useKnowledge,

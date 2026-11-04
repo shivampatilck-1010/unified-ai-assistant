@@ -216,21 +216,60 @@ export default {
       const userMessage = body.message || '';
       const chosenModel = body.model || 'gemini-3-flash-preview';
 
-      // Format conversation contents for Google Gemini API
-      const geminiContents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-      if (body.messages && Array.isArray(body.messages) && body.messages.length > 0) {
-        for (const m of body.messages) {
+      // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
+      const geminiContents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+      const rawList =
+        body.messages && Array.isArray(body.messages) && body.messages.length > 0
+          ? [...body.messages]
+          : userMessage
+          ? [{ role: 'user', content: userMessage }]
+          : [];
+
+      // If userMessage wasn't at the end of messages, append it
+      if (
+        userMessage &&
+        rawList.length > 0 &&
+        rawList[rawList.length - 1].content !== userMessage
+      ) {
+        rawList.push({ role: 'user', content: userMessage });
+      }
+
+      for (const m of rawList) {
+        const text = (m.content || '').trim();
+        if (!text) continue;
+        const role: 'user' | 'model' = m.role === 'assistant' ? 'model' : 'user';
+
+        const last = geminiContents[geminiContents.length - 1];
+        if (last && last.role === role) {
+          last.parts.push({ text: `\n${text}` });
+        } else {
           geminiContents.push({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content || '' }],
+            role,
+            parts: [{ text }],
           });
         }
-      } else if (userMessage) {
+      }
+
+      // Ensure conversation begins with a 'user' turn
+      while (geminiContents.length > 0 && geminiContents[0].role !== 'user') {
+        geminiContents.shift();
+      }
+
+      if (geminiContents.length === 0 && userMessage) {
         geminiContents.push({
           role: 'user',
           parts: [{ text: userMessage }],
         });
       }
+
+      const systemInstruction = {
+        parts: [
+          {
+            text:
+              'You are Unified AI Assistant, an advanced multimodal coding and reasoning AI. You have full contextual memory of the ongoing conversation history. When the user asks follow-up questions referencing previous concepts, topics, or code (such as "give code of that" or "explain further"), immediately connect your answer to the preceding discussion without asking them to repeat themselves.',
+          },
+        ],
+      };
 
       // Stream transform setup
       const encoder = new TextEncoder();
@@ -271,7 +310,10 @@ export default {
               const resp = await fetch(geminiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: geminiContents }),
+                body: JSON.stringify({
+                  contents: geminiContents,
+                  system_instruction: systemInstruction,
+                }),
               });
 
               if (resp.ok && resp.body) {

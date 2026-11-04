@@ -45,6 +45,7 @@ export interface ChatRequest {
   use_orchestration?: boolean;
   project_id?: string | null;
   custom_api_key?: string | null;
+  messages?: Array<{ role: string; content: string }>;
 }
 
 export interface HealthResponse {
