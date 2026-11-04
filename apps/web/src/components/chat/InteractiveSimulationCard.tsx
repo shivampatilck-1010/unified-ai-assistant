@@ -64,6 +64,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   const [activeTab, setActiveTab] = useState<'sim' | 'code'>('sim');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [activeSimOverride, setActiveSimOverride] = useState<string | null>(null);
   // Hover Inspector State for Canvas & SVG elements
   const [hoveredInfo, setHoveredInfo] = useState<HoveredInfo | null>(null);
   const hoveredParticleIdRef = useRef<number | null>(null);
@@ -71,6 +72,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
 
   // Determine actual simulation type
   const resolvedType = React.useMemo(() => {
+    if (activeSimOverride) return activeSimOverride;
     // If explicitly provided a specific type (other than generic custom-html), use it
     if (type && type !== 'custom-html') return type;
 
@@ -1506,6 +1508,58 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   // =========================================================================
   const renderCustomHtml = () => {
     let cleanCode = code.trim();
+    const hasHtmlTags = /<[a-z][\s\S]*>/i.test(cleanCode);
+
+    if (!hasHtmlTags) {
+      return (
+        <div style={{ padding: '36px 20px', textAlign: 'center', color: '#94a3b8' }}>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '8px' }}>
+            ⚡ Interactive Simulation Engines Ready
+          </div>
+          <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '440px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+            Select an interactive visual engine below to launch dynamic node manipulation, live algorithmic traversal, or scientific simulations:
+          </p>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="sim-btn sim-btn--primary"
+              onClick={() => setActiveSimOverride('linked-list')}
+            >
+              🔗 Singly Linked List
+            </button>
+            <button
+              type="button"
+              className="sim-btn sim-btn--primary"
+              onClick={() => setActiveSimOverride('binary-tree')}
+            >
+              🌲 Binary Search Tree
+            </button>
+            <button
+              type="button"
+              className="sim-btn"
+              onClick={() => setActiveSimOverride('sorting')}
+            >
+              📊 Bubble Sort
+            </button>
+            <button
+              type="button"
+              className="sim-btn"
+              onClick={() => setActiveSimOverride('nuclear-fusion')}
+            >
+              ⚛️ Nuclear Fusion
+            </button>
+            <button
+              type="button"
+              className="sim-btn"
+              onClick={() => setActiveSimOverride('photosynthesis')}
+            >
+              🌿 Photosynthesis
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     const isFullDoc = cleanCode.includes('<!DOCTYPE') || cleanCode.includes('<html');
 
     

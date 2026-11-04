@@ -97,6 +97,17 @@ export default {
       });
     }
 
+    if (path === '/api/debug-models') {
+      const apiKey = env.GOOGLE_API_KEY || env.GEMINI_API_KEY;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const data = await res.json();
+        return jsonResponse(data);
+      } catch (e: unknown) {
+        return jsonResponse({ error: String(e) }, 500);
+      }
+    }
+
     // Google OAuth & Session Endpoints
     if (path === '/api/auth/google' && request.method === 'POST') {
       let body: {
@@ -189,18 +200,25 @@ export default {
         configured: hasKey,
         provider: 'gemini',
         active_provider: 'gemini',
-        active_model: 'gemini-2.0-flash',
+        active_model: 'gemini-3.8-flash',
         available_models: [
           {
-            id: 'gemini-2.0-flash',
-            name: 'Gemini 2.0 Flash (Ultra Fast & Sub-Second)',
+            id: 'gemini-3.8-flash',
+            name: 'Gemini 3.8 Flash (Ultra Fast & Latest Generation)',
             provider: 'gemini',
             is_default: true,
             context_window: 1048576,
           },
           {
-            id: 'gemini-1.5-flash',
-            name: 'Gemini 1.5 Flash (High Stability)',
+            id: 'gemini-flash-latest',
+            name: 'Gemini Flash Latest',
+            provider: 'gemini',
+            is_default: false,
+            context_window: 1048576,
+          },
+          {
+            id: 'gemini-3.5-flash',
+            name: 'Gemini 3.5 Flash',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
@@ -260,7 +278,13 @@ export default {
       const conversationId = body.conversation_id || `conv-${Date.now()}`;
       const messageId = `msg-${Date.now()}`;
       const userMessage = body.message || '';
-      const chosenModel = body.model || 'gemini-2.0-flash';
+      const chosenModel =
+        body.model &&
+        !body.model.includes('2.0') &&
+        !body.model.includes('1.5') &&
+        !body.model.includes('2.5')
+          ? body.model
+          : 'gemini-3.8-flash';
 
       // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
       type GeminiPart =
@@ -408,15 +432,17 @@ export default {
           const candidateModels = Array.from(
             new Set([
               chosenModel,
-              'gemini-2.0-flash',
-              'gemini-1.5-flash',
-              'gemini-2.5-flash',
+              'gemini-3.8-flash',
+              'gemini-flash-latest',
+              'gemini-3.5-flash',
+              'gemini-3.1-flash-lite',
             ])
           );
           let geminiResponse: Response | null = null;
           let usedModel = chosenModel;
           let lastErrorText = '';
           let lastErrorStatus = 0;
+          const modelErrors: string[] = [];
 
           for (const model of candidateModels) {
             const fetchCtrl = new AbortController();
@@ -445,10 +471,13 @@ export default {
               } else {
                 lastErrorStatus = resp.status;
                 lastErrorText = await resp.text().catch(() => '');
+                modelErrors.push(`[${model} => ${resp.status}: ${lastErrorText}]`);
               }
             } catch (err: unknown) {
               clearTimeout(fetchTimer);
-              lastErrorText = err instanceof Error ? err.message : String(err);
+              const errMsg = err instanceof Error ? err.message : String(err);
+              lastErrorText = errMsg;
+              modelErrors.push(`[${model} => Err: ${errMsg}]`);
             }
           }
 
