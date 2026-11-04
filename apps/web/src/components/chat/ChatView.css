@@ -159,7 +159,8 @@
   font-size: clamp(12px, 2.4vw, 13.5px);
   color: var(--text-secondary);
   padding: clamp(6px, 1.2vh, 8px) clamp(10px, 2.5vw, 14px);
-  background: var(--surface-elevated);
+  background: #070709;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
 }
 
@@ -201,7 +202,7 @@
 }
 
 .chat-message--user .chat-message__content {
-  background: #2f2f2f;
+  background: #070709;
   border-radius: 20px;
   padding: 10px 18px;
   font-family: var(--font-sans);
@@ -210,8 +211,8 @@
   color: #f5f5f5;
   word-wrap: break-word;
   white-space: pre-wrap;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 /* Assistant messages: Flowing editorial layout */
