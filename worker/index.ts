@@ -410,8 +410,7 @@ export default {
               chosenModel,
               'gemini-2.0-flash',
               'gemini-1.5-flash',
-              'gemini-2.0-flash-lite-preview-02-05',
-              'gemini-3.1-flash-lite',
+              'gemini-2.5-flash',
             ])
           );
           let geminiResponse: Response | null = null;
@@ -421,7 +420,7 @@ export default {
 
           for (const model of candidateModels) {
             const fetchCtrl = new AbortController();
-            const fetchTimer = setTimeout(() => fetchCtrl.abort(), 6500);
+            const fetchTimer = setTimeout(() => fetchCtrl.abort(), 12000);
             try {
               const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
               const resp = await fetch(geminiUrl, {
