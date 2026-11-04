@@ -1,3 +1,4 @@
+import { AgentStepsTray } from './AgentStepsTray';
 import type { QueuedMessage } from '../composer/QueuedMessagesTray';
 import { useRef, useEffect, useState } from 'react';
 import type { ChatMessage, ModelInfo, ChatAttachment } from '../../types';
@@ -476,6 +477,12 @@ export function ChatView({
                 ? getActionBadge(msg.content || '', Boolean(msg.citations && msg.citations.length > 0), browserTaskId)
                 : null;
 
+              const prevUserMsg = messages
+                .slice(0, messages.findIndex((m) => m.id === msg.id))
+                .reverse()
+                .find((m) => m.role === 'user');
+              const promptContext = prevUserMsg?.content || '';
+
               return (
                 <div
                   key={msg.id}
@@ -491,9 +498,15 @@ export function ChatView({
                       </div>
                     )}
 
-                    {msg.isStreaming && !msg.content ? (
-                      <span className="chat-message__thinking">Thinking…</span>
-                    ) : isError ? (
+                    {msg.role === 'assistant' && !isError && (
+                      <AgentStepsTray
+                        isStreaming={Boolean(msg.isStreaming)}
+                        promptText={promptContext}
+                        defaultExpanded={Boolean(msg.isStreaming && !msg.content)}
+                      />
+                    )}
+
+                    {msg.isStreaming && !msg.content ? null : isError ? (
                       <div className="chat-message__error-container">
                         <div className="chat-message__error-header">
                           <svg className="chat-message__error-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
