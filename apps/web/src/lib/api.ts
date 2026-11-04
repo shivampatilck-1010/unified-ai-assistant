@@ -79,10 +79,11 @@ export function getApiBase(): string {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://127.0.0.1:8000';
     }
+    return window.location.origin;
   }
   const raw =
     import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD ? 'https://transmitted-tools-encourages-breath.trycloudflare.com' : 'http://127.0.0.1:8000');
+    (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
   return raw.replace(/\/+$/, '');
 }
 

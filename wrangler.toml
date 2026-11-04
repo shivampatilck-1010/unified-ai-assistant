@@ -1,7 +1,9 @@
 name = "unified-ai-assistant"
+main = "./worker/index.ts"
 compatibility_date = "2026-03-01"
 
 [assets]
 directory = "./apps/web/dist"
+binding = "ASSETS"
 html_handling = "auto-trailing-slash"
 not_found_handling = "single-page-application"
