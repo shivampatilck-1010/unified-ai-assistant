@@ -303,7 +303,6 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
           category={category}
           typeBadge={typeBadge}
           summary={summary}
-          branches={customBranches.length > 0 ? customBranches : undefined}
           onSelectChoice={onSelectChoice}
         />
       );

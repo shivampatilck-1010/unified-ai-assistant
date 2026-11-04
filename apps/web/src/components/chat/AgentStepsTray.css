@@ -102,8 +102,13 @@
 }
 
 .antigravity-check-icon {
-  color: #38bdf8;
+  color: #71717a;
   flex-shrink: 0;
+  transition: color 0.18s ease;
+}
+
+.antigravity-thought-header:hover .antigravity-check-icon {
+  color: #38bdf8;
 }
 
 .antigravity-thought-summary {
