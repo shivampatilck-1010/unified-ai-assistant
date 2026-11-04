@@ -5,6 +5,7 @@ import mermaid from 'mermaid';
 import { ImageGenerationCard } from './ImageGenerationCard';
 import { FileAttachmentCard } from './FileAttachmentCard';
 import { PromptFlashcard } from './PromptFlashcard';
+import { InteractiveSimulationCard } from './InteractiveSimulationCard';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import './MarkdownContent.css';
 
@@ -211,12 +212,36 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     return content;
   }, [content]);
 
-  // Code Block Component with Copy Button
+  // Code Block Component with Copy Button, Syntax Highlighting & Simulation Sandbox
   const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, code }) => {
     const [copied, setCopied] = useState<boolean>(false);
+    const lowerLang = (language || '').toLowerCase().trim();
 
-    if (language.toLowerCase() === 'mermaid') {
+    if (lowerLang === 'mermaid') {
       return <MermaidDiagram code={code} />;
+    }
+
+    if (
+      lowerLang === 'interactive-simulation' ||
+      lowerLang === 'simulation' ||
+      lowerLang === 'visual' ||
+      lowerLang === 'interactive' ||
+      lowerLang === 'atomic-collision' ||
+      lowerLang === 'atoms' ||
+      lowerLang === 'binary-tree' ||
+      lowerLang === 'tree-visualizer' ||
+      lowerLang === 'generative-ui' ||
+      (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script')))
+    ) {
+      let simType: 'atomic-collision' | 'binary-tree' | 'sorting' | 'custom-html' = 'atomic-collision';
+      if (lowerLang.includes('tree') || code.includes('BinarySearchTree') || code.includes('TreeNode') || code.includes('binary-tree')) {
+        simType = 'binary-tree';
+      } else if (lowerLang.includes('sort') || code.includes('bubbleSort')) {
+        simType = 'sorting';
+      } else if (lowerLang === 'html' || code.includes('<canvas') || code.includes('<script')) {
+        simType = 'custom-html';
+      }
+      return <InteractiveSimulationCard type={simType} code={code} />;
     }
 
     const handleCopy = () => {
@@ -345,6 +370,29 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     let autoDetectedFile: string | null = null;
     let isPreviousLinePromptIntro = false;
 
+    // Visual Simulation Auto-detection
+    const hasExplicitSimBlock =
+      text.includes('```interactive-simulation') ||
+      text.includes('```simulation') ||
+      text.includes('```visual') ||
+      text.includes('```atomic-collision') ||
+      text.includes('```binary-tree');
+
+    const hasAtomicMention =
+      !hasExplicitSimBlock &&
+      /(?:here['’]?s\s+a\s+simulation\s+of\s+atoms\s+colliding|simulation\s+of\s+atoms\s+colliding|how\s+atoms?\s+collide\s+with\s+visuals|atomic\s+collisions?\s+visual(?:ization|izer)?)/i.test(
+        text
+      );
+
+    const hasTreeVisualMention =
+      !hasExplicitSimBlock &&
+      /(?:binary\s+(?:search\s+)?tree\s+visual(?:izer|ization)?|interactive\s+binary\s+(?:search\s+)?tree)/i.test(
+        text
+      );
+
+    let injectedAtomicSim = false;
+    let injectedTreeSim = false;
+
     const flushList = () => {
       if (listItems.length === 0) return;
       if (isOrderedList) {
@@ -420,6 +468,32 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+
+      // Auto-inject visual simulation card right after intro line or before "What you're seeing"
+      if (
+        hasAtomicMention &&
+        !injectedAtomicSim &&
+        (line.toLowerCase().includes("what you're seeing") || i === 1 || i === 2)
+      ) {
+        flushList();
+        flushTable();
+        nodes.push(
+          <InteractiveSimulationCard key={`auto-atomic-sim-${nodes.length}`} type="atomic-collision" />
+        );
+        injectedAtomicSim = true;
+      }
+      if (
+        hasTreeVisualMention &&
+        !injectedTreeSim &&
+        (line.toLowerCase().includes('binary') || i === 1 || i === 2)
+      ) {
+        flushList();
+        flushTable();
+        nodes.push(
+          <InteractiveSimulationCard key={`auto-tree-sim-${nodes.length}`} type="binary-tree" />
+        );
+        injectedTreeSim = true;
+      }
 
       // 1. Math Display Block: $$ or \[
       if (line.trim().startsWith('$$') || line.trim().startsWith('\\[')) {
@@ -666,6 +740,19 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
           filename={autoDetectedFile}
         />
       );
+    }
+
+    if (hasAtomicMention && !injectedAtomicSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-atomic-sim-fallback" type="atomic-collision" />
+      );
+      injectedAtomicSim = true;
+    }
+    if (hasTreeVisualMention && !injectedTreeSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-tree-sim-fallback" type="binary-tree" />
+      );
+      injectedTreeSim = true;
     }
 
     return nodes;
