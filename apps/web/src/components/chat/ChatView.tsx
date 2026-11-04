@@ -282,8 +282,8 @@ export function ChatView({
       >
         {isEmpty ? (
           <div className="chat-view__empty">
-            <div className="chat-view__empty-icon" aria-hidden="true" style={{ width: '72px', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-              <UnifiedLogo size={72} />
+            <div className="chat-view__empty-icon" aria-hidden="true">
+              <UnifiedLogo size={76} className="chat-view__hero-logo" />
             </div>
             <h2 className="chat-view__empty-title">Unified AI Assistant</h2>
             <p className="chat-view__empty-desc">

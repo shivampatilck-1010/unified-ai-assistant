@@ -16,7 +16,11 @@ export const UnifiedLogo: React.FC<UnifiedLogoProps> = ({
   return (
     <div
       className={`unified-logo ${className}`}
-      style={{ width: `${size}px`, height: `${size}px` }}
+      style={{
+        '--logo-default-size': `${size}px`,
+        width: `${size}px`,
+        height: `${size}px`,
+      } as React.CSSProperties}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

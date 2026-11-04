@@ -10,11 +10,17 @@
 .chat-view__topbar {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
+  padding: 10px 18px;
   border-bottom: 1px solid var(--border);
   min-height: 48px;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-view__topbar::-webkit-scrollbar {
+  display: none;
 }
 
 .chat-view__new-btn {
@@ -95,51 +101,64 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 80px 32px 40px;
-  max-width: 560px;
+  padding: clamp(24px, 6vh, 64px) clamp(16px, 4vw, 32px) clamp(20px, 4vh, 40px);
+  max-width: 580px;
   margin: 0 auto;
-  height: 100%;
-  min-height: 400px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 0;
 }
 
 .chat-view__empty-icon {
   color: var(--text-tertiary);
-  margin-bottom: 24px;
+  margin-bottom: clamp(14px, 2.5vh, 24px);
   opacity: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-view__hero-logo {
+  width: clamp(52px, 14vw, 84px) !important;
+  height: clamp(52px, 14vw, 84px) !important;
+  transition: width 0.2s ease, height 0.2s ease;
 }
 
 .chat-view__empty-title {
   font-family: var(--font-serif);
-  font-size: 28px;
+  font-size: clamp(22px, 5.2vw, 32px);
   font-weight: 400;
   color: var(--text-primary);
-  margin: 0 0 12px;
+  margin: 0 0 clamp(8px, 1.5vh, 12px);
   letter-spacing: -0.3px;
+  line-height: 1.25;
 }
 
 .chat-view__empty-desc {
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: clamp(13px, 2.8vw, 15px);
+  line-height: 1.58;
   color: var(--text-secondary);
-  margin: 0 0 32px;
+  margin: 0 0 clamp(18px, 3.5vh, 32px);
+  max-width: 480px;
 }
 
 .chat-view__empty-capabilities {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: clamp(7px, 1.3vh, 10px);
   text-align: left;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  box-sizing: border-box;
 }
 
 .chat-view__capability {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13.5px;
+  font-size: clamp(12px, 2.4vw, 13.5px);
   color: var(--text-secondary);
-  padding: 8px 14px;
+  padding: clamp(6px, 1.2vh, 8px) clamp(10px, 2.5vw, 14px);
   background: var(--surface-elevated);
   border-radius: 10px;
 }
@@ -386,3 +405,47 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   Responsive Viewport Scaling across Mobile, Tablet, and Desktop Devices
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .chat-view__topbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .chat-view__message-list {
+    padding: 16px 12px 14px;
+    gap: 18px;
+  }
+
+  .chat-message--user {
+    max-width: 88%;
+  }
+
+  .chat-message--user .chat-message__content {
+    padding: 8px 14px;
+    font-size: 14.5px;
+    border-radius: 16px;
+  }
+
+  .chat-view__scroll-bottom-btn {
+    bottom: 16px;
+    right: 16px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-message--user {
+    max-width: 92%;
+  }
+
+  .chat-view__empty {
+    padding: 24px 12px 16px;
+  }
+}
+

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Unified AI Logo — Static Metallic Brand Icon (Clean Transparent)
+   Unified AI Logo — Static Metallic Brand Icon (Clean Transparent & Responsive)
    ========================================================================== */
 
 .unified-logo {
@@ -11,6 +11,8 @@
   background: transparent;
   padding: 0;
   margin: 0;
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .unified-logo[role="button"] {
@@ -26,9 +28,10 @@
 .unified-logo__img {
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   display: block;
   background: transparent;
-  /* Crisp rendering without background boxes or distracting halos */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
 }

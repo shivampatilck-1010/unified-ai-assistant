@@ -108,6 +108,26 @@
 
 @media (max-width: 768px) {
   .composer {
-    padding: 0 12px 12px;
+    padding: 0 12px 10px;
+  }
+
+  .composer__inner {
+    padding: 6px 10px;
+    border-radius: 14px;
+    gap: 6px;
+  }
+
+  .composer__input {
+    font-size: 14.5px;
+  }
+
+  .composer__hint {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .composer {
+    padding: 0 8px 8px;
   }
 }
