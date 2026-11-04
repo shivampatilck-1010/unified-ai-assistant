@@ -143,11 +143,11 @@ export default {
         configured: hasKey,
         provider: 'gemini',
         active_provider: 'gemini',
-        active_model: 'gemini-3.5-flash-lite',
+        active_model: 'gemini-3-flash-preview',
         available_models: [
           {
-            id: 'gemini-3.5-flash-lite',
-            name: 'Gemini 3.5 Flash Lite (Ultra Fast)',
+            id: 'gemini-3-flash-preview',
+            name: 'Gemini 3 Flash Turbo (Ultra Fast <2s)',
             provider: 'gemini',
             is_default: true,
             context_window: 1048576,
@@ -160,15 +160,8 @@ export default {
             context_window: 1048576,
           },
           {
-            id: 'gemini-3.8-flash',
-            name: 'Gemini 3.8 Flash',
-            provider: 'gemini',
-            is_default: false,
-            context_window: 1048576,
-          },
-          {
-            id: 'gemini-flash-latest',
-            name: 'Gemini Flash Latest',
+            id: 'gemini-3.5-flash-lite',
+            name: 'Gemini 3.5 Flash Lite',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
@@ -221,7 +214,7 @@ export default {
       const conversationId = body.conversation_id || `conv-${Date.now()}`;
       const messageId = `msg-${Date.now()}`;
       const userMessage = body.message || '';
-      const chosenModel = body.model || 'gemini-3.5-flash-lite';
+      const chosenModel = body.model || 'gemini-3-flash-preview';
 
       // Format conversation contents for Google Gemini API
       const geminiContents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
@@ -260,13 +253,15 @@ export default {
         try {
           await sendSSE('message_start', { role: 'assistant' });
 
-          const candidateModels = [
-            chosenModel,
-            'gemini-3.5-flash-lite',
-            'gemini-3.5-flash',
-            'gemini-3.8-flash',
-            'gemini-flash-latest',
-          ];
+          const candidateModels = Array.from(
+            new Set([
+              chosenModel,
+              'gemini-3-flash-preview',
+              'gemini-3.5-flash',
+              'gemini-3.5-flash-lite',
+              'gemini-flash-latest',
+            ])
+          );
           let geminiResponse: Response | null = null;
           let usedModel = chosenModel;
 

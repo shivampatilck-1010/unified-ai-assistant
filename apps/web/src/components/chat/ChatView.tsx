@@ -47,7 +47,7 @@ export function ChatView({
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const userScrolledUp = useRef(false);
+  const isUserScrolledUp = useRef(false);
 
   // States for interactive toolbar actions
   const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -58,34 +58,98 @@ export function ChatView({
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [hasCustomKey, setHasCustomKey] = useState<boolean>(Boolean(getCustomApiKey()));
 
-  // Detect if user has scrolled up
+  // Reset flag and scroll smoothly when requested
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    const el = containerRef.current;
+    if (!el) return;
+    isUserScrolledUp.current = false;
+    setShowScrollBottomBtn(false);
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  };
+
+  // Passive scroll listener: re-enable auto-scroll when user returns near the bottom
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
-    const threshold = 120;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-    userScrolledUp.current = !isAtBottom;
-    setShowScrollBottomBtn(!isAtBottom);
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distFromBottom <= 120) {
+      isUserScrolledUp.current = false;
+      setShowScrollBottomBtn(false);
+    }
   };
 
-  const scrollToBottom = () => {
+  // Wheel and touch listeners to detect TRUE intentional user scrolling
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    userScrolledUp.current = false;
-    setShowScrollBottomBtn(false);
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  };
 
-  // High-performance auto-scroll follow-up during streaming and on new messages
-  useEffect(() => {
-    if (!userScrolledUp.current && containerRef.current) {
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) {
+        // User physically scrolled up
+        isUserScrolledUp.current = true;
+        setShowScrollBottomBtn(true);
+      } else if (e.deltaY > 0) {
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (distFromBottom <= 120) {
+          isUserScrolledUp.current = false;
+          setShowScrollBottomBtn(false);
         }
-      });
+      }
+    };
+
+    let touchStartY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0]?.clientY || 0;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const currentY = e.touches[0]?.clientY || 0;
+      const deltaY = currentY - touchStartY;
+      if (deltaY > 15) {
+        // Swiping down = scrolling up
+        isUserScrolledUp.current = true;
+        setShowScrollBottomBtn(true);
+      } else if (deltaY < -15) {
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (distFromBottom <= 120) {
+          isUserScrolledUp.current = false;
+          setShowScrollBottomBtn(false);
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: true });
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
+
+  // Continuous auto-scroll follow-up during streaming and on new messages
+  useEffect(() => {
+    if (!isUserScrolledUp.current && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages, isStreaming]);
+
+  // ResizeObserver to track dynamic formula/KaTeX/image expansions
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => {
+      if (!isUserScrolledUp.current && el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Clean up speech synthesis on unmount
   useEffect(() => {
@@ -103,7 +167,14 @@ export function ChatView({
   const currentModel = availableModels.find((m) => m.id === selectedModelId) ?? availableModels[0];
 
   const handleSend = (text: string) => {
+    isUserScrolledUp.current = false;
+    setShowScrollBottomBtn(false);
     onSend(text, currentModel?.provider, currentModel?.id, false, undefined, useResearch, 'standard', useOrchestration);
+    requestAnimationFrame(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
+    });
   };
 
   const handleCopy = (msgId: string, text: string) => {
