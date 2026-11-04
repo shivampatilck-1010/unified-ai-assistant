@@ -36,7 +36,6 @@ export function detectCalendarIntent(text: string): CalendarReminderData | null 
   let targetDate = new Date(now);
 
   const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  let matchedDayOffset: number | null = null;
 
   if (/\btomorrow\b/i.test(lower)) {
     targetDate.setDate(now.getDate() + 1);
@@ -52,7 +51,6 @@ export function detectCalendarIntent(text: string): CalendarReminderData | null 
         const currentDayIndex = now.getDay();
         let diff = (i - currentDayIndex + 7) % 7;
         if (diff === 0) diff = 7; // Next occurrence
-        matchedDayOffset = diff;
         targetDate.setDate(now.getDate() + diff);
         break;
       }

@@ -59,7 +59,7 @@ export function ChatView({
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState<boolean>(false);
   const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
-  const [hasCustomKey, setHasCustomKey] = useState<boolean>(Boolean(getCustomApiKey()));
+  const [_hasCustomKey, setHasCustomKey] = useState<boolean>(Boolean(getCustomApiKey()));
 
   // Reset flag and scroll smoothly when requested
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -633,7 +633,7 @@ export function ChatView({
           <button
             type="button"
             className="chat-view__scroll-bottom-btn"
-            onClick={scrollToBottom}
+            onClick={() => scrollToBottom()}
             aria-label="Scroll to bottom"
             title="Scroll to bottom"
           >

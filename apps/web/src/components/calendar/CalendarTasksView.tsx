@@ -167,9 +167,17 @@ export function CalendarTasksView() {
               const list = Array.from(map.values());
               setOccurrences(
                 list.map((e) => ({
-                  event: e,
+                  event_id: e.id,
+                  title: e.title,
+                  description: e.description,
                   start_time: e.start_time,
                   end_time: e.end_time,
+                  timezone: e.timezone || 'UTC',
+                  all_day: e.all_day || false,
+                  location: e.location,
+                  color: e.color,
+                  is_recurring: e.is_recurring || false,
+                  recurrence_rule: e.recurrence_rule,
                 }))
               );
               return list;

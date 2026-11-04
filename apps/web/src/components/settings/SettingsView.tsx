@@ -808,6 +808,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
       <FollowupEmailModal
         isOpen={showEmailModal}
         onClose={() => setShowEmailModal(false)}
+        conversationId={null}
       />
     </div>
   );

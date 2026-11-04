@@ -5,6 +5,7 @@ import mermaid from 'mermaid';
 import { ImageGenerationCard } from './ImageGenerationCard';
 import { FileAttachmentCard } from './FileAttachmentCard';
 import { PromptFlashcard } from './PromptFlashcard';
+import { highlightCode } from '../../utils/syntaxHighlighter';
 import './MarkdownContent.css';
 
 // Initialize Mermaid once with dark theme
@@ -224,10 +225,14 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       setTimeout(() => setCopied(false), 2000);
     };
 
+    const highlighted = React.useMemo(() => {
+      return highlightCode(code, language);
+    }, [code, language]);
+
     return (
       <div className="code-block-container">
         <div className="code-block-header">
-          <span className="code-block-lang">{language || 'code'}</span>
+          <span className="code-block-lang">{highlighted.language || language || 'code'}</span>
           <button type="button" className="code-copy-btn" onClick={handleCopy} title="Copy to clipboard">
             {copied ? (
               <span className="code-copy-success">
@@ -248,7 +253,10 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
           </button>
         </div>
         <pre className="code-block-pre">
-          <code>{code}</code>
+          <code
+            className={`language-${highlighted.language}`}
+            dangerouslySetInnerHTML={{ __html: highlighted.html }}
+          />
         </pre>
       </div>
     );
