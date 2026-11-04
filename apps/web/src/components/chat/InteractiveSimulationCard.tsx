@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './InteractiveSimulationCard.css';
 
 export interface InteractiveSimulationCardProps {
-  type?: 'atomic-collision' | 'binary-tree' | 'sorting' | 'custom-html';
+  type?: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'sorting' | 'custom-html';
   title?: string;
   code?: string;
 }
@@ -16,6 +16,7 @@ interface Particle {
   radius: number;
   mass: number;
   color: string;
+  type?: string;
 }
 
 interface CollisionRing {
@@ -53,6 +54,12 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   const [avgSpeed, setAvgSpeed] = useState<number>(2.1);
   const [totalEnergy, setTotalEnergy] = useState<number>(84);
 
+  // --- Nuclear Fusion State ---
+  const [fusionTempMK, setFusionTempMK] = useState<number>(120); // Millions of Kelvin
+  const [magneticFieldT, setMagneticFieldT] = useState<number>(5.5); // Tesla
+  const [fusionEvents, setFusionEvents] = useState<number>(0);
+  const [energyOutputMeV, setEnergyOutputMeV] = useState<number>(0);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const particlesRef = useRef<Particle[]>([]);
   const ringsRef = useRef<CollisionRing[]>([]);
@@ -68,14 +75,25 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   // Determine actual simulation type
   const resolvedType = React.useMemo(() => {
     if (type) return type;
-    if (code.includes('atomic') || code.includes('atom')) return 'atomic-collision';
-    if (code.includes('BinarySearchTree') || code.includes('tree')) return 'binary-tree';
-    if (code.includes('<canvas') || code.includes('<script')) return 'custom-html';
-    return 'atomic-collision';
+    const lowerCode = code.toLowerCase();
+    if (lowerCode.includes('nuclear') || lowerCode.includes('fusion') || lowerCode.includes('deuterium') || lowerCode.includes('tritium')) {
+      return 'nuclear-fusion';
+    }
+    if (lowerCode.includes('atomic') || lowerCode.includes('atom')) {
+      return 'atomic-collision';
+    }
+    if (lowerCode.includes('binarysearchtree') || lowerCode.includes('treenode') || lowerCode.includes('tree')) {
+      return 'binary-tree';
+    }
+    if (code.includes('<canvas') || code.includes('<script') || code.includes('<!DOCTYPE') || code.includes('<svg')) {
+      return 'custom-html';
+    }
+    return 'custom-html';
   }, [type, code]);
 
   const defaultTitle = React.useMemo(() => {
     if (title) return title;
+    if (resolvedType === 'nuclear-fusion') return 'D-T Nuclear Fusion Reactor Simulation';
     if (resolvedType === 'atomic-collision') return 'Atomic Collisions Simulation';
     if (resolvedType === 'binary-tree') return 'Binary Search Tree Visualizer';
     return 'Interactive Visual Simulation';
@@ -84,7 +102,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   // =========================================================================
   // ATOMIC COLLISION SIMULATOR ENGINE
   // =========================================================================
-  const initParticles = useCallback((count: number, temp: number) => {
+  const initAtomicParticles = useCallback((count: number, temp: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -100,11 +118,9 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
       const mass = isHeavy ? 4.0 : 1.0;
       const color = isHeavy ? '#818cf8' : '#34d399'; // Purple vs Green
 
-      // Position safely within boundary
       const x = radius + Math.random() * Math.max(10, width - radius * 2);
       const y = radius + Math.random() * Math.max(10, height - radius * 2);
 
-      // Velocity based on Maxwell-Boltzmann-like thermal spread
       const angle = Math.random() * Math.PI * 2;
       const speed = (isHeavy ? 1.0 : 2.2) * temp * (0.8 + Math.random() * 0.4);
       const vx = Math.cos(angle) * speed;
@@ -118,9 +134,91 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     setCollisionCount(0);
   }, []);
 
-  // Set up & run canvas animation loop
+  // =========================================================================
+  // NUCLEAR FUSION SIMULATOR ENGINE (Deuterium + Tritium -> He4 + Neutron)
+  // =========================================================================
+  const initFusionPlasma = useCallback((tempMK: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const width = canvas.width / (window.devicePixelRatio || 1);
+    const height = canvas.height / (window.devicePixelRatio || 1);
+
+    const particles: Particle[] = [];
+    const pairCount = 12; // 12 Deuterium + 12 Tritium
+
+    for (let i = 0; i < pairCount * 2; i++) {
+      const isDeuterium = i % 2 === 0;
+      const radius = isDeuterium ? 7.5 : 9.5;
+      const mass = isDeuterium ? 2.0 : 3.0;
+      const color = isDeuterium ? '#38bdf8' : '#22d3ee'; // Deuterium (sky blue), Tritium (cyan)
+
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * Math.min(width, height) * 0.35;
+      const x = width / 2 + Math.cos(angle) * r;
+      const y = height / 2 + Math.sin(angle) * r;
+
+      const speed = (tempMK / 40) * (1.2 + Math.random() * 0.8);
+      const vAngle = Math.random() * Math.PI * 2;
+      const vx = Math.cos(vAngle) * speed;
+      const vy = Math.sin(vAngle) * speed;
+
+      particles.push({
+        id: i,
+        x,
+        y,
+        vx,
+        vy,
+        radius,
+        mass,
+        color,
+        type: isDeuterium ? 'D' : 'T',
+      });
+    }
+
+    particlesRef.current = particles;
+    ringsRef.current = [];
+    setFusionEvents(0);
+    setEnergyOutputMeV(0);
+  }, []);
+
+  // Inject additional D-T fuel pellet
+  const handleInjectFuel = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const width = canvas.width / (window.devicePixelRatio || 1);
+    const height = canvas.height / (window.devicePixelRatio || 1);
+
+    const newParticles: Particle[] = [];
+    for (let i = 0; i < 4; i++) {
+      const isDeuterium = i % 2 === 0;
+      const radius = isDeuterium ? 7.5 : 9.5;
+      const mass = isDeuterium ? 2.0 : 3.0;
+      const color = isDeuterium ? '#38bdf8' : '#22d3ee';
+      const x = width / 2 + (Math.random() - 0.5) * 60;
+      const y = height / 2 + (Math.random() - 0.5) * 60;
+      const speed = (fusionTempMK / 40) * 1.5;
+      const angle = Math.random() * Math.PI * 2;
+      newParticles.push({
+        id: Date.now() + i,
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius,
+        mass,
+        color,
+        type: isDeuterium ? 'D' : 'T',
+      });
+    }
+    particlesRef.current = [...particlesRef.current, ...newParticles];
+  };
+
+  // Run Canvas Simulation Animation Loop (Atomic Collision OR Nuclear Fusion)
   useEffect(() => {
-    if (resolvedType !== 'atomic-collision' || activeTab !== 'sim') return;
+    if ((resolvedType !== 'atomic-collision' && resolvedType !== 'nuclear-fusion') || activeTab !== 'sim') {
+      return;
+    }
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -134,61 +232,120 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    initParticles(atomCount, temperature);
+    if (resolvedType === 'atomic-collision') {
+      initAtomicParticles(atomCount, temperature);
+    } else {
+      initFusionPlasma(fusionTempMK);
+    }
 
     let lastTelemetryUpdate = performance.now();
 
     const loop = () => {
       const width = rect.width;
       const height = rect.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
 
       ctx.fillStyle = '#06070a';
       ctx.fillRect(0, 0, width, height);
 
-      // Subtle container grid background
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
-      ctx.lineWidth = 1;
-      const gridSize = 40;
-      for (let gx = 0; gx < width; gx += gridSize) {
+      // Render Tokamak Magnetic Chamber Ring for Nuclear Fusion
+      if (resolvedType === 'nuclear-fusion') {
+        const torusRadius = Math.min(width, height) * 0.42;
         ctx.beginPath();
-        ctx.moveTo(gx, 0);
-        ctx.lineTo(gx, height);
+        ctx.arc(centerX, centerY, torusRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(99, 102, 241, 0.25)';
+        ctx.lineWidth = 4;
         ctx.stroke();
-      }
-      for (let gy = 0; gy < height; gy += gridSize) {
+
         ctx.beginPath();
-        ctx.moveTo(0, gy);
-        ctx.lineTo(width, gy);
+        ctx.arc(centerX, centerY, torusRadius * 0.35, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(99, 102, 241, 0.15)';
+        ctx.lineWidth = 2;
         ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+        ctx.lineWidth = 1;
+        for (let r = torusRadius * 0.5; r < torusRadius; r += 20) {
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+        ctx.lineWidth = 1;
+        const gridSize = 40;
+        for (let gx = 0; gx < width; gx += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, height);
+          ctx.stroke();
+        }
+        for (let gy = 0; gy < height; gy += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(0, gy);
+          ctx.lineTo(width, gy);
+          ctx.stroke();
+        }
       }
 
       const particles = particlesRef.current;
       const rings = ringsRef.current;
 
       if (!isPaused) {
-        // 1. Move and bounce off walls
-        for (const p of particles) {
+        // 1. Particle Movement & Magnetic Confinement
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
           p.x += p.vx;
           p.y += p.vy;
 
-          if (p.x - p.radius <= 0) {
-            p.x = p.radius;
-            p.vx = -p.vx;
-          } else if (p.x + p.radius >= width) {
-            p.x = width - p.radius;
-            p.vx = -p.vx;
-          }
+          if (resolvedType === 'nuclear-fusion') {
+            if (p.type !== 'neutron') {
+              const dx = p.x - centerX;
+              const dy = p.y - centerY;
+              const distFromCenter = Math.hypot(dx, dy);
+              const confinementRadius = Math.min(width, height) * 0.4;
 
-          if (p.y - p.radius <= 0) {
-            p.y = p.radius;
-            p.vy = -p.vy;
-          } else if (p.y + p.radius >= height) {
-            p.y = height - p.radius;
-            p.vy = -p.vy;
+              if (distFromCenter > confinementRadius) {
+                const nx = dx / distFromCenter;
+                const ny = dy / distFromCenter;
+                const dot = p.vx * nx + p.vy * ny;
+                p.vx -= 2 * dot * nx;
+                p.vy -= 2 * dot * ny;
+                p.x = centerX + nx * confinementRadius;
+                p.y = centerY + ny * confinementRadius;
+              } else {
+                const lorentz = (magneticFieldT / 10) * 0.04;
+                p.vx += -dy * lorentz;
+                p.vy += dx * lorentz;
+              }
+            } else {
+              if (p.x < 0 || p.x > width || p.y < 0 || p.y > height) {
+                particles.splice(i, 1);
+                i--;
+                continue;
+              }
+            }
+          } else {
+            if (p.x - p.radius <= 0) {
+              p.x = p.radius;
+              p.vx = -p.vx;
+            } else if (p.x + p.radius >= width) {
+              p.x = width - p.radius;
+              p.vx = -p.vx;
+            }
+
+            if (p.y - p.radius <= 0) {
+              p.y = p.radius;
+              p.vy = -p.vy;
+            } else if (p.y + p.radius >= height) {
+              p.y = height - p.radius;
+              p.vy = -p.vy;
+            }
           }
         }
 
-        // 2. Pairwise elastic collisions
+        // 2. Pairwise Collisions & Nuclear Fusion Reactions
         for (let i = 0; i < particles.length; i++) {
           for (let j = i + 1; j < particles.length; j++) {
             const p1 = particles[i];
@@ -200,10 +357,57 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             const minDist = p1.radius + p2.radius;
 
             if (dist < minDist && dist > 0) {
+              if (
+                resolvedType === 'nuclear-fusion' &&
+                ((p1.type === 'D' && p2.type === 'T') || (p1.type === 'T' && p2.type === 'D'))
+              ) {
+                const relSpeed = Math.hypot(p1.vx - p2.vx, p1.vy - p2.vy);
+                const fusionThreshold = 3.5 * (100 / Math.max(20, fusionTempMK));
+
+                if (relSpeed > fusionThreshold) {
+                  const midX = (p1.x + p2.x) / 2;
+                  const midY = (p1.y + p2.y) / 2;
+
+                  rings.push({
+                    x: midX,
+                    y: midY,
+                    radius: 10,
+                    maxRadius: 75,
+                    opacity: 1.0,
+                    color: '#ffffff',
+                  });
+                  rings.push({
+                    x: midX,
+                    y: midY,
+                    radius: 5,
+                    maxRadius: 55,
+                    opacity: 0.9,
+                    color: '#fbbf24',
+                  });
+
+                  p1.type = 'He4';
+                  p1.radius = 12;
+                  p1.mass = 4;
+                  p1.color = '#c084fc';
+                  p1.vx = (Math.random() - 0.5) * 4;
+                  p1.vy = (Math.random() - 0.5) * 4;
+
+                  p2.type = 'neutron';
+                  p2.radius = 4.5;
+                  p2.mass = 1;
+                  p2.color = '#ffffff';
+                  const nAngle = Math.random() * Math.PI * 2;
+                  p2.vx = Math.cos(nAngle) * 9;
+                  p2.vy = Math.sin(nAngle) * 9;
+
+                  setFusionEvents((fe) => fe + 1);
+                  setEnergyOutputMeV((eo) => eo + 17.6);
+                  continue;
+                }
+              }
+
               const nx = dx / dist;
               const ny = dy / dist;
-
-              // Relative velocity along collision normal
               const kx = p1.vx - p2.vx;
               const ky = p1.vy - p2.vy;
               const p = 2 * (nx * kx + ny * ky) / (p1.mass + p2.mass);
@@ -214,20 +418,18 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                 p2.vx += p * p1.mass * nx;
                 p2.vy += p * p1.mass * ny;
 
-                // Spawn amber shockwave ring at collision point
                 rings.push({
                   x: (p1.x + p2.x) / 2,
                   y: (p1.y + p2.y) / 2,
                   radius: minDist * 0.4,
                   maxRadius: minDist * 1.8,
-                  opacity: 0.9,
-                  color: '#fbbf24',
+                  opacity: 0.85,
+                  color: resolvedType === 'nuclear-fusion' ? '#38bdf8' : '#fbbf24',
                 });
 
                 setCollisionCount((c) => c + 1);
               }
 
-              // Position correction to prevent particle overlap
               const overlap = 0.5 * (minDist - dist);
               p1.x -= overlap * nx;
               p1.y -= overlap * ny;
@@ -238,49 +440,54 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         }
       }
 
-      // 3. Render collision shockwave rings
+      // 3. Render Shockwave Rings
       for (let rIdx = rings.length - 1; rIdx >= 0; rIdx--) {
         const ring = rings[rIdx];
         ctx.beginPath();
         ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(251, 191, 36, ${ring.opacity})`;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = ring.color === '#ffffff' ? `rgba(255, 255, 255, ${ring.opacity})` : `rgba(251, 191, 36, ${ring.opacity})`;
+        ctx.lineWidth = ring.color === '#ffffff' ? 3.5 : 2;
         ctx.stroke();
 
-        ring.radius += 1.2;
-        ring.opacity -= 0.05;
+        ring.radius += 2.0;
+        ring.opacity -= 0.04;
 
         if (ring.opacity <= 0 || ring.radius >= ring.maxRadius) {
           rings.splice(rIdx, 1);
         }
       }
 
-      // 4. Render particles with glowing halos
+      // 4. Render Particles
       for (const p of particles) {
-        // Outer halo glow
-        const gradient = ctx.createRadialGradient(p.x, p.y, p.radius * 0.2, p.x, p.y, p.radius * 1.5);
+        const gradient = ctx.createRadialGradient(p.x, p.y, p.radius * 0.2, p.x, p.y, p.radius * 1.6);
         gradient.addColorStop(0, p.color);
         gradient.addColorStop(0.8, p.color);
         gradient.addColorStop(1, 'transparent');
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * 1.4, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.radius * 1.5, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.35;
         ctx.fill();
         ctx.globalAlpha = 1.0;
 
-        // Solid atom core
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
         ctx.lineWidth = 1.2;
         ctx.stroke();
+
+        if (resolvedType === 'nuclear-fusion' && p.radius >= 7) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(p.type || '', p.x, p.y + 3);
+        }
       }
 
-      // 5. Periodic telemetry stats calculation (throttled to 100ms for smoothness)
+      // 5. Periodic Telemetry Calculation
       const now = performance.now();
       if (now - lastTelemetryUpdate > 100) {
         lastTelemetryUpdate = now;
@@ -306,9 +513,18 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [resolvedType, activeTab, isPaused, atomCount, temperature, initParticles]);
+  }, [
+    resolvedType,
+    activeTab,
+    isPaused,
+    atomCount,
+    temperature,
+    fusionTempMK,
+    magneticFieldT,
+    initAtomicParticles,
+    initFusionPlasma,
+  ]);
 
-  // Adjust temperature on the fly
   const handleTemperatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTemp = parseFloat(e.target.value);
     setTemperature(newTemp);
@@ -319,15 +535,28 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     }
   };
 
-  // Adjust atom count
   const handleAtomCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newCount = parseInt(e.target.value, 10);
     setAtomCount(newCount);
-    initParticles(newCount, temperature);
+    initAtomicParticles(newCount, temperature);
+  };
+
+  const handleFusionTempChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newMK = parseInt(e.target.value, 10);
+    setFusionTempMK(newMK);
+    const ratio = newMK / (fusionTempMK || 1);
+    for (const p of particlesRef.current) {
+      p.vx *= Math.sqrt(ratio);
+      p.vy *= Math.sqrt(ratio);
+    }
+  };
+
+  const handleMagneticFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMagneticFieldT(parseFloat(e.target.value));
   };
 
   // =========================================================================
-  // BINARY TREE VISUALIZER ENGINE
+  // BINARY TREE ENGINE
   // =========================================================================
   const insertTreeNode = (root: TreeNode | null, val: number): TreeNode => {
     if (!root) return { val, left: null, right: null };
@@ -360,7 +589,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     if (isNaN(val)) return;
     setTreeRoot((prev) => insertTreeNode(prev, val));
     setTreeInputVal('');
-    setSearchStatus(`Inserted node with key: ${val}`);
+    setSearchStatus(`Inserted node: ${val}`);
   };
 
   const handleSearchNode = () => {
@@ -385,12 +614,11 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     setSearchingPath(path);
     setSearchStatus(
       found
-        ? `Found ${val}! Traversal path: ${path.join(' ➔ ')}`
-        : `${val} not found in tree. Searched: ${path.join(' ➔ ')}`
+        ? `Found ${val}! Path: ${path.join(' ➔ ')}`
+        : `${val} not found. Path: ${path.join(' ➔ ')}`
     );
   };
 
-  // Render SVG tree nodes recursively
   const renderTreeSvg = () => {
     if (!treeRoot) {
       return (
@@ -477,16 +705,22 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   };
 
   // =========================================================================
-  // SANDBOXED CUSTOM HTML GENERATIVE UI
+  // UNIVERSAL DYNAMIC SANDBOXED GENERATIVE UI
   // =========================================================================
   const renderCustomHtml = () => {
-    // Injects dark theme CSS so generated HTML matches the app
-    const styledHtml = `
+    let cleanCode = code.trim();
+    const isFullDoc = cleanCode.includes('<!DOCTYPE') || cleanCode.includes('<html');
+
+    const styledHtml = isFullDoc
+      ? cleanCode
+      : `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <style>
+            * { box-sizing: border-box; }
             body {
               margin: 0;
               padding: 12px;
@@ -499,16 +733,19 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               background: #1e2230;
               color: #f1f5f9;
               border: 1px solid rgba(255,255,255,0.15);
-              padding: 6px 12px;
+              padding: 6px 14px;
               border-radius: 6px;
               cursor: pointer;
+              font-size: 12px;
+              transition: all 0.15s;
             }
-            button:hover { background: #2d3345; }
-            input[type="range"] { accent-color: #818cf8; }
+            button:hover { background: #2d3345; border-color: rgba(255,255,255,0.3); }
+            input[type="range"] { accent-color: #818cf8; cursor: pointer; }
+            canvas { display: block; border-radius: 8px; }
           </style>
         </head>
         <body>
-          ${code}
+          ${cleanCode}
         </body>
       </html>
     `;
@@ -516,7 +753,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     return (
       <iframe
         className="sim-iframe"
-        title="Custom Interactive Visualizer"
+        title="Universal Interactive Simulation Sandbox"
         sandbox="allow-scripts allow-forms"
         srcDoc={styledHtml}
       />
@@ -530,7 +767,11 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         <div className="sim-header__left">
           <span className="sim-header__badge">
             <span className="sim-header__badge-dot" />
-            {resolvedType === 'atomic-collision' ? 'Live Physics' : 'Interactive'}
+            {resolvedType === 'nuclear-fusion'
+              ? 'Tokamak Plasma'
+              : resolvedType === 'atomic-collision'
+              ? 'Live Physics'
+              : 'Interactive'}
           </span>
           <span className="sim-header__title">{defaultTitle}</span>
         </div>
@@ -588,6 +829,54 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
 
       {activeTab === 'sim' ? (
         <>
+          {/* Controls Bar for Nuclear Fusion */}
+          {resolvedType === 'nuclear-fusion' && (
+            <div className="sim-controls-bar">
+              <div className="sim-slider-group">
+                <label>Plasma Temp</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="30"
+                  max="200"
+                  step="5"
+                  value={fusionTempMK}
+                  onChange={handleFusionTempChange}
+                />
+                <span className="sim-slider-val">{fusionTempMK} MK</span>
+              </div>
+
+              <div className="sim-slider-group">
+                <label>Magnetic Field</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="2.0"
+                  max="9.0"
+                  step="0.5"
+                  value={magneticFieldT}
+                  onChange={handleMagneticFieldChange}
+                />
+                <span className="sim-slider-val">{magneticFieldT.toFixed(1)} T</span>
+              </div>
+
+              <div className="sim-legend">
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#38bdf8' }} /> D (²H)
+                </span>
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#22d3ee' }} /> T (³H)
+                </span>
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#c084fc' }} /> ⁴He (Alpha)
+                </span>
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#ffffff' }} /> n (14 MeV)
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Controls Bar for Atomic Collisions */}
           {resolvedType === 'atomic-collision' && (
             <div className="sim-controls-bar">
@@ -659,12 +948,76 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
 
           {/* Interactive Simulation Viewport */}
           <div className="sim-viewport">
-            {resolvedType === 'atomic-collision' && <canvas ref={canvasRef} className="sim-canvas" />}
+            {(resolvedType === 'atomic-collision' || resolvedType === 'nuclear-fusion') && (
+              <canvas ref={canvasRef} className="sim-canvas" />
+            )}
             {resolvedType === 'binary-tree' && renderTreeSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}
           </div>
 
-          {/* Bottom Telemetry Bar */}
+          {/* Bottom Telemetry Bar for Nuclear Fusion */}
+          {resolvedType === 'nuclear-fusion' && (
+            <div className="sim-telemetry">
+              <div className="sim-stats">
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Fusion Reactions</span>
+                  <span className="sim-stat-value" style={{ color: '#fbbf24' }}>
+                    {fusionEvents}
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Plasma Temp</span>
+                  <span className="sim-stat-value">{fusionTempMK} MK</span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Energy Output</span>
+                  <span className="sim-stat-value" style={{ color: '#34d399' }}>
+                    {energyOutputMeV.toFixed(1)} MeV
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Q-Factor</span>
+                  <span className="sim-stat-value" style={{ color: fusionEvents > 5 ? '#34d399' : '#a5b4fc' }}>
+                    {fusionEvents > 0 ? (1.0 + fusionEvents * 0.08).toFixed(2) : '0.00'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="sim-actions">
+                <button
+                  type="button"
+                  className="sim-btn sim-btn--primary"
+                  onClick={handleInjectFuel}
+                  title="Inject fresh Deuterium and Tritium fuel pellets"
+                >
+                  ⚡ Inject D-T Fuel
+                </button>
+                <button
+                  type="button"
+                  className="sim-btn"
+                  onClick={() => setIsPaused(!isPaused)}
+                >
+                  {isPaused ? '▶ Resume' : '⏸ Pause'}
+                </button>
+                <button
+                  type="button"
+                  className="sim-btn"
+                  onClick={() => initFusionPlasma(fusionTempMK)}
+                >
+                  🔄 Reset
+                </button>
+                <button
+                  type="button"
+                  className={`sim-btn ${showDetails ? 'sim-btn--primary' : ''}`}
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  Fusion Physics ↗
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Telemetry Bar for Atomic Collisions */}
           {resolvedType === 'atomic-collision' && (
             <div className="sim-telemetry">
               <div className="sim-stats">
@@ -693,7 +1046,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                 <button
                   type="button"
                   className="sim-btn"
-                  onClick={() => initParticles(atomCount, temperature)}
+                  onClick={() => initAtomicParticles(atomCount, temperature)}
                 >
                   🔄 Reset
                 </button>
@@ -704,6 +1057,31 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                 >
                   What happens at the atomic level ↗
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Fusion Deep Dive Drawer */}
+          {showDetails && resolvedType === 'nuclear-fusion' && (
+            <div className="sim-details-drawer">
+              <div className="sim-details-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                Physical Principles of D-T Nuclear Fusion:
+              </div>
+              <div className="sim-details-content">
+                <p>
+                  • <strong>Reaction Equation:</strong> ²H (Deuterium) + ³H (Tritium) ➔ ⁴He (Alpha, 3.5 MeV) + n (Neutron, 14.1 MeV) + <strong>17.6 MeV</strong> total net energy.
+                </p>
+                <p>
+                  • <strong>Coulomb Barrier & Quantum Tunneling:</strong> Both nuclei carry positive electric charges that violently repel. Only at astronomical temperatures (&gt;100 million &deg;C) do their kinetic speeds allow quantum tunneling through the electrostatic barrier.
+                </p>
+                <p>
+                  • <strong>Magnetic Confinement (Tokamak):</strong> Powerful toroidal magnetic fields (5&ndash;8 Tesla) exert inward Lorentz forces (<em>F = q v &times; B</em>), preventing the 100+ million degree plasma from touching and melting the reactor walls.
+                </p>
               </div>
             </div>
           )}

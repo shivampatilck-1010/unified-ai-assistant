@@ -226,19 +226,33 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       lowerLang === 'simulation' ||
       lowerLang === 'visual' ||
       lowerLang === 'interactive' ||
+      lowerLang === 'nuclear-fusion' ||
+      lowerLang === 'fusion' ||
       lowerLang === 'atomic-collision' ||
       lowerLang === 'atoms' ||
       lowerLang === 'binary-tree' ||
       lowerLang === 'tree-visualizer' ||
       lowerLang === 'generative-ui' ||
-      (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script')))
+      (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script') || code.includes('<!DOCTYPE')))
     ) {
-      let simType: 'atomic-collision' | 'binary-tree' | 'sorting' | 'custom-html' = 'atomic-collision';
-      if (lowerLang.includes('tree') || code.includes('BinarySearchTree') || code.includes('TreeNode') || code.includes('binary-tree')) {
+      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'sorting' | 'custom-html' = 'custom-html';
+      const lowerCode = code.toLowerCase();
+      if (
+        lowerLang.includes('fusion') ||
+        lowerCode.includes('nuclear') ||
+        lowerCode.includes('fusion') ||
+        lowerCode.includes('deuterium') ||
+        lowerCode.includes('tritium')
+      ) {
+        simType = 'nuclear-fusion';
+      } else if (lowerLang.includes('atom') || lowerCode.includes('atomic')) {
+        simType = 'atomic-collision';
+      } else if (lowerLang.includes('tree') || lowerCode.includes('binarysearchtree') || lowerCode.includes('treenode')) {
         simType = 'binary-tree';
-      } else if (lowerLang.includes('sort') || code.includes('bubbleSort')) {
+      } else if (lowerLang.includes('sort') || lowerCode.includes('bubblesort')) {
         simType = 'sorting';
-      } else if (lowerLang === 'html' || code.includes('<canvas') || code.includes('<script')) {
+      } else {
+        // Universal dynamic Generative UI / HTML5 Canvas / SVG simulation for ANY other topic!
         simType = 'custom-html';
       }
       return <InteractiveSimulationCard type={simType} code={code} />;
@@ -376,10 +390,19 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       text.includes('```simulation') ||
       text.includes('```visual') ||
       text.includes('```atomic-collision') ||
+      text.includes('```nuclear-fusion') ||
+      text.includes('```fusion') ||
       text.includes('```binary-tree');
+
+    const hasNuclearMention =
+      !hasExplicitSimBlock &&
+      /(?:nuclear\s+fusion|nucler\s+fussion|fusion\s+(?:reaction|simulation|with\s+live\s+visual)|tokamak\s+plasma|deuterium.*tritium)/i.test(
+        text
+      );
 
     const hasAtomicMention =
       !hasExplicitSimBlock &&
+      !hasNuclearMention &&
       /(?:here['’]?s\s+a\s+simulation\s+of\s+atoms\s+colliding|simulation\s+of\s+atoms\s+colliding|how\s+atoms?\s+collide\s+with\s+visuals|atomic\s+collisions?\s+visual(?:ization|izer)?)/i.test(
         text
       );
@@ -390,6 +413,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         text
       );
 
+    let injectedNuclearSim = false;
     let injectedAtomicSim = false;
     let injectedTreeSim = false;
 
@@ -470,6 +494,18 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       const line = lines[i];
 
       // Auto-inject visual simulation card right after intro line or before "What you're seeing"
+      if (
+        hasNuclearMention &&
+        !injectedNuclearSim &&
+        (line.toLowerCase().includes("what you're seeing") || line.toLowerCase().includes('reaction') || i === 1 || i === 2)
+      ) {
+        flushList();
+        flushTable();
+        nodes.push(
+          <InteractiveSimulationCard key={`auto-nuclear-sim-${nodes.length}`} type="nuclear-fusion" />
+        );
+        injectedNuclearSim = true;
+      }
       if (
         hasAtomicMention &&
         !injectedAtomicSim &&
@@ -742,6 +778,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       );
     }
 
+    if (hasNuclearMention && !injectedNuclearSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-nuclear-sim-fallback" type="nuclear-fusion" />
+      );
+      injectedNuclearSim = true;
+    }
     if (hasAtomicMention && !injectedAtomicSim) {
       nodes.unshift(
         <InteractiveSimulationCard key="auto-atomic-sim-fallback" type="atomic-collision" />

@@ -189,25 +189,39 @@ export default {
         configured: hasKey,
         provider: 'gemini',
         active_provider: 'gemini',
-        active_model: 'gemini-3-flash-preview',
+        active_model: 'gemini-3.5-flash',
         available_models: [
           {
-            id: 'gemini-3-flash-preview',
-            name: 'Gemini 3 Flash Turbo (Ultra Fast <2s)',
+            id: 'gemini-3.5-flash',
+            name: 'Gemini 3.5 Flash (Ultra Fast & Stable)',
             provider: 'gemini',
             is_default: true,
             context_window: 1048576,
           },
           {
-            id: 'gemini-3.5-flash',
-            name: 'Gemini 3.5 Flash',
+            id: 'gemini-3.6-flash',
+            name: 'Gemini 3.6 Flash',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
           },
           {
-            id: 'gemini-3.5-flash-lite',
-            name: 'Gemini 3.5 Flash Lite',
+            id: 'gemini-3.1-flash-lite',
+            name: 'Gemini 3.1 Flash Lite',
+            provider: 'gemini',
+            is_default: false,
+            context_window: 1048576,
+          },
+          {
+            id: 'gemini-flash-lite-latest',
+            name: 'Gemini Flash Lite (Latest)',
+            provider: 'gemini',
+            is_default: false,
+            context_window: 1048576,
+          },
+          {
+            id: 'gemini-3-flash-preview',
+            name: 'Gemini 3 Flash Turbo',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
@@ -260,7 +274,7 @@ export default {
       const conversationId = body.conversation_id || `conv-${Date.now()}`;
       const messageId = `msg-${Date.now()}`;
       const userMessage = body.message || '';
-      const chosenModel = body.model || 'gemini-3-flash-preview';
+      const chosenModel = body.model || 'gemini-3.5-flash';
 
       // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
       type GeminiPart =
@@ -345,19 +359,36 @@ export default {
         parts: [
           {
             text:
-              'You are Unified AI Assistant, an advanced multimodal coding, reasoning, and visual learning assistant with integrated interactive generative UI capabilities.\n\n' +
-              'INTERACTIVE SIMULATIONS & VISUAL LEARNING:\n' +
-              'When the user asks to see, simulate, learn, or explore a concept "with visuals" or asks for an interactive simulation/visualizer (such as atomic collisions, particle physics, binary search trees, sorting algorithms, wave mechanics, pendulum, cellular automata, or data structures):\n' +
-              '1. Immediately output an interactive simulation block at the beginning using:\n' +
+              'You are Unified AI Assistant, an advanced multimodal coding, reasoning, and visual learning assistant with universal interactive simulation capabilities.\n\n' +
+              'UNIVERSAL INTERACTIVE SIMULATIONS & VISUAL LEARNING:\n' +
+              'When the user asks to see, simulate, learn, or explore ANY concept "with visuals", "live visual", "simulation", or asks for visual interactive models (such as nuclear fusion, atomic collisions, binary trees, solar system orbits, double pendulum, sorting algorithms, wave interference, photosynthesis, cellular automata, neural networks, or ANY arbitrary topic):\n' +
+              '1. Immediately output an interactive simulation block at the beginning of your answer using:\n' +
               '```interactive-simulation\n' +
-              'type: atomic-collision\n' +
-              'title: Atomic Collisions Simulation\n' +
+              '<!DOCTYPE html>\n' +
+              '<html>\n' +
+              '<head>\n' +
+              '<style>\n' +
+              '  body { margin: 0; background: #050608; color: #f1f5f9; font-family: sans-serif; overflow: hidden; }\n' +
+              '  .controls { display: flex; gap: 12px; padding: 10px; background: #0a0b10; border-bottom: 1px solid rgba(255,255,255,0.08); }\n' +
+              '  canvas { display: block; width: 100%; height: 320px; }\n' +
+              '  .stats { display: flex; gap: 18px; padding: 10px; background: #08090d; border-top: 1px solid rgba(255,255,255,0.08); font-family: monospace; }\n' +
+              '</style>\n' +
+              '</head>\n' +
+              '<body>\n' +
+              '  <div class="controls"><!-- sliders & buttons --></div>\n' +
+              '  <canvas id="simCanvas"></canvas>\n' +
+              '  <div class="stats"><!-- live telemetry counters --></div>\n' +
+              '  <script>\n' +
+              '    // Complete, working 60fps simulation code with canvas animation, controls, and physics\n' +
+              '  </script>\n' +
+              '</body>\n' +
+              '</html>\n' +
               '```\n' +
-              '(or for binary trees: ```interactive-simulation\\ntype: binary-tree\\n```, or write self-contained interactive HTML5 Canvas/JavaScript code inside ```interactive-simulation).\n' +
-              '2. Follow with clear, beautifully structured educational insights:\n' +
+              '(Note: If the topic is nuclear fusion, you can also write: ```interactive-simulation\\ntype: nuclear-fusion\\n```; or if atomic collisions: ```interactive-simulation\\ntype: atomic-collision\\n```; or if binary tree: ```interactive-simulation\\ntype: binary-tree\\n```; or write a complete custom HTML5 Canvas interactive simulation for any other topic!).\n' +
+              '2. Follow immediately with clear, structured educational explanations:\n' +
               '   - **What you\'re seeing**: Bullet points explaining visual elements, colors, particles/nodes, and live behavior.\n' +
-              '   - **What actually happens in reality / underneath**: The underlying scientific principles, atomic laws, physics, or algorithmic theory.\n' +
-              '   - **Why it matters**: Practical applications in engineering, chemistry, computing, or nature.\n\n' +
+              '   - **What actually happens in reality / underneath**: The underlying scientific principles, equations, laws of physics, or algorithmic mechanics.\n' +
+              '   - **Why it matters**: Real-world applications, engineering challenges, and practical significance.\n\n' +
               'CONTEXTUAL MEMORY & MULTIMODAL REASONING:\n' +
               'You have full vision and multimodal capabilities to analyze images, charts, diagrams, screenshots, documents, and code. You also have full contextual memory of the ongoing conversation history. When the user asks follow-up questions referencing previous concepts, topics, or code, immediately connect your answer to the preceding discussion without asking them to repeat themselves. When the user asks to set a reminder, schedule an event, or create a task, summarize the date, time, and details clearly.',
           },
@@ -388,14 +419,18 @@ export default {
           const candidateModels = Array.from(
             new Set([
               chosenModel,
-              'gemini-3-flash-preview',
               'gemini-3.5-flash',
-              'gemini-3.5-flash-lite',
-              'gemini-flash-latest',
+              'gemini-3.6-flash',
+              'gemini-3.1-flash-lite',
+              'gemini-flash-lite-latest',
+              'gemma-4-26b-a4b-it',
+              'gemini-3-flash-preview',
             ])
           );
           let geminiResponse: Response | null = null;
           let usedModel = chosenModel;
+          let lastErrorText = '';
+          let lastErrorStatus = 0;
 
           for (const model of candidateModels) {
             try {
@@ -413,15 +448,27 @@ export default {
                 geminiResponse = resp;
                 usedModel = model;
                 break;
+              } else {
+                lastErrorStatus = resp.status;
+                lastErrorText = await resp.text().catch(() => '');
               }
-            } catch {
-              // Try next model
+            } catch (err: unknown) {
+              lastErrorText = err instanceof Error ? err.message : String(err);
             }
           }
 
           if (!geminiResponse || !geminiResponse.body) {
+            const isQuota =
+              lastErrorStatus === 429 ||
+              lastErrorText.includes('RESOURCE_EXHAUSTED') ||
+              lastErrorText.includes('Quota exceeded');
+
+            const errorText = isQuota
+              ? '**Daily Free-Tier Quota Limit Reached on Gemini**\n\nThe free-tier usage limit for this shared API key has been reached for today. You can enter your personal Gemini API key in Settings (or by clicking the 🔑 API Key button in the header) to continue immediately with unlimited requests.'
+              : 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.';
+
             await sendSSE('text_delta', {
-              text: 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.',
+              text: errorText,
             });
             await sendSSE('message_complete', {
               finish_reason: 'stop',
