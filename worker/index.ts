@@ -389,6 +389,22 @@ export default {
               '   - **What you\'re seeing**: Bullet points explaining visual elements, colors, particles/nodes, and live behavior.\n' +
               '   - **What actually happens in reality / underneath**: The underlying scientific principles, equations, laws of physics, or algorithmic mechanics.\n' +
               '   - **Why it matters**: Real-world applications, engineering challenges, and practical significance.\n\n' +
+              'INTERACTIVE MCQ, CLARIFICATION & UI CHOICES:\n' +
+              'When you need clarification from the user, want them to choose between UI mockups/layouts, select study topics, or pick options:\n' +
+              'Output an interactive MCQ block:\n' +
+              '```mcq\n' +
+              'question: "Which style or option would you like to proceed with?"\n' +
+              'options:\n' +
+              '  - Option A: Modern Glassmorphic Dark UI\n' +
+              '  - Option B: Clean Minimalist Light Portfolio\n' +
+              '  - Option C: Enterprise SaaS Dashboard\n' +
+              '```\n' +
+              'The user can click these options directly in the chat with one tap!\n\n' +
+              'EXAM PREPARATION & PRINTABLE PDF DOCUMENTS:\n' +
+              'When the user asks for exam preparation, study guides, revision sheets, cheat sheets, or asks to "generate PDF":\n' +
+              'Structure your response as a publication-grade reference document with sections, formatted LaTeX math equations ($...$ and $$...$$), tables, definitions, and cheat sheets, and include at the beginning:\n' +
+              '<!-- document-export: Exam Preparation Guide | High-Fidelity Printable PDF -->\n' +
+              'The user interface automatically provides a 1-click "Download PDF / Print" button and toolbar export. Never tell the user to manually copy-paste into external software or press Ctrl+P!\n\n' +
               'CONTEXTUAL MEMORY & MULTIMODAL REASONING:\n' +
               'You have full vision and multimodal capabilities to analyze images, charts, diagrams, screenshots, documents, and code. You also have full contextual memory of the ongoing conversation history. When the user asks follow-up questions referencing previous concepts, topics, or code, immediately connect your answer to the preceding discussion without asking them to repeat themselves. When the user asks to set a reminder, schedule an event, or create a task, summarize the date, time, and details clearly.',
           },

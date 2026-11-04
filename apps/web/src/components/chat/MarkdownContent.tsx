@@ -6,6 +6,8 @@ import { ImageGenerationCard } from './ImageGenerationCard';
 import { FileAttachmentCard } from './FileAttachmentCard';
 import { PromptFlashcard } from './PromptFlashcard';
 import { InteractiveSimulationCard } from './InteractiveSimulationCard';
+import { PdfExportCard } from './PdfExportCard';
+import { InteractiveChoiceCard } from './InteractiveChoiceCard';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import './MarkdownContent.css';
 
@@ -30,6 +32,7 @@ mermaid.initialize({
 interface MarkdownContentProps {
   content: string;
   isError?: boolean;
+  onSelectChoice?: (choice: string) => void;
 }
 
 // Mermaid Diagram Component with Live Render & Action Controls
@@ -178,7 +181,7 @@ const KaTeXInline: React.FC<{ math: string }> = ({ math }) => {
   );
 };
 
-export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isError }) => {
+export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isError, onSelectChoice }) => {
   // Clean raw quota errors
   const cleanContent = React.useMemo(() => {
     if (!content) return '';
@@ -221,6 +224,40 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       return <MermaidDiagram code={code} />;
     }
 
+    // Interactive MCQ / Choice Poll Block
+    if (
+      lowerLang === 'mcq' ||
+      lowerLang === 'choices' ||
+      lowerLang === 'choice' ||
+      lowerLang === 'poll' ||
+      lowerLang === 'options'
+    ) {
+      let question = 'Please select an option:';
+      const options: string[] = [];
+      const lines = code.split('\n');
+      for (const l of lines) {
+        const t = l.trim();
+        if (t.toLowerCase().startsWith('question:')) {
+          question = t.replace(/^question:\s*/i, '').replace(/^["']|["']$/g, '');
+        } else if (t.startsWith('- ') || t.startsWith('* ')) {
+          options.push(t.slice(2).replace(/^["']|["']$/g, '').trim());
+        } else if (/^[A-D]\)\s+/.test(t)) {
+          options.push(t.replace(/^[A-D]\)\s+/, '').trim());
+        } else if (/^\d+\.\s+/.test(t)) {
+          options.push(t.replace(/^\d+\.\s+/, '').trim());
+        }
+      }
+
+      return (
+        <InteractiveChoiceCard
+          question={question}
+          options={options.length > 0 ? options : ['Option A', 'Option B', 'Option C']}
+          category="Clarification & Choice"
+          onSelectChoice={onSelectChoice}
+        />
+      );
+    }
+
     if (
       lowerLang === 'interactive-simulation' ||
       lowerLang === 'simulation' ||
@@ -232,10 +269,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       lowerLang === 'atoms' ||
       lowerLang === 'binary-tree' ||
       lowerLang === 'tree-visualizer' ||
+      lowerLang === 'photosynthesis' ||
+      lowerLang === 'sorting' ||
       lowerLang === 'generative-ui' ||
       (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script') || code.includes('<!DOCTYPE')))
     ) {
-      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'sorting' | 'custom-html' = 'custom-html';
+      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'sorting' | 'photosynthesis' | 'custom-html' = 'custom-html';
       const lowerCode = code.toLowerCase();
       if (
         lowerLang.includes('fusion') ||
@@ -249,6 +288,8 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         simType = 'atomic-collision';
       } else if (lowerLang.includes('tree') || lowerCode.includes('binarysearchtree') || lowerCode.includes('treenode')) {
         simType = 'binary-tree';
+      } else if (lowerLang.includes('photo') || lowerCode.includes('photosynthesis') || lowerCode.includes('chlorophyll')) {
+        simType = 'photosynthesis';
       } else if (lowerLang.includes('sort') || lowerCode.includes('bubblesort')) {
         simType = 'sorting';
       } else {
@@ -413,9 +454,31 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         text
       );
 
+    const hasPhotoMention =
+      !hasExplicitSimBlock &&
+      /(?:photosynthesis.*(?:live\s+visual|with\s+visual|simulation)|photochemical\s+reaction.*(?:visual|simulation)|here['’]?s\s+a\s+simulation\s+of\s+photosynthesis)/i.test(
+        text
+      );
+
+    const hasSortMention =
+      !hasExplicitSimBlock &&
+      /(?:(?:bubble|quick|selection|merge)\s+sort.*(?:live\s+visual|with\s+visual|simulation)|sorting\s+algorithms?.*(?:live\s+visual|with\s+visual|simulation))/i.test(
+        text
+      );
+
+    const isExamGuide =
+      text.includes('<!-- document-export:') ||
+      text.includes('EXAM PREPARATION GUIDE') ||
+      text.includes('Exam Preparation Guide') ||
+      /(?:#\s*.*exam\s+preparation\s+guide|##\s*section\s+1:\s+chemical\s+&\s+nuclear|study\s+reference:\s+chemical|exam\s+revision\s+cheat\s+sheet)/i.test(
+        text
+      );
+
     let injectedNuclearSim = false;
     let injectedAtomicSim = false;
     let injectedTreeSim = false;
+    let injectedPhotoSim = false;
+    let injectedSortSim = false;
 
     const flushList = () => {
       if (listItems.length === 0) return;
@@ -795,6 +858,25 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         <InteractiveSimulationCard key="auto-tree-sim-fallback" type="binary-tree" />
       );
       injectedTreeSim = true;
+    }
+    if (hasPhotoMention && !injectedPhotoSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-photo-sim-fallback" type="photosynthesis" />
+      );
+      injectedPhotoSim = true;
+    }
+    if (hasSortMention && !injectedSortSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-sort-sim-fallback" type="sorting" />
+      );
+      injectedSortSim = true;
+    }
+
+    // Auto-inject high-fidelity printable PDF export card for study/exam guides
+    if (isExamGuide) {
+      nodes.unshift(
+        <PdfExportCard key="auto-pdf-export-guide" content={cleanContent} />
+      );
     }
 
     return nodes;
