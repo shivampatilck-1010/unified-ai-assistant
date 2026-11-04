@@ -189,18 +189,18 @@ export default {
         configured: hasKey,
         provider: 'gemini',
         active_provider: 'gemini',
-        active_model: 'gemini-3.5-flash',
+        active_model: 'gemini-2.0-flash',
         available_models: [
           {
-            id: 'gemini-3.5-flash',
-            name: 'Gemini 3.5 Flash (Ultra Fast & Stable)',
+            id: 'gemini-2.0-flash',
+            name: 'Gemini 2.0 Flash (Ultra Fast & Sub-Second)',
             provider: 'gemini',
             is_default: true,
             context_window: 1048576,
           },
           {
-            id: 'gemini-3.6-flash',
-            name: 'Gemini 3.6 Flash',
+            id: 'gemini-1.5-flash',
+            name: 'Gemini 1.5 Flash (High Stability)',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
@@ -208,20 +208,6 @@ export default {
           {
             id: 'gemini-3.1-flash-lite',
             name: 'Gemini 3.1 Flash Lite',
-            provider: 'gemini',
-            is_default: false,
-            context_window: 1048576,
-          },
-          {
-            id: 'gemini-flash-lite-latest',
-            name: 'Gemini Flash Lite (Latest)',
-            provider: 'gemini',
-            is_default: false,
-            context_window: 1048576,
-          },
-          {
-            id: 'gemini-3-flash-preview',
-            name: 'Gemini 3 Flash Turbo',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
@@ -274,7 +260,7 @@ export default {
       const conversationId = body.conversation_id || `conv-${Date.now()}`;
       const messageId = `msg-${Date.now()}`;
       const userMessage = body.message || '';
-      const chosenModel = body.model || 'gemini-3.5-flash';
+      const chosenModel = body.model || 'gemini-2.0-flash';
 
       // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
       type GeminiPart =
@@ -360,35 +346,11 @@ export default {
           {
             text:
               'You are Unified AI Assistant, an advanced multimodal coding, reasoning, and visual learning assistant with universal interactive simulation capabilities.\n\n' +
-              'UNIVERSAL INTERACTIVE SIMULATIONS & VISUAL LEARNING:\n' +
-              'When the user asks to see, simulate, learn, or explore ANY concept "with visuals", "live visual", "simulation", or asks for visual interactive models (such as nuclear fusion, atomic collisions, binary trees, solar system orbits, double pendulum, sorting algorithms, wave interference, photosynthesis, cellular automata, neural networks, or ANY arbitrary topic):\n' +
-              '1. Immediately output an interactive simulation block at the beginning of your answer using:\n' +
-              '```interactive-simulation\n' +
-              '<!DOCTYPE html>\n' +
-              '<html>\n' +
-              '<head>\n' +
-              '<style>\n' +
-              '  body { margin: 0; background: #050608; color: #f1f5f9; font-family: sans-serif; overflow: hidden; }\n' +
-              '  .controls { display: flex; gap: 12px; padding: 10px; background: #0a0b10; border-bottom: 1px solid rgba(255,255,255,0.08); }\n' +
-              '  canvas { display: block; width: 100%; height: 320px; }\n' +
-              '  .stats { display: flex; gap: 18px; padding: 10px; background: #08090d; border-top: 1px solid rgba(255,255,255,0.08); font-family: monospace; }\n' +
-              '</style>\n' +
-              '</head>\n' +
-              '<body>\n' +
-              '  <div class="controls"><!-- sliders & buttons --></div>\n' +
-              '  <canvas id="simCanvas"></canvas>\n' +
-              '  <div class="stats"><!-- live telemetry counters --></div>\n' +
-              '  <script>\n' +
-              '    // Complete, working 60fps simulation code with canvas animation, controls, and physics\n' +
-              '  </script>\n' +
-              '</body>\n' +
-              '</html>\n' +
-              '```\n' +
-              '(Note: If the topic is nuclear fusion: ```interactive-simulation\\ntype: nuclear-fusion\\n```; if atomic collisions: ```interactive-simulation\\ntype: atomic-collision\\n```; if binary tree: ```interactive-simulation\\ntype: binary-tree\\n```; if photosynthesis/photochemical: ```interactive-simulation\\ntype: photosynthesis\\n```; if sorting: ```interactive-simulation\\ntype: sorting\\n```; or write a complete custom HTML5 Canvas interactive simulation for any arbitrary topic!). When the user hovers over elements/particles, provide interactive inspection and clear visual feedback.\n' +
-              '2. Follow immediately with clear, structured educational explanations:\n' +
-              '   - **What you\'re seeing**: Bullet points explaining visual elements, colors, particles/nodes, and live behavior.\n' +
-              '   - **What actually happens in reality / underneath**: The underlying scientific principles, equations, laws of physics, or algorithmic mechanics.\n' +
-              '   - **Why it matters**: Real-world applications, engineering challenges, and practical significance.\n\n' +
+              'RESPONSE SPEED & INSTANT STREAMING:\n' +
+              '1. Always output your direct explanation, overview, code, or answer FIRST so the user sees immediate streaming feedback without waiting.\n' +
+              '2. When the user asks to see, simulate, learn, or explore a concept with visuals (or for nuclear fusion, atomic collisions, binary trees, sorting, photosynthesis):\n' +
+              '   - For standard visual concepts, use concise typed tags: ```interactive-simulation\\ntype: binary-tree\\n```, ```interactive-simulation\\ntype: nuclear-fusion\\n```, ```interactive-simulation\\ntype: atomic-collision\\n```, or ```interactive-simulation\\ntype: sorting\\n```.\n' +
+              '   - If writing custom HTML5 Canvas simulations, provide concise, clean, working code.\n\n' +
               'INTERACTIVE MCQ, CONCEPT TREES & EXPLORATION BRANCHES:\n' +
               'When you quiz the user, need clarification, explain a course topic, or present choices:\n' +
               'Output an interactive MCQ or Concept block:\n' +
@@ -446,12 +408,10 @@ export default {
           const candidateModels = Array.from(
             new Set([
               chosenModel,
-              'gemini-3.5-flash',
-              'gemini-3.6-flash',
+              'gemini-2.0-flash',
+              'gemini-1.5-flash',
+              'gemini-2.0-flash-lite-preview-02-05',
               'gemini-3.1-flash-lite',
-              'gemini-flash-lite-latest',
-              'gemma-4-26b-a4b-it',
-              'gemini-3-flash-preview',
             ])
           );
           let geminiResponse: Response | null = null;
@@ -460,6 +420,8 @@ export default {
           let lastErrorStatus = 0;
 
           for (const model of candidateModels) {
+            const fetchCtrl = new AbortController();
+            const fetchTimer = setTimeout(() => fetchCtrl.abort(), 6500);
             try {
               const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
               const resp = await fetch(geminiUrl, {
@@ -473,7 +435,9 @@ export default {
                     temperature: 0.7,
                   },
                 }),
+                signal: fetchCtrl.signal,
               });
+              clearTimeout(fetchTimer);
 
               if (resp.ok && resp.body) {
                 geminiResponse = resp;
@@ -484,6 +448,7 @@ export default {
                 lastErrorText = await resp.text().catch(() => '');
               }
             } catch (err: unknown) {
+              clearTimeout(fetchTimer);
               lastErrorText = err instanceof Error ? err.message : String(err);
             }
           }
