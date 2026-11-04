@@ -168,13 +168,13 @@ export function Sidebar({
               title="New conversation"
             >
               <span className="sidebar__brand-icon" aria-hidden="true" style={{ display: 'flex', alignItems: 'center' }}>
-                <UnifiedLogo size={28} animated />
+                <UnifiedLogo size={28} />
               </span>
               <span className="sidebar__brand-name">Unified AI</span>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: '4px' }}>
-              <UnifiedLogo size={24} animated onClick={onNewChat} />
+              <UnifiedLogo size={24} onClick={onNewChat} />
             </div>
           )}
           <button

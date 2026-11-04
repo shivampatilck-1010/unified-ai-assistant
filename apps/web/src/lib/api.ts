@@ -74,7 +74,13 @@ export function getApiBase(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('unified_ai_api_base');
     if (custom && custom.trim()) {
-      return custom.trim().replace(/\/+$/, '');
+      const cleaned = custom.trim().replace(/\/+$/, '');
+      // Automatically purge ephemeral/expired trycloudflare.com tunnels from local storage
+      if (cleaned.includes('.trycloudflare.com')) {
+        localStorage.removeItem('unified_ai_api_base');
+      } else {
+        return cleaned;
+      }
     }
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://127.0.0.1:8000';

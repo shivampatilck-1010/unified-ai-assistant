@@ -1,6 +1,5 @@
 /* ==========================================================================
-   Unified AI Logo & Planetary Orbital Animation
-   Precision 3D Metallic U with Cosmic Planetary Ring & Light Sheen
+   Unified AI Logo — Static Metallic Brand Icon (Clean Transparent)
    ========================================================================== */
 
 .unified-logo {
@@ -9,147 +8,27 @@
   align-items: center;
   justify-content: center;
   user-select: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+.unified-logo[role="button"] {
   cursor: pointer;
-  perspective: 600px;
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.unified-logo:hover {
-  transform: scale(1.08) translateY(-1px);
+.unified-logo[role="button"]:hover {
+  opacity: 0.92;
+  transform: scale(1.04);
 }
 
-/* Image container with exact square bounding */
-.unified-logo__img-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  overflow: visible;
-}
-
-/* High-res authentic transparent 3D metallic logo */
 .unified-logo__img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
-  /* Lift metallic luster and specular rim contrast cleanly on dark themes */
-  filter: brightness(1.24) contrast(1.12) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(129, 140, 248, 0.22));
-  transition: filter 0.3s ease, transform 0.3s ease;
-}
-
-.unified-logo:hover .unified-logo__img {
-  filter: brightness(1.38) contrast(1.18) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 16px rgba(129, 140, 248, 0.45));
-}
-
-/* Dynamic specular light sheen sweep across the face of the letter U */
-.unified-logo--animated .unified-logo__sheen {
-  position: absolute;
-  inset: -10%;
-  border-radius: 50%;
-  background: linear-gradient(
-    118deg,
-    transparent 15%,
-    rgba(255, 255, 255, 0.5) 48%,
-    rgba(255, 255, 255, 0.75) 50%,
-    rgba(255, 255, 255, 0.5) 52%,
-    transparent 85%
-  );
-  transform: translateX(-160%) skewX(-22deg);
-  animation: logoSheenSweep 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  pointer-events: none;
-  mix-blend-mode: color-dodge;
-  opacity: 0.65;
-}
-
-@keyframes logoSheenSweep {
-  0% {
-    transform: translateX(-160%) skewX(-22deg);
-  }
-  32%, 100% {
-    transform: translateX(180%) skewX(-22deg);
-  }
-}
-
-/* Glowing planetary orbital plasma ring pulse */
-.unified-logo--animated .unified-logo__orbit-glow {
-  position: absolute;
-  inset: -14%;
-  border-radius: 50%;
-  border: 1.5px solid rgba(165, 180, 252, 0.35);
-  box-shadow: 
-    0 0 14px rgba(129, 140, 248, 0.35),
-    inset 0 0 8px rgba(165, 180, 252, 0.2);
-  transform: rotateX(68deg) rotateY(18deg);
-  animation: orbitRingPulse 3.2s ease-in-out infinite alternate;
-  pointer-events: none;
-}
-
-@keyframes orbitRingPulse {
-  0% {
-    opacity: 0.45;
-    transform: rotateX(68deg) rotateY(18deg) scale(0.95);
-    border-color: rgba(165, 180, 252, 0.25);
-    box-shadow: 0 0 8px rgba(129, 140, 248, 0.2);
-  }
-  100% {
-    opacity: 0.95;
-    transform: rotateX(68deg) rotateY(18deg) scale(1.04);
-    border-color: rgba(224, 231, 255, 0.6);
-    box-shadow: 0 0 18px rgba(165, 180, 252, 0.5), inset 0 0 10px rgba(129, 140, 248, 0.3);
-  }
-}
-
-/* Orbiting photon particle track */
-.unified-logo--animated .unified-logo__photon-track {
-  position: absolute;
-  inset: -14%;
-  border-radius: 50%;
-  transform: rotateX(68deg) rotateY(18deg);
-  pointer-events: none;
-  animation: photonSpin 4.5s linear infinite;
-}
-
-.unified-logo__photon {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.9), 0 0 12px 4px rgba(129, 140, 248, 0.7);
-  transform: translate(-50%, -50%);
-}
-
-@keyframes photonSpin {
-  0% {
-    transform: rotateX(68deg) rotateY(18deg) rotateZ(0deg);
-  }
-  100% {
-    transform: rotateX(68deg) rotateY(18deg) rotateZ(360deg);
-  }
-}
-
-/* Deep cosmic background aura */
-.unified-logo__ambient-aura {
-  position: absolute;
-  inset: -25%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 75%);
-  animation: auraBreathe 4.5s ease-in-out infinite alternate;
-  z-index: -1;
-  pointer-events: none;
-}
-
-@keyframes auraBreathe {
-  0% {
-    transform: scale(0.88);
-    opacity: 0.35;
-  }
-  100% {
-    transform: scale(1.18);
-    opacity: 0.75;
-  }
+  background: transparent;
+  /* Crisp rendering without background boxes or distracting halos */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
 }
