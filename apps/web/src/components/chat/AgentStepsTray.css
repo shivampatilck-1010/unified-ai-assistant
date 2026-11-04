@@ -1,34 +1,94 @@
 /* ==========================================================================
-   AgentStepsTray.css — Antigravity Signature Thought & Execution Steps
-   Pixel-Perfect Match to User Reference Screenshots (Image 1 & Image 2):
-   - Image 1: Clean, understated streaming thought trace ("Thinking for 7s")
-   - Image 2: "Thought for 1s · 4 steps completed ∨" with aligned columns:
-     Action | Description | #Tag / >
+   AgentStepsTray.css — Ghost Graphite Single-Line Thinking Bar
+   Variant 1: Slim Obsidian Bar
+   - Background: #070709
+   - Single-line height: 38px (Zero downward expansion)
+   - Dynamic in-place text cross-fade
+   - Pure Monochrome (Zero Color)
    ========================================================================== */
 
-/* --- STREAMING STATE (Image 1) --- */
-.antigravity-thinking-stream {
-  margin: 4px 0 14px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-}
-
-.antigravity-stream-step {
+/* Main Single-Line Obsidian Bar (#070709) */
+.ghost-single-bar {
+  background: #070709;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  padding: 0 14px;
+  height: 38px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #e2e8f0;
-  animation: streamFadeIn 0.18s ease-out;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  margin: 6px 0 10px 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  user-select: none;
 }
 
-@keyframes streamFadeIn {
+.ghost-single-bar:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65);
+}
+
+/* Left Group: Micro-Badge & In-Place Text */
+.ghost-single-bar__left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 12px;
+}
+
+/* Ghost Graphite Micro-Badge (Zero Color) */
+.ghost-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  flex-shrink: 0;
+  line-height: 1.35;
+}
+
+.ghost-badge--row {
+  width: 86px;
+  font-size: 10.5px;
+}
+
+/* Sliding / In-Place Viewport (Exact 1 line height) */
+.ghost-text-viewport {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ghost-text-sliding {
+  display: block;
+  color: #f4f4f5;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: ghostSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ghostSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -36,121 +96,100 @@
   }
 }
 
-.antigravity-stream-desc {
-  flex: 1;
-  min-width: 0;
-  color: #cbd5e1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.antigravity-thinking-counter {
-  margin-top: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  user-select: none;
-}
-
-.antigravity-thinking-counter::after {
-  content: '';
-  display: inline-block;
-  width: 4px;
-  height: 14px;
-  background: #38bdf8;
-  animation: counterBlink 1s infinite;
-}
-
-@keyframes counterBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-/* --- COMPLETED TRAY (Image 2) --- */
-.antigravity-thought-tray {
-  margin: 2px 0 12px 0;
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  user-select: none;
-}
-
-/* Clickable Header Bar */
-.antigravity-thought-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 3px 0;
-  cursor: pointer;
-  text-align: left;
-  transition: opacity 0.15s ease;
-}
-
-.antigravity-thought-header:hover {
-  opacity: 0.85;
-}
-
-.antigravity-thought-header__left {
+/* Right Status Counter */
+.ghost-counter {
   display: flex;
   align-items: center;
   gap: 7px;
-}
-
-.antigravity-check-icon {
-  color: #71717a;
+  font-size: 12px;
+  color: #a1a1aa;
+  font-family: var(--font-mono, monospace);
   flex-shrink: 0;
-  transition: color 0.18s ease;
+  margin-left: 12px;
 }
 
-.antigravity-thought-header:hover .antigravity-check-icon {
-  color: #38bdf8;
+.ghost-pulse-ring {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+  animation: ghostRingPulse 1.4s infinite;
 }
 
-.antigravity-thought-summary {
+@keyframes ghostRingPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.45;
+  }
+}
+
+/* ==========================================================================
+   Completed State Button
+   ========================================================================== */
+.antigravity-thought-tray {
+  margin: 4px 0 12px 0;
+  width: 100%;
+}
+
+.ghost-single-bar--completed {
+  cursor: pointer;
+  background: #070709;
+  border-color: rgba(255, 255, 255, 0.09);
+  text-align: left;
+}
+
+.ghost-single-bar--completed:hover {
+  background: #0b0c10;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.ghost-check-icon {
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.ghost-completed-text {
   font-size: 13px;
   font-weight: 500;
-  color: #94a3b8;
+  color: #ffffff;
   letter-spacing: -0.01em;
 }
 
-.antigravity-thought-header__right {
-  display: flex;
-  align-items: center;
-}
-
-.antigravity-chevron {
+.ghost-chevron {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #71717a;
-  transition: transform 0.18s ease;
+  flex-shrink: 0;
 }
 
-.antigravity-chevron svg {
-  transform: rotate(0deg);
-  transition: transform 0.18s ease;
+.ghost-chevron-icon {
+  transition: transform 0.2s ease;
 }
 
-.antigravity-chevron--open svg {
+.ghost-chevron-icon--open {
   transform: rotate(180deg);
 }
 
-/* Expanded Step Rows (Matching Image 2) */
-.antigravity-steps-dropdown {
-  margin-top: 10px;
+/* ==========================================================================
+   Expanded Dropdown (Only when clicked)
+   ========================================================================== */
+.ghost-steps-dropdown {
+  margin-top: 6px;
+  background: #070709;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 7px;
-  padding-left: 2px;
-  animation: dropdownFadeIn 0.16s ease-out;
+  animation: ghostDropIn 0.16s ease-out;
 }
 
-@keyframes dropdownFadeIn {
+@keyframes ghostDropIn {
   from {
     opacity: 0;
     transform: translateY(-4px);
@@ -161,77 +200,50 @@
   }
 }
 
-.antigravity-step-row {
+.ghost-step-row {
   display: flex;
   align-items: center;
-  width: 100%;
-  gap: 14px;
+  gap: 12px;
   font-size: 13px;
   line-height: 1.5;
+  padding: 2px 0;
 }
 
-/* Left Action Column */
-.antigravity-action {
-  width: 88px;
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-}
-
-.antigravity-action--analyzed {
-  color: #818cf8; /* Soft Indigo / Blue */
-}
-
-.antigravity-action--ran {
-  color: #94a3b8; /* Muted Slate */
-}
-
-.antigravity-action--synthesized {
-  color: #38bdf8; /* Sky Cyan */
-}
-
-.antigravity-action--rendered {
-  color: #34d399; /* Soft Emerald */
-}
-
-.antigravity-action--edited {
-  color: #38bdf8;
-}
-
-/* Description Column */
-.antigravity-step-desc {
+.ghost-row-desc {
   flex: 1;
   min-width: 0;
-  color: #e2e8f0;
+  color: #d4d4d8;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Right Meta: Tag or Arrow */
-.antigravity-step-meta {
-  flex-shrink: 0;
+.ghost-row-meta {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
-.antigravity-tag {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.ghost-meta-tag {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  padding: 1.5px 7px;
-  color: #94a3b8;
+  padding: 1.5px 6px;
+  color: #a1a1aa;
   font-size: 11px;
   font-family: var(--font-mono, monospace);
-  font-weight: 500;
 }
 
-.antigravity-arrow {
-  color: #64748b;
+.ghost-row-arrow {
+  color: #71717a;
   font-size: 13px;
   font-weight: 600;
-  padding-right: 2px;
+}
+
+@media (max-width: 640px) {
+  .ghost-counter {
+    display: none;
+  }
 }

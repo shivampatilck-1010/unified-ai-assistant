@@ -7,7 +7,8 @@ export default defineConfig({
   build: {
     minify: false,
     sourcemap: false,
-    chunkSizeWarningLimit: 2000,
+    reportCompressedSize: false,
+    target: 'esnext',
   },
   server: {
     port: 5173,
