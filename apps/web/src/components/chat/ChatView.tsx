@@ -1,3 +1,4 @@
+import type { QueuedMessage } from '../composer/QueuedMessagesTray';
 import { useRef, useEffect, useState } from 'react';
 import type { ChatMessage, ModelInfo, ChatAttachment } from '../../types';
 import { Composer } from '../composer/Composer';
@@ -196,16 +197,63 @@ export function ChatView({
   }, []);
   const [pendingCalendarData, setPendingCalendarData] = useState<CalendarReminderData | null>(null);
   const [showCalendarCard, setShowCalendarCard] = useState(false);
+  // Queued Messages System (sends after agent finishes working)
+  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
+  const [editPayload, setEditPayload] = useState<{ content: string; attachments?: ChatAttachment[] } | null>(null);
+
+  const handleQueueMessage = (content: string, attachments?: ChatAttachment[]) => {
+    const newItem: QueuedMessage = {
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      content,
+      attachments,
+      timestamp: Date.now(),
+    };
+    setQueuedMessages((prev) => [...prev, newItem]);
+  };
+
+  const handleRemoveQueuedMessage = (id: string) => {
+    setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const handleSendQueuedMessageNow = (id: string) => {
+    const msg = queuedMessages.find((m) => m.id === id);
+    if (!msg) return;
+    setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+    if (isStreaming) {
+      onCancel();
+    }
+    setTimeout(() => {
+      handleSend(msg.content, msg.attachments);
+    }, 150);
+  };
+
+  const handleEditQueuedMessage = (id: string) => {
+    const msg = queuedMessages.find((m) => m.id === id);
+    if (!msg) return;
+    setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+    setEditPayload({ content: msg.content, attachments: msg.attachments });
+  };
+
   const prevStreamingRef = useRef(isStreaming);
   const currentModel = availableModels.find((m) => m.id === selectedModelId) ?? availableModels[0];
 
   // When the thinking process and model stream completes, pop up the calendar card in front
   useEffect(() => {
-    if (prevStreamingRef.current && !isStreaming && pendingCalendarData) {
-      setShowCalendarCard(true);
+    if (prevStreamingRef.current && !isStreaming) {
+      if (pendingCalendarData) {
+        setShowCalendarCard(true);
+      }
+      // If messages are queued, auto-send next message
+      if (queuedMessages.length > 0) {
+        const nextMsg = queuedMessages[0];
+        setQueuedMessages((prev) => prev.slice(1));
+        setTimeout(() => {
+          handleSend(nextMsg.content, nextMsg.attachments);
+        }, 150);
+      }
     }
     prevStreamingRef.current = isStreaming;
-  }, [isStreaming, pendingCalendarData]);
+  }, [isStreaming, pendingCalendarData, queuedMessages]);
 
   const handleSend = (text: string, attachments?: ChatAttachment[]) => {
     isUserScrolledUp.current = false;
@@ -685,6 +733,13 @@ export function ChatView({
         onSend={handleSend}
         isStreaming={isStreaming}
         onCancel={onCancel}
+        queuedMessages={queuedMessages}
+        onQueueMessage={handleQueueMessage}
+        onRemoveQueuedMessage={handleRemoveQueuedMessage}
+        onSendQueuedMessageNow={handleSendQueuedMessageNow}
+        onEditQueuedMessage={handleEditQueuedMessage}
+        editPayload={editPayload}
+        onClearEditPayload={() => setEditPayload(null)}
       />
 
       {/* Follow-up Email Modal */}

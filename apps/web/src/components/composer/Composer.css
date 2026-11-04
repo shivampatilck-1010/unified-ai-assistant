@@ -209,3 +209,19 @@
     padding: 0 8px 8px;
   }
 }
+
+
+/* Queued button highlight */
+.composer__send-btn--queue:not(:disabled) {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+}
+
+.composer__send-btn--queue:not(:disabled):hover {
+  background: rgba(56, 189, 248, 0.3);
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+}

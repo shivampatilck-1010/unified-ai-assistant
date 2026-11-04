@@ -1,26 +1,75 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ChatAttachment } from '../../types';
+import { QueuedMessagesTray, type QueuedMessage } from './QueuedMessagesTray';
 import './Composer.css';
 
-interface ComposerProps {
+export interface ComposerProps {
   onSend: (message: string, attachments?: ChatAttachment[]) => void;
   isStreaming: boolean;
   onCancel?: () => void;
   disabled?: boolean;
+  queuedMessages?: QueuedMessage[];
+  onQueueMessage?: (message: string, attachments?: ChatAttachment[]) => void;
+  onRemoveQueuedMessage?: (id: string) => void;
+  onSendQueuedMessageNow?: (id: string) => void;
+  onEditQueuedMessage?: (id: string) => void;
+  editPayload?: { content: string; attachments?: ChatAttachment[] } | null;
+  onClearEditPayload?: () => void;
 }
 
-export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerProps) {
+export function Composer({
+  onSend,
+  isStreaming,
+  onCancel,
+  disabled,
+  queuedMessages = [],
+  onQueueMessage,
+  onRemoveQueuedMessage,
+  onSendQueuedMessageNow,
+  onEditQueuedMessage,
+  editPayload,
+  onClearEditPayload,
+}: ComposerProps) {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canSend = (value.trim().length > 0 || attachments.length > 0) && !isStreaming && !disabled;
+  // Can submit if there is text or attachment, and composer is not disabled
+  const canSubmit = (value.trim().length > 0 || attachments.length > 0) && !disabled;
+
+  // Sync editPayload if provided from QueuedMessages edit action
+  useEffect(() => {
+    if (editPayload) {
+      setValue(editPayload.content || '');
+      setAttachments(editPayload.attachments || []);
+      if (onClearEditPayload) onClearEditPayload();
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+        }
+      }, 50);
+    }
+  }, [editPayload, onClearEditPayload]);
 
   const handleSubmit = () => {
-    if (!canSend) return;
-    onSend(value.trim(), attachments.length > 0 ? attachments : undefined);
+    if (!canSubmit) return;
+    const textToSend = value.trim();
+    const attachmentsToSend = attachments.length > 0 ? attachments : undefined;
+
+    if (isStreaming) {
+      // If agent is busy working, queue the message
+      if (onQueueMessage) {
+        onQueueMessage(textToSend, attachmentsToSend);
+      }
+    } else {
+      // If agent is idle, send immediately
+      onSend(textToSend, attachmentsToSend);
+    }
+
     setValue('');
     setAttachments([]);
     if (textareaRef.current) {
@@ -41,8 +90,12 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
     // On mobile keyboards tapping Return appends '\n'
     if (val.endsWith('\n') && !val.endsWith('\n\n')) {
       const trimmed = val.replace(/\r?\n$/, '');
-      if ((trimmed.trim().length > 0 || attachments.length > 0) && !isStreaming && !disabled) {
-        onSend(trimmed.trim(), attachments.length > 0 ? attachments : undefined);
+      if ((trimmed.trim().length > 0 || attachments.length > 0) && !disabled) {
+        if (isStreaming && onQueueMessage) {
+          onQueueMessage(trimmed.trim(), attachments.length > 0 ? attachments : undefined);
+        } else {
+          onSend(trimmed.trim(), attachments.length > 0 ? attachments : undefined);
+        }
         setValue('');
         setAttachments([]);
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -79,7 +132,6 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       processFiles(e.target.files);
-      // Reset input value so re-selecting same file works
       e.target.value = '';
     }
   };
@@ -164,6 +216,16 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
         onChange={handleFileChange}
       />
 
+      {/* Queued Messages Tray (Sends after agent finishes working) */}
+      {queuedMessages.length > 0 && (
+        <QueuedMessagesTray
+          messages={queuedMessages}
+          onRemove={onRemoveQueuedMessage || (() => {})}
+          onSendNow={onSendQueuedMessageNow || (() => {})}
+          onEdit={onEditQueuedMessage || (() => {})}
+        />
+      )}
+
       <div className="composer__inner">
         {attachments.length > 0 && (
           <div className="composer__attachments-strip">
@@ -186,7 +248,7 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
                   type="button"
                   className="composer__attachment-remove-btn"
                   onClick={() => removeAttachment(att.id)}
-                  aria-label={`Remove ${att.name}`}
+                  aria-label="Remove attachment"
                 >
                   ×
                 </button>
@@ -202,7 +264,7 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
             title="Attach images or documents (PNG, JPG, PDF, TXT, Code)"
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || isStreaming}
+            disabled={disabled}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path
@@ -224,7 +286,9 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
             onPaste={handlePaste}
             enterKeyHint="send"
             placeholder={
-              attachments.length > 0
+              isStreaming
+                ? 'Type to queue message for when agent finishes…'
+                : attachments.length > 0
                 ? 'Ask about this image/document, or press Enter…'
                 : 'Send a message or drop files here…'
             }
@@ -233,36 +297,52 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
             aria-label="Message input"
           />
 
-          {isStreaming ? (
+          {/* Action buttons on the right */}
+          <div className="composer__actions-group" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {isStreaming && (
+              <button
+                className="composer__stop-btn"
+                onClick={onCancel}
+                type="button"
+                aria-label="Stop generating"
+                title="Stop current response"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" />
+                </svg>
+              </button>
+            )}
+
             <button
-              className="composer__stop-btn"
-              onClick={onCancel}
-              type="button"
-              aria-label="Stop generating"
-              title="Stop generating"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              className="composer__send-btn"
+              className={`composer__send-btn ${isStreaming && canSubmit ? 'composer__send-btn--queue' : ''}`}
               onClick={handleSubmit}
-              disabled={!canSend}
+              disabled={!canSubmit}
               type="button"
-              aria-label="Send message"
-              title="Send message"
+              aria-label={isStreaming ? 'Queue message' : 'Send message'}
+              title={
+                isStreaming
+                  ? 'Queue message (sends after agent finishes working)'
+                  : 'Send message (Enter)'
+              }
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                 <path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-          )}
+          </div>
         </div>
       </div>
+
       <div className="composer__hint">
-        <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for newline · Paste or attach images/files
+        {isStreaming ? (
+          <span style={{ color: '#38bdf8' }}>
+            Agent is working · <kbd>Enter</kbd> will queue your message to send next
+          </span>
+        ) : (
+          <>
+            <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for newline · Paste or attach images/files
+          </>
+        )}
       </div>
     </div>
   );
