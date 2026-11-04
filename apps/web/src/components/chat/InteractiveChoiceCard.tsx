@@ -28,6 +28,10 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
   const [isDeleted, setIsDeleted] = useState<boolean>(false);
   const [hoveredNode, setHoveredNode] = useState<'view' | 'download' | 'delete' | null>(null);
+  // Support both Image 6 (Interactive Explanation Branches) and Image 7/8 (Chamfered Cyber Actions)
+  const [rightPanelView, setRightPanelView] = useState<'branches' | 'actions'>(
+    options.length > 0 ? 'branches' : 'actions'
+  );
   const svgId = useId();
 
   // Resolve 3 explanation branches (custom or intelligently inferred)
@@ -177,21 +181,41 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
 
   return (
     <div className="cortex-canvas-container">
-      {/* Top Header Row with "+ Add Resource" button matching reference */}
+      {/* Top Header Row with "+ Add Resource" & View Toggle matching references */}
       <div className="cortex-top-action-row">
         <div className="cortex-top-section-title">
           <span className="cortex-top-title-icon">✦</span>
-          <span>Course Materials & Reference Handouts</span>
+          <span>{options.length > 0 ? 'Clarification & Concept Choice' : 'Course Materials & Reference Handouts'}</span>
         </div>
-        <button
-          type="button"
-          className="cortex-add-resource-btn"
-          onClick={handleAddResource}
-          title="Add related resource to classroom"
-        >
-          <span className="cortex-add-plus">+</span>
-          <span>Add Resource</span>
-        </button>
+        <div className="cortex-top-action-controls">
+          <div className="cortex-view-mode-toggle">
+            <button
+              type="button"
+              className={`cortex-mode-btn ${rightPanelView === 'branches' ? 'cortex-mode-btn--active' : ''}`}
+              onClick={() => setRightPanelView('branches')}
+              title="Show Interactive Concept Explanation Tree (Image 6)"
+            >
+              ✦ Concept Tree
+            </button>
+            <button
+              type="button"
+              className={`cortex-mode-btn ${rightPanelView === 'actions' ? 'cortex-mode-btn--active' : ''}`}
+              onClick={() => setRightPanelView('actions')}
+              title="Show Cyberpunk Actions: View, Download, Delete (Image 7 & 8)"
+            >
+              ⚙️ Actions
+            </button>
+          </div>
+          <button
+            type="button"
+            className="cortex-add-resource-btn"
+            onClick={handleAddResource}
+            title="Add related resource to classroom"
+          >
+            <span className="cortex-add-plus">+</span>
+            <span>Add Resource</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Layout: Main Cyan Card + SVG Circuit Tree + Chamfered Action Nodes */}
@@ -304,13 +328,13 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
             />
             <path d={midCurveD} className="cortex-fiber-dataflow" />
 
-            {/* Branch 3: Curves DOWN to DELETE button (Rose/Red Fluid Fiber) */}
+            {/* Branch 3: Curves DOWN to DELETE button / Branch 3 */}
             <path
               d={botCurveD}
-              className={`cortex-fiber-base cortex-fiber-base--rose ${
-                isDeleted || hoveredNode === 'delete' ? 'cortex-fiber-base--active' : ''
-              }`}
-              filter={`url(#${svgId}-roseGlow)`}
+              className={`cortex-fiber-base ${
+                rightPanelView === 'branches' ? 'cortex-fiber-base--cyan' : 'cortex-fiber-base--rose'
+              } ${isDeleted || hoveredNode === 'delete' ? 'cortex-fiber-base--active' : ''}`}
+              filter={rightPanelView === 'branches' ? `url(#${svgId}-cyanGlow)` : `url(#${svgId}-roseGlow)`}
             />
             <path d={botCurveD} className="cortex-fiber-dataflow" />
 
@@ -320,93 +344,133 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
             {/* Terminal Dots entering each node */}
             <circle cx={coords.w} cy={coords.yView} r="2.5" fill="#00e5ff" />
             <circle cx={coords.w} cy={coords.yDownload} r="2.5" fill="#00e5ff" />
-            <circle cx={coords.w} cy={coords.yDelete} r="2.5" fill="#f43f5e" />
+            <circle
+              cx={coords.w}
+              cy={coords.yDelete}
+              r="2.5"
+              fill={rightPanelView === 'branches' ? '#00e5ff' : '#f43f5e'}
+            />
           </svg>
         </div>
 
-        {/* The Branches (Nodes): Locked into the sharp, chamfered Cyberpunk design (Image 2 & 3) */}
-        <div className="cortex-nodes-column">
-          {/* Node 1: VIEW */}
-          <button
-            ref={viewNodeRef}
-            type="button"
-            className={`cortex-cyber-node cortex-cyber-node--view ${isViewOpen ? 'cortex-cyber-node--active' : ''}`}
-            onClick={handleViewToggle}
-            onMouseEnter={() => setHoveredNode('view')}
-            onMouseLeave={() => setHoveredNode(null)}
-            title="Click to view full interactive explanation"
-          >
-            <svg className="cortex-cyber-border-svg" preserveAspectRatio="none" viewBox="0 0 100 42">
-              <polygon
-                points="10,1 99,1 99,32 89,41 1,41 1,11"
-                className="cortex-cyber-polygon cortex-cyber-polygon--cyan"
-                vectorEffect="non-scaling-stroke"
-              />
-            </svg>
-            <div className="cortex-cyber-inner">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              <span className="cortex-cyber-label">{isViewOpen ? 'CLOSE' : 'VIEW'}</span>
+        {/* The Branches (Nodes): Dual Mode (Image 6 Concept Tree vs Image 7/8 Cyber Actions) */}
+        {rightPanelView === 'branches' ? (
+          <div className="cortex-nodes-column cortex-nodes-column--branches">
+            <div className="cortex-branches-header">
+              <span className="cortex-branches-title">✦ INTERACTIVE EXPLANATION</span>
             </div>
-          </button>
+            {branches.map((b, idx) => {
+              const isNodeActive = isViewOpen && activeBranchIdx === idx;
+              const ref = idx === 0 ? viewNodeRef : idx === 1 ? downloadNodeRef : deleteNodeRef;
 
-          {/* Node 2: DOWNLOAD */}
-          <button
-            ref={downloadNodeRef}
-            type="button"
-            className={`cortex-cyber-node cortex-cyber-node--download ${
-              downloadSuccess ? 'cortex-cyber-node--active' : ''
-            }`}
-            onClick={handleDownload}
-            onMouseEnter={() => setHoveredNode('download')}
-            onMouseLeave={() => setHoveredNode(null)}
-            title="Download / Copy reference notes"
-          >
-            <svg className="cortex-cyber-border-svg" preserveAspectRatio="none" viewBox="0 0 100 42">
-              <polygon
-                points="10,1 99,1 99,32 89,41 1,41 1,11"
-                className="cortex-cyber-polygon cortex-cyber-polygon--cyan"
-                vectorEffect="non-scaling-stroke"
-              />
-            </svg>
-            <div className="cortex-cyber-inner">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
+              return (
+                <button
+                  key={b.id || idx}
+                  ref={ref}
+                  type="button"
+                  className={`cortex-branch-card-node ${isNodeActive ? 'cortex-branch-card-node--active' : ''}`}
+                  onClick={() => {
+                    setActiveBranchIdx(idx);
+                    setIsViewOpen(true);
+                  }}
+                  onMouseEnter={() => setHoveredNode(idx === 0 ? 'view' : idx === 1 ? 'download' : 'delete')}
+                  onMouseLeave={() => setHoveredNode(null)}
+                  title={`Click to view deep dive on ${b.title}`}
+                >
+                  <div className="cortex-branch-card-node__icon">{b.icon || '✦'}</div>
+                  <div className="cortex-branch-card-node__body">
+                    <div className="cortex-branch-card-node__title">{b.title}</div>
+                    <div className="cortex-branch-card-node__badge">{b.badge || 'CONCEPT'}</div>
+                  </div>
+                  <div className="cortex-branch-card-node__chevron">&gt;</div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="cortex-nodes-column">
+            {/* Node 1: VIEW */}
+            <button
+              ref={viewNodeRef}
+              type="button"
+              className={`cortex-cyber-node cortex-cyber-node--view ${isViewOpen ? 'cortex-cyber-node--active' : ''}`}
+              onClick={handleViewToggle}
+              onMouseEnter={() => setHoveredNode('view')}
+              onMouseLeave={() => setHoveredNode(null)}
+              title="Click to view full interactive explanation"
+            >
+              <svg className="cortex-cyber-border-svg" preserveAspectRatio="none" viewBox="0 0 100 42">
+                <polygon
+                  points="10,1 99,1 99,32 89,41 1,41 1,11"
+                  className="cortex-cyber-polygon cortex-cyber-polygon--cyan"
+                  vectorEffect="non-scaling-stroke"
+                />
               </svg>
-              <span className="cortex-cyber-label">{downloadSuccess ? 'COPIED!' : 'DOWNLOAD'}</span>
-            </div>
-          </button>
+              <div className="cortex-cyber-inner">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <span className="cortex-cyber-label">{isViewOpen ? 'CLOSE' : 'VIEW'}</span>
+              </div>
+            </button>
 
-          {/* Node 3: DELETE (Rose/Red) */}
-          <button
-            ref={deleteNodeRef}
-            type="button"
-            className={`cortex-cyber-node cortex-cyber-node--delete ${isDeleted ? 'cortex-cyber-node--active' : ''}`}
-            onClick={handleDelete}
-            onMouseEnter={() => setHoveredNode('delete')}
-            onMouseLeave={() => setHoveredNode(null)}
-            title="Reset or clear selection"
-          >
-            <svg className="cortex-cyber-border-svg" preserveAspectRatio="none" viewBox="0 0 100 42">
-              <polygon
-                points="10,1 99,1 99,32 89,41 1,41 1,11"
-                className="cortex-cyber-polygon cortex-cyber-polygon--rose"
-                vectorEffect="non-scaling-stroke"
-              />
-            </svg>
-            <div className="cortex-cyber-inner">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            {/* Node 2: DOWNLOAD */}
+            <button
+              ref={downloadNodeRef}
+              type="button"
+              className={`cortex-cyber-node cortex-cyber-node--download ${
+                downloadSuccess ? 'cortex-cyber-node--active' : ''
+              }`}
+              onClick={handleDownload}
+              onMouseEnter={() => setHoveredNode('download')}
+              onMouseLeave={() => setHoveredNode(null)}
+              title="Download / Copy reference notes"
+            >
+              <svg className="cortex-cyber-border-svg" preserveAspectRatio="none" viewBox="0 0 100 42">
+                <polygon
+                  points="10,1 99,1 99,32 89,41 1,41 1,11"
+                  className="cortex-cyber-polygon cortex-cyber-polygon--cyan"
+                  vectorEffect="non-scaling-stroke"
+                />
               </svg>
-              <span className="cortex-cyber-label">{isDeleted ? 'CLEARED' : 'DELETE'}</span>
-            </div>
-          </button>
-        </div>
+              <div className="cortex-cyber-inner">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span className="cortex-cyber-label">{downloadSuccess ? 'COPIED!' : 'DOWNLOAD'}</span>
+              </div>
+            </button>
+
+            {/* Node 3: DELETE (Rose/Red) */}
+            <button
+              ref={deleteNodeRef}
+              type="button"
+              className={`cortex-cyber-node cortex-cyber-node--delete ${isDeleted ? 'cortex-cyber-node--active' : ''}`}
+              onClick={handleDelete}
+              onMouseEnter={() => setHoveredNode('delete')}
+              onMouseLeave={() => setHoveredNode(null)}
+              title="Reset or clear selection"
+            >
+              <svg className="cortex-cyber-border-svg" preserveAspectRatio="none" viewBox="0 0 100 42">
+                <polygon
+                  points="10,1 99,1 99,32 89,41 1,41 1,11"
+                  className="cortex-cyber-polygon cortex-cyber-polygon--rose"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              <div className="cortex-cyber-inner">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                <span className="cortex-cyber-label">{isDeleted ? 'CLEARED' : 'DELETE'}</span>
+              </div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* The Background: NO BLACKOUT OVERLAY! Attached inline drawer below the card */}

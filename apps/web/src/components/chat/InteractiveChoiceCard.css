@@ -44,6 +44,43 @@
   font-size: 13px;
 }
 
+.cortex-top-action-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cortex-view-mode-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.cortex-mode-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cortex-mode-btn:hover {
+  color: #f1f5f9;
+}
+
+.cortex-mode-btn--active {
+  background: rgba(0, 229, 255, 0.18);
+  color: #00e5ff;
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+}
+
 .cortex-add-resource-btn {
   display: inline-flex;
   align-items: center;
@@ -348,6 +385,100 @@
   gap: 14px;
   padding: 4px 0;
   z-index: 3;
+}
+
+/* Branch Explanation Tree Column (Image 6) */
+.cortex-nodes-column--branches {
+  width: 220px;
+  gap: 10px;
+}
+
+.cortex-branches-header {
+  margin-bottom: 2px;
+  padding-left: 2px;
+}
+
+.cortex-branches-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-family: var(--font-mono, monospace);
+}
+
+.cortex-branch-card-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #080b12;
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.16s ease;
+  position: relative;
+  user-select: none;
+}
+
+.cortex-branch-card-node:hover {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: #00e5ff;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+  transform: translateX(3px);
+}
+
+.cortex-branch-card-node--active {
+  background: rgba(0, 229, 255, 0.16) !important;
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.5) !important;
+}
+
+.cortex-branch-card-node__icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.cortex-branch-card-node__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cortex-branch-card-node__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cortex-branch-card-node__badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #00e5ff;
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono, monospace);
+  margin-top: 2px;
+}
+
+.cortex-branch-card-node__chevron {
+  color: #64748b;
+  font-size: 13px;
+  font-family: monospace;
+  font-weight: bold;
+  flex-shrink: 0;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.cortex-branch-card-node:hover .cortex-branch-card-node__chevron,
+.cortex-branch-card-node--active .cortex-branch-card-node__chevron {
+  color: #00e5ff;
+  transform: translateX(2px);
 }
 
 .cortex-cyber-node {

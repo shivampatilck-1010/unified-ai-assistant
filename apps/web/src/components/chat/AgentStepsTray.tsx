@@ -3,10 +3,10 @@ import './AgentStepsTray.css';
 
 export interface StepItem {
   id: string;
-  type: 'ran' | 'analyzed' | 'synthesized' | 'verified' | 'rendered';
+  action: 'Analyzed' | 'Ran' | 'Synthesized' | 'Rendered' | 'Edited';
   text: string;
   tag?: string;
-  status: 'completed' | 'active';
+  hasArrow?: boolean;
 }
 
 interface AgentStepsTrayProps {
@@ -20,266 +20,230 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
   isStreaming,
   promptText = '',
   customSteps,
-  defaultExpanded,
+  defaultExpanded = false,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(
-    defaultExpanded !== undefined ? !defaultExpanded : !isStreaming
-  );
-  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
+  const [elapsedMs, setElapsedMs] = useState<number>(1200);
   const startTimeRef = useRef<number>(Date.now());
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
 
-  // Auto-expand when streaming starts, collapse 1s after stream finishes
   useEffect(() => {
     if (isStreaming) {
       startTimeRef.current = Date.now();
-      setIsCollapsed(false);
       setActiveStepIndex(0);
 
       const interval = setInterval(() => {
         const ms = Date.now() - startTimeRef.current;
         setElapsedMs(ms);
 
-        // Advance steps progressively
-        if (ms > 2400) setActiveStepIndex(3);
-        else if (ms > 1400) setActiveStepIndex(2);
-        else if (ms > 600) setActiveStepIndex(1);
+        if (ms > 2800) setActiveStepIndex(3);
+        else if (ms > 1600) setActiveStepIndex(2);
+        else if (ms > 700) setActiveStepIndex(1);
         else setActiveStepIndex(0);
       }, 100);
 
       return () => clearInterval(interval);
     } else {
-      setActiveStepIndex(4); // All done
+      setActiveStepIndex(4);
     }
   }, [isStreaming]);
 
-  // Contextually synthesize steps based on user prompt
-  const generatedSteps = useMemo<StepItem[]>(() => {
+  // Contextually synthesize steps matching Antigravity's signature output
+  const steps = useMemo<StepItem[]>(() => {
     if (customSteps && customSteps.length > 0) return customSteps;
 
     const lower = promptText.toLowerCase();
 
-    // 1. Physics / Chemistry / Atoms / Fusion / Photochemical
+    // 1. Science / Reactions / Fusion / Photosynthesis
     if (
       lower.includes('atom') ||
       lower.includes('fusion') ||
       lower.includes('reaction') ||
       lower.includes('photo') ||
-      lower.includes('collision') ||
-      lower.includes('energy')
+      lower.includes('calvin') ||
+      lower.includes('collision')
     ) {
       return [
         {
-          id: 's1',
-          type: 'analyzed',
-          text: 'Analyzed reaction kinetics & molecular conservation laws',
-          tag: '#Physics',
-          status: activeStepIndex > 0 ? 'completed' : 'active',
+          id: 'step-1',
+          action: 'Analyzed',
+          text: 'Analyzed photochemical kinetics & reaction equilibrium',
+          tag: '#Kinetics',
         },
         {
-          id: 's2',
-          type: 'ran',
-          text: 'Ran verify elastic collision momentum transfer matrix',
-          status: activeStepIndex > 1 ? 'completed' : activeStepIndex === 1 ? 'active' : 'completed',
+          id: 'step-2',
+          action: 'Ran',
+          text: 'Ran verify quantum tunneling & Coulomb barrier models',
+          hasArrow: true,
         },
         {
-          id: 's3',
-          type: 'synthesized',
-          text: 'Analyzed ⚛️ PhotolysisEnergySpectrum.ts #L1-85',
-          tag: '#Quantum',
-          status: activeStepIndex > 2 ? 'completed' : activeStepIndex === 2 ? 'active' : 'completed',
+          id: 'step-3',
+          action: 'Synthesized',
+          text: 'Analyzed ⚛️ PhotolysisReactionGraph.ts #L1-88',
+          tag: '#Biophysics',
         },
         {
-          id: 's4',
-          type: 'rendered',
-          text: 'Rendered 60fps simulation & [? ABOUT] HUD reticle inspector',
-          status: activeStepIndex >= 3 ? 'completed' : 'active',
+          id: 'step-4',
+          action: 'Rendered',
+          text: 'Formulated structured response with KaTeX & visual formatting',
         },
       ];
     }
 
-    // 2. Exam Prep / PDF / Guide
-    if (lower.includes('pdf') || lower.includes('exam') || lower.includes('prep') || lower.includes('summary')) {
+    // 2. Code / Algorithms / Trees / Sorting
+    if (lower.includes('tree') || lower.includes('bst') || lower.includes('sort') || lower.includes('code') || lower.includes('algo')) {
       return [
         {
-          id: 's1',
-          type: 'analyzed',
-          text: 'Analyzed syllabus topics & high-yield revision objectives',
-          tag: '#Curriculum',
-          status: activeStepIndex > 0 ? 'completed' : 'active',
-        },
-        {
-          id: 's2',
-          type: 'ran',
-          text: 'Ran compile KaTeX mathematical definitions & formulas',
-          status: activeStepIndex > 1 ? 'completed' : activeStepIndex === 1 ? 'active' : 'completed',
-        },
-        {
-          id: 's3',
-          type: 'synthesized',
-          text: 'Analyzed 📄 ExamStudyReferenceGuide.md #L1-160',
-          tag: '#StudyGuide',
-          status: activeStepIndex > 2 ? 'completed' : activeStepIndex === 2 ? 'active' : 'completed',
-        },
-        {
-          id: 's4',
-          type: 'rendered',
-          text: 'Compiled 1-click printable PDF document exporter',
-          status: activeStepIndex >= 3 ? 'completed' : 'active',
-        },
-      ];
-    }
-
-    // 3. Algorithms / Trees / Code
-    if (lower.includes('tree') || lower.includes('binary') || lower.includes('code') || lower.includes('sort')) {
-      return [
-        {
-          id: 's1',
-          type: 'analyzed',
-          text: 'Analyzed algorithmic time & space complexity bounds',
+          id: 'step-1',
+          action: 'Analyzed',
+          text: 'Analyzed algorithmic invariants & recursion tree depth',
           tag: '#Complexity',
-          status: activeStepIndex > 0 ? 'completed' : 'active',
         },
         {
-          id: 's2',
-          type: 'ran',
-          text: 'Ran verify recursive node insertion & search invariants',
-          status: activeStepIndex > 1 ? 'completed' : activeStepIndex === 1 ? 'active' : 'completed',
+          id: 'step-2',
+          action: 'Ran',
+          text: 'Ran verify binary partition invariant & in-order sorting',
+          hasArrow: true,
         },
         {
-          id: 's3',
-          type: 'synthesized',
+          id: 'step-3',
+          action: 'Synthesized',
           text: 'Analyzed ⚛️ BinarySearchTreeNode.ts #L1-120',
-          tag: '#BST',
-          status: activeStepIndex > 2 ? 'completed' : activeStepIndex === 2 ? 'active' : 'completed',
+          tag: '#Algorithms',
         },
         {
-          id: 's4',
-          type: 'rendered',
-          text: 'Synthesized interactive SVG visualizer & traversal trace',
-          status: activeStepIndex >= 3 ? 'completed' : 'active',
+          id: 'step-4',
+          action: 'Rendered',
+          text: 'Formulated structured response with KaTeX & visual formatting',
         },
       ];
     }
 
-    // 4. Default General Reasoning Steps
+    // 3. UI / Components / CSS / Design
+    if (lower.includes('design') || lower.includes('card') || lower.includes('ui') || lower.includes('css') || lower.includes('ref')) {
+      return [
+        {
+          id: 'step-1',
+          action: 'Analyzed',
+          text: 'Analyzed InteractiveChoiceCard.tsx #L180-280',
+          tag: '#Architecture',
+        },
+        {
+          id: 'step-2',
+          action: 'Ran',
+          text: 'Ran cross-reference neural reasoning models',
+          hasArrow: true,
+        },
+        {
+          id: 'step-3',
+          action: 'Synthesized',
+          text: 'Analyzed ⚛️ InteractiveChoiceCard.tsx #L280-340',
+          tag: '#UI',
+        },
+        {
+          id: 'step-4',
+          action: 'Rendered',
+          text: 'Formulated structured response with KaTeX & visual formatting',
+        },
+      ];
+    }
+
+    // 4. Default Antigravity Signature Steps (Exact Match to Image 2)
     return [
       {
-        id: 's1',
-        type: 'analyzed',
+        id: 'step-1',
+        action: 'Analyzed',
         text: 'Analyzed request context & user intent',
         tag: '#Intent',
-        status: activeStepIndex > 0 ? 'completed' : 'active',
       },
       {
-        id: 's2',
-        type: 'ran',
+        id: 'step-2',
+        action: 'Ran',
         text: 'Ran cross-reference neural reasoning models',
-        status: activeStepIndex > 1 ? 'completed' : activeStepIndex === 1 ? 'active' : 'completed',
+        hasArrow: true,
       },
       {
-        id: 's3',
-        type: 'synthesized',
+        id: 'step-3',
+        action: 'Synthesized',
         text: 'Analyzed ⚛️ ConceptualKnowledgeGraph.ts #L1-90',
         tag: '#Framework',
-        status: activeStepIndex > 2 ? 'completed' : activeStepIndex === 2 ? 'active' : 'completed',
       },
       {
-        id: 's4',
-        type: 'rendered',
+        id: 'step-4',
+        action: 'Rendered',
         text: 'Formulated structured response with KaTeX & visual formatting',
-        status: activeStepIndex >= 3 ? 'completed' : 'active',
       },
     ];
-  }, [promptText, customSteps, activeStepIndex]);
+  }, [promptText, customSteps]);
 
-  const durationSec = Math.max(1, Math.round(elapsedMs / 1000));
-  const activeStep = generatedSteps[Math.min(activeStepIndex, generatedSteps.length - 1)];
+  const elapsedSec = Math.max(1, Math.round(elapsedMs / 1000));
 
+  // --- STREAMING VIEW (Matching Image 1) ---
+  if (isStreaming) {
+    const visibleSteps = steps.slice(0, Math.min(activeStepIndex + 1, steps.length));
+
+    return (
+      <div className="antigravity-thinking-stream">
+        {visibleSteps.map((step) => (
+          <div key={step.id} className="antigravity-stream-step">
+            <span className={`antigravity-action antigravity-action--${step.action.toLowerCase()}`}>
+              {step.action}
+            </span>
+            <span className="antigravity-stream-desc">{step.text}</span>
+            {step.tag && <span className="antigravity-tag">{step.tag}</span>}
+            {step.hasArrow && <span className="antigravity-arrow">&gt;</span>}
+          </div>
+        ))}
+        <div className="antigravity-thinking-counter">
+          Thinking for {elapsedSec}s
+        </div>
+      </div>
+    );
+  }
+
+  // --- COMPLETED COLLAPSIBLE VIEW (Matching Image 2) ---
   return (
-    <div className={`agent-steps-tray ${isStreaming ? 'agent-steps-tray--streaming' : ''}`}>
-      {/* Header Bar */}
-      <div
-        className="agent-steps-header"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        title={isCollapsed ? 'Click to view execution steps' : 'Click to collapse steps'}
+    <div className="antigravity-thought-tray">
+      {/* Clickable Header Bar */}
+      <button
+        type="button"
+        className="antigravity-thought-header"
+        onClick={() => setIsOpen(!isOpen)}
+        title={isOpen ? 'Collapse thought steps' : 'Expand thought steps'}
       >
-        <div className="agent-steps-header__left">
-          {isStreaming ? (
-            <>
-              <span className="agent-steps-spinner" />
-              <span className="agent-steps-title agent-steps-title--active">
-                {activeStep ? activeStep.text : 'Thinking…'}
-              </span>
-            </>
-          ) : (
-            <>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.4">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span className="agent-steps-title">
-                Thought for {durationSec}s · {generatedSteps.length} steps completed
-              </span>
-            </>
-          )}
+        <div className="antigravity-thought-header__left">
+          <svg className="antigravity-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span className="antigravity-thought-summary">
+            Thought for {elapsedSec}s · {steps.length} steps completed
+          </span>
         </div>
 
-        <div className="agent-steps-header__right">
-          {isStreaming && (
-            <span className="agent-steps-timer">
-              {(elapsedMs / 1000).toFixed(1)}s
-            </span>
-          )}
-          <button
-            type="button"
-            className={`agent-steps-chevron ${isCollapsed ? 'agent-steps-chevron--collapsed' : ''}`}
-            aria-label={isCollapsed ? 'Expand steps' : 'Collapse steps'}
-          >
+        <div className="antigravity-thought-header__right">
+          <span className={`antigravity-chevron ${isOpen ? 'antigravity-chevron--open' : ''}`}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
               <polyline points="6 9 12 15 18 9" />
             </svg>
-          </button>
+          </span>
         </div>
-      </div>
+      </button>
 
-      {/* Expandable Steps List */}
-      {!isCollapsed && (
-        <div className="agent-steps-body">
-          <div className="agent-steps-list">
-            {generatedSteps.map((step, idx) => {
-              const isRunning = isStreaming && idx === activeStepIndex;
-              const isDone = !isStreaming || idx < activeStepIndex;
-
-              return (
-                <div
-                  key={step.id}
-                  className={`agent-step-item ${isRunning ? 'agent-step-item--active' : ''} ${
-                    isDone ? 'agent-step-item--done' : ''
-                  }`}
-                >
-                  <span className="agent-step-prefix">
-                    {step.type === 'ran' ? (
-                      <span className="agent-step-ran">Ran</span>
-                    ) : step.type === 'analyzed' ? (
-                      <span className="agent-step-analyzed">Analyzed</span>
-                    ) : step.type === 'synthesized' ? (
-                      <span className="agent-step-synthesized">Synthesized</span>
-                    ) : (
-                      <span className="agent-step-rendered">Rendered</span>
-                    )}
-                  </span>
-
-                  <span className="agent-step-text">{step.text}</span>
-
-                  {step.tag && <span className="agent-step-tag">{step.tag}</span>}
-
-                  {step.type === 'ran' && <span className="agent-step-arrow">&gt;</span>}
-
-                  {isRunning && <span className="agent-step-pulsar" />}
-                </div>
-              );
-            })}
-          </div>
+      {/* Expanded Step Rows (Matching Image 2) */}
+      {isOpen && (
+        <div className="antigravity-steps-dropdown">
+          {steps.map((step) => (
+            <div key={step.id} className="antigravity-step-row">
+              <span className={`antigravity-action antigravity-action--${step.action.toLowerCase()}`}>
+                {step.action}
+              </span>
+              <span className="antigravity-step-desc">{step.text}</span>
+              <div className="antigravity-step-meta">
+                {step.tag && <span className="antigravity-tag">{step.tag}</span>}
+                {step.hasArrow && <span className="antigravity-arrow">&gt;</span>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

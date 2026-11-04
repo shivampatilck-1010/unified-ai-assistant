@@ -268,6 +268,6 @@ export const INJECTED_INSPECTOR_SCRIPT = `
 `;
 
 export const INJECTED_SIMULATION_INSPECTOR_HTML = `
-  <style>\${INJECTED_INSPECTOR_STYLE}</style>
-  <script>\${INJECTED_INSPECTOR_SCRIPT}</script>
+  <style>${INJECTED_INSPECTOR_STYLE}</style>
+  <script>${INJECTED_INSPECTOR_SCRIPT}</script>
 `;

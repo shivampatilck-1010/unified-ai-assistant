@@ -468,6 +468,10 @@ export default {
                 body: JSON.stringify({
                   contents: geminiContents,
                   system_instruction: systemInstruction,
+                  generationConfig: {
+                    maxOutputTokens: 8192,
+                    temperature: 0.7,
+                  },
                 }),
               });
 

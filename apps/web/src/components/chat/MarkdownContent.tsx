@@ -521,7 +521,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       text.includes('<!-- document-export:') ||
       text.includes('EXAM PREPARATION GUIDE') ||
       text.includes('Exam Preparation Guide') ||
-      /(?:#\s*.*exam\s+preparation\s+guide|##\s*section\s+1:\s+chemical\s+&\s+nuclear|study\s+reference:\s+chemical|exam\s+revision\s+cheat\s+sheet)/i.test(
+      /(?:exam\s*(?:prep|guide|preparation|revision)|study\s*(?:guide|notes|reference|handout)|cheat\s*sheet|quick\s*exam|target\s*date.*november|section\s+\d+:\s+chemical)/i.test(
         text
       );
 
