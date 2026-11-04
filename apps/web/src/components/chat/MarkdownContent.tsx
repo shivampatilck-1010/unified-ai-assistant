@@ -319,14 +319,42 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       lowerLang === 'atoms' ||
       lowerLang === 'binary-tree' ||
       lowerLang === 'tree-visualizer' ||
+      lowerLang === 'linked-list' ||
       lowerLang === 'photosynthesis' ||
       lowerLang === 'sorting' ||
       lowerLang === 'generative-ui' ||
       (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script') || code.includes('<!DOCTYPE')))
     ) {
-      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'sorting' | 'photosynthesis' | 'custom-html' = 'custom-html';
-      const lowerCode = code.toLowerCase();
+      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'linked-list' | 'sorting' | 'photosynthesis' | 'custom-html' = 'custom-html';
+      const lowerCode = code.toLowerCase().trim();
+      const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
+      const declaredType = typeMatch ? typeMatch[1].toLowerCase() : '';
+
       if (
+        declaredType === 'linked-list' ||
+        declaredType === 'linkedlist' ||
+        lowerLang.includes('linked-list') ||
+        lowerCode.includes('linked-list') ||
+        lowerCode.includes('linked_list') ||
+        lowerCode.includes('linked list') ||
+        lowerCode.includes('singlylinkedlist')
+      ) {
+        simType = 'linked-list';
+      } else if (
+        declaredType === 'binary-tree' ||
+        declaredType === 'tree' ||
+        declaredType === 'bst' ||
+        lowerLang.includes('tree') ||
+        lowerCode.includes('binary-tree') ||
+        lowerCode.includes('type: binary-tree') ||
+        lowerCode.includes('binarysearchtree') ||
+        lowerCode.includes('treenode') ||
+        lowerCode.includes('tree')
+      ) {
+        simType = 'binary-tree';
+      } else if (
+        declaredType === 'nuclear-fusion' ||
+        declaredType === 'fusion' ||
         lowerLang.includes('fusion') ||
         lowerCode.includes('nuclear') ||
         lowerCode.includes('fusion') ||
@@ -334,13 +362,31 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         lowerCode.includes('tritium')
       ) {
         simType = 'nuclear-fusion';
-      } else if (lowerLang.includes('atom') || lowerCode.includes('atomic')) {
+      } else if (
+        declaredType === 'atomic-collision' ||
+        declaredType === 'atomic' ||
+        lowerLang.includes('atom') ||
+        lowerCode.includes('atomic') ||
+        lowerCode.includes('collision')
+      ) {
         simType = 'atomic-collision';
-      } else if (lowerLang.includes('tree') || lowerCode.includes('binarysearchtree') || lowerCode.includes('treenode')) {
-        simType = 'binary-tree';
-      } else if (lowerLang.includes('photo') || lowerCode.includes('photosynthesis') || lowerCode.includes('chlorophyll')) {
+      } else if (
+        declaredType === 'photosynthesis' ||
+        declaredType === 'photo' ||
+        lowerLang.includes('photo') ||
+        lowerCode.includes('photosynthesis') ||
+        lowerCode.includes('chlorophyll') ||
+        lowerCode.includes('photolysis')
+      ) {
         simType = 'photosynthesis';
-      } else if (lowerLang.includes('sort') || lowerCode.includes('bubblesort')) {
+      } else if (
+        declaredType === 'sorting' ||
+        declaredType === 'sort' ||
+        lowerLang.includes('sort') ||
+        lowerCode.includes('bubblesort') ||
+        lowerCode.includes('quicksort') ||
+        lowerCode.includes('mergesort')
+      ) {
         simType = 'sorting';
       } else {
         // Universal dynamic Generative UI / HTML5 Canvas / SVG simulation for ANY other topic!

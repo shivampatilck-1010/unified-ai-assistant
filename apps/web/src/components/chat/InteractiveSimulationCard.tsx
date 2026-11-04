@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './InteractiveSimulationCard.css';
 
 export interface InteractiveSimulationCardProps {
-  type?: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'sorting' | 'photosynthesis' | 'custom-html';
+  type?: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'linked-list' | 'sorting' | 'photosynthesis' | 'custom-html';
   title?: string;
   code?: string;
 }
@@ -49,6 +49,13 @@ interface TreeNode {
   highlighted?: boolean;
 }
 
+interface LinkedListNode {
+  id: string;
+  val: number;
+  addr: string;
+  nextAddr: string | null;
+}
+
 export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps> = ({
   type = 'atomic-collision',
   title,
@@ -64,27 +71,74 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
 
   // Determine actual simulation type
   const resolvedType = React.useMemo(() => {
-    if (type) return type;
-    const lowerCode = code.toLowerCase();
-    if (lowerCode.includes('nuclear') || lowerCode.includes('fusion') || lowerCode.includes('deuterium') || lowerCode.includes('tritium')) {
+    // If explicitly provided a specific type (other than generic custom-html), use it
+    if (type && type !== 'custom-html') return type;
+
+    const lowerCode = code.toLowerCase().trim();
+    const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
+    const declaredType = typeMatch ? typeMatch[1].toLowerCase() : '';
+
+    if (
+      declaredType === 'linked-list' ||
+      declaredType === 'linkedlist' ||
+      lowerCode.includes('linked-list') ||
+      lowerCode.includes('linked list') ||
+      lowerCode.includes('singlylinkedlist')
+    ) {
+      return 'linked-list';
+    }
+    if (
+      declaredType === 'binary-tree' ||
+      declaredType === 'tree' ||
+      declaredType === 'bst' ||
+      lowerCode.includes('binary-tree') ||
+      lowerCode.includes('binarysearchtree') ||
+      lowerCode.includes('treenode') ||
+      lowerCode.includes('type: binary-tree') ||
+      lowerCode.includes('tree')
+    ) {
+      return 'binary-tree';
+    }
+    if (
+      declaredType === 'nuclear-fusion' ||
+      declaredType === 'fusion' ||
+      lowerCode.includes('nuclear') ||
+      lowerCode.includes('fusion') ||
+      lowerCode.includes('deuterium') ||
+      lowerCode.includes('tritium')
+    ) {
       return 'nuclear-fusion';
     }
-    if (lowerCode.includes('photosynthesis') || lowerCode.includes('chlorophyll') || lowerCode.includes('chloroplast') || lowerCode.includes('photolysis')) {
+    if (
+      declaredType === 'photosynthesis' ||
+      declaredType === 'photo' ||
+      lowerCode.includes('photosynthesis') ||
+      lowerCode.includes('chlorophyll') ||
+      lowerCode.includes('chloroplast') ||
+      lowerCode.includes('photolysis')
+    ) {
       return 'photosynthesis';
     }
-    if (lowerCode.includes('sort') || lowerCode.includes('bubblesort')) {
+    if (
+      declaredType === 'sorting' ||
+      declaredType === 'sort' ||
+      lowerCode.includes('sort') ||
+      lowerCode.includes('bubblesort')
+    ) {
       return 'sorting';
     }
-    if (lowerCode.includes('atomic') || lowerCode.includes('atom')) {
+    if (
+      declaredType === 'atomic-collision' ||
+      declaredType === 'atomic' ||
+      lowerCode.includes('atomic') ||
+      lowerCode.includes('atom')
+    ) {
       return 'atomic-collision';
-    }
-    if (lowerCode.includes('binarysearchtree') || lowerCode.includes('treenode') || lowerCode.includes('tree')) {
-      return 'binary-tree';
     }
     if (code.includes('<canvas') || code.includes('<script') || code.includes('<!DOCTYPE') || code.includes('<svg')) {
       return 'custom-html';
     }
-    return 'custom-html';
+    return type || 'custom-html';
   }, [type, code]);
 
   const defaultTitle = React.useMemo(() => {
@@ -92,6 +146,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     if (resolvedType === 'nuclear-fusion') return 'D-T Nuclear Fusion Reactor Simulation';
     if (resolvedType === 'atomic-collision') return 'Atomic Collisions Simulation';
     if (resolvedType === 'binary-tree') return 'Binary Search Tree Visualizer';
+    if (resolvedType === 'linked-list') return 'Singly Linked List Interactive Visualizer';
     if (resolvedType === 'photosynthesis') return 'Photosynthesis & Solar Photolysis Simulation';
     if (resolvedType === 'sorting') return 'Sorting Algorithm Visualizer';
     return 'Interactive Visual Simulation';
@@ -122,6 +177,17 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   const [searchTarget, setSearchTarget] = useState<number | null>(null);
   const [searchingPath, setSearchingPath] = useState<number[]>([]);
   const [searchStatus, setSearchStatus] = useState<string | null>(null);
+
+  // --- Singly Linked List State ---
+  const [listInputVal, setListInputVal] = useState<string>('50');
+  const [listNodes, setListNodes] = useState<LinkedListNode[]>([
+    { id: 'l-1', val: 12, addr: '0x10A0', nextAddr: '0x10B4' },
+    { id: 'l-2', val: 25, addr: '0x10B4', nextAddr: '0x10F8' },
+    { id: 'l-3', val: 42, addr: '0x10F8', nextAddr: '0x1120' },
+    { id: 'l-4', val: 88, addr: '0x1120', nextAddr: null },
+  ]);
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [listStatus, setListStatus] = useState<string | null>(null);
 
   // --- Photosynthesis Simulation State ---
   const [lightIntensity, setLightIntensity] = useState<number>(1.2);
@@ -935,6 +1001,239 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   };
 
   // =========================================================================
+  // SINGLY LINKED LIST ENGINE
+  // =========================================================================
+  const generateHexAddr = () =>
+    '0x' + (Math.floor(Math.random() * 0xe000) + 0x1000).toString(16).toUpperCase();
+
+  const handlePrependHead = () => {
+    const val = parseInt(listInputVal.trim(), 10);
+    if (isNaN(val)) return;
+    const newAddr = generateHexAddr();
+    setListNodes((prev) => {
+      const nextAddr = prev.length > 0 ? prev[0].addr : null;
+      const newNode: LinkedListNode = {
+        id: `l-${Date.now()}`,
+        val,
+        addr: newAddr,
+        nextAddr,
+      };
+      return [newNode, ...prev];
+    });
+    setListStatus(`Prepended [${val}] at Head (O(1))`);
+    setListInputVal('');
+  };
+
+  const handleAppendTail = () => {
+    const val = parseInt(listInputVal.trim(), 10);
+    if (isNaN(val)) return;
+    const newAddr = generateHexAddr();
+    setListNodes((prev) => {
+      const newNode: LinkedListNode = {
+        id: `l-${Date.now()}`,
+        val,
+        addr: newAddr,
+        nextAddr: null,
+      };
+      if (prev.length === 0) return [newNode];
+      const updated = [...prev];
+      updated[updated.length - 1] = {
+        ...updated[updated.length - 1],
+        nextAddr: newAddr,
+      };
+      return [...updated, newNode];
+    });
+    setListStatus(`Appended [${val}] at Tail (O(n))`);
+    setListInputVal('');
+  };
+
+  const handleDeleteHead = () => {
+    if (listNodes.length === 0) return;
+    const removedVal = listNodes[0].val;
+    setListNodes((prev) => prev.slice(1));
+    setListStatus(`Deleted Head node [${removedVal}] (O(1))`);
+  };
+
+  const handleSearchList = async () => {
+    const val = parseInt(listInputVal.trim(), 10);
+    if (isNaN(val) || listNodes.length === 0) return;
+    setListStatus(`Searching for [${val}]...`);
+    let found = false;
+
+    for (let i = 0; i < listNodes.length; i++) {
+      setHighlightedNodeId(listNodes[i].id);
+      await new Promise((r) => setTimeout(r, 380));
+      if (listNodes[i].val === val) {
+        found = true;
+        setListStatus(`Found [${val}] at index ${i} (${listNodes[i].addr})!`);
+        break;
+      }
+    }
+
+    if (!found) {
+      setListStatus(`Value [${val}] not found in list (reached NULL).`);
+      setHighlightedNodeId(null);
+    }
+  };
+
+  const handleResetList = () => {
+    setListNodes([
+      { id: 'l-1', val: 12, addr: '0x10A0', nextAddr: '0x10B4' },
+      { id: 'l-2', val: 25, addr: '0x10B4', nextAddr: '0x10F8' },
+      { id: 'l-3', val: 42, addr: '0x10F8', nextAddr: '0x1120' },
+      { id: 'l-4', val: 88, addr: '0x1120', nextAddr: null },
+    ]);
+    setHighlightedNodeId(null);
+    setListStatus(null);
+  };
+
+  const renderLinkedListSvg = () => {
+    if (listNodes.length === 0) {
+      return (
+        <text x="250" y="140" fill="#64748b" textAnchor="middle" fontSize="14">
+          Linked List is empty. Prepend or Append nodes above.
+        </text>
+      );
+    }
+
+    const nodeWidth = 66;
+    const nodeHeight = 44;
+    const gap = 34;
+    const startX = 64;
+    const y = 140;
+
+    return (
+      <svg width="100%" height="280" viewBox="0 0 540 280">
+        <defs>
+          <marker id="arrow-ll" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
+          </marker>
+          <marker id="arrow-gold-ll" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#fbbf24" />
+          </marker>
+        </defs>
+
+        {/* HEAD Pointer Tag */}
+        <g>
+          <rect x={10} y={y - 14} width={42} height={28} rx={4} fill="#0284c7" stroke="#38bdf8" strokeWidth="1" />
+          <text x={31} y={y + 4} fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">HEAD</text>
+          <line x1={52} y1={y} x2={startX - 4} y2={y} stroke="#38bdf8" strokeWidth="2" markerEnd="url(#arrow-ll)" />
+        </g>
+
+        {listNodes.map((node, i) => {
+          const x = startX + i * (nodeWidth + gap);
+          const isHighlighted = highlightedNodeId === node.id;
+          const isLast = i === listNodes.length - 1;
+
+          return (
+            <g
+              key={node.id}
+              className="tree-node-group"
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+                setHoveredInfo({
+                  x: rect ? e.clientX - rect.left : x,
+                  y: rect ? e.clientY - rect.top : y,
+                  title: `Node [${node.val}] at ${node.addr}`,
+                  category: i === 0 ? 'Head Node' : isLast ? 'Tail Node' : 'Internal Node',
+                  color: isHighlighted ? '#fbbf24' : '#38bdf8',
+                  description: `Singly Linked List node storing value ${node.val}. Dynamically allocated at heap address ${node.addr}. Next pointer links to ${node.nextAddr || 'NULL (0x0)'}.`,
+                  stats: [
+                    { label: 'Data', value: String(node.val) },
+                    { label: 'Address', value: node.addr },
+                    { label: 'Next Pointer', value: node.nextAddr || 'NULL' },
+                    { label: 'Insert Complexity', value: 'O(1) at Head' },
+                    { label: 'Search Complexity', value: 'O(n)' },
+                  ],
+                });
+              }}
+              onMouseLeave={() => setHoveredInfo(null)}
+            >
+              {/* Memory Block Box */}
+              <rect
+                x={x}
+                y={y - nodeHeight / 2}
+                width={nodeWidth}
+                height={nodeHeight}
+                rx={6}
+                fill={isHighlighted ? '#1e293b' : '#070913'}
+                stroke={isHighlighted ? '#fbbf24' : '#38bdf8'}
+                strokeWidth={isHighlighted ? '2.5' : '1.5'}
+              />
+              {/* Divider between data and pointer */}
+              <line
+                x1={x + nodeWidth * 0.62}
+                y1={y - nodeHeight / 2}
+                x2={x + nodeWidth * 0.62}
+                y2={y + nodeHeight / 2}
+                stroke="rgba(255,255,255,0.18)"
+                strokeWidth="1"
+              />
+              {/* Data label */}
+              <text x={x + (nodeWidth * 0.62) / 2} y={y + 5} fill="#f8fafc" fontSize="13" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+                {node.val}
+              </text>
+              {/* Next pointer dot */}
+              <circle cx={x + nodeWidth * 0.81} cy={y} r="4" fill={isHighlighted ? '#fbbf24' : '#38bdf8'} />
+
+              {/* Memory Address under node */}
+              <text x={x + nodeWidth / 2} y={y + nodeHeight / 2 + 14} fill="#94a3b8" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                {node.addr}
+              </text>
+
+              {/* Arrow to Next Node or NULL */}
+              {!isLast ? (
+                <line
+                  x1={x + nodeWidth}
+                  y1={y}
+                  x2={x + nodeWidth + gap - 4}
+                  y2={y}
+                  stroke={isHighlighted ? '#fbbf24' : '#38bdf8'}
+                  strokeWidth="2"
+                  markerEnd={isHighlighted ? 'url(#arrow-gold-ll)' : 'url(#arrow-ll)'}
+                />
+              ) : (
+                <g>
+                  <line
+                    x1={x + nodeWidth}
+                    y1={y}
+                    x2={x + nodeWidth + 20}
+                    y2={y}
+                    stroke="#ef4444"
+                    strokeWidth="1.8"
+                  />
+                  <rect
+                    x={x + nodeWidth + 20}
+                    y={y - 10}
+                    width={34}
+                    height={20}
+                    rx={3}
+                    fill="#1f1315"
+                    stroke="#ef4444"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={x + nodeWidth + 37}
+                    y={y + 4}
+                    fill="#fca5a5"
+                    fontSize="9.5"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                  >
+                    NULL
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  };
+
+  // =========================================================================
   // PHOTOSYNTHESIS & LIGHT-HARVESTING ENGINE
   // =========================================================================
   const renderPhotosynthesisSvg = () => {
@@ -1516,6 +1815,40 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             </div>
           )}
 
+          {/* Controls Bar for Singly Linked List */}
+          {resolvedType === 'linked-list' && (
+            <div className="tree-controls-bar">
+              <input
+                type="number"
+                className="tree-input"
+                style={{ width: '64px' }}
+                placeholder="Val..."
+                value={listInputVal}
+                onChange={(e) => setListInputVal(e.target.value)}
+              />
+              <button type="button" className="sim-btn sim-btn--primary" onClick={handlePrependHead}>
+                + Prepend Head
+              </button>
+              <button type="button" className="sim-btn" onClick={handleAppendTail}>
+                + Append Tail
+              </button>
+              <button type="button" className="sim-btn" onClick={handleDeleteHead}>
+                Delete Head
+              </button>
+              <button type="button" className="sim-btn" onClick={handleSearchList}>
+                Search
+              </button>
+              <button type="button" className="sim-btn" onClick={handleResetList}>
+                Reset
+              </button>
+              {listStatus && (
+                <span style={{ fontSize: '11.5px', color: '#38bdf8', marginLeft: 'auto' }}>
+                  {listStatus}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Interactive Simulation Viewport */}
           <div className="sim-viewport">
             {(resolvedType === 'atomic-collision' || resolvedType === 'nuclear-fusion') && (
@@ -1527,6 +1860,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               />
             )}
             {resolvedType === 'binary-tree' && renderTreeSvg()}
+            {resolvedType === 'linked-list' && renderLinkedListSvg()}
             {resolvedType === 'photosynthesis' && renderPhotosynthesisSvg()}
             {resolvedType === 'sorting' && renderSortingSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}
