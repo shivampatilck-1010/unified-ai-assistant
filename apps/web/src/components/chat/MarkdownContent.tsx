@@ -8,6 +8,7 @@ import { PromptFlashcard } from './PromptFlashcard';
 import { InteractiveSimulationCard } from './InteractiveSimulationCard';
 import { PdfExportCard } from './PdfExportCard';
 import { InteractiveChoiceCard } from './InteractiveChoiceCard';
+import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import './MarkdownContent.css';
 
@@ -212,7 +213,26 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       return `**Daily Quota Limit Reached**\n\nThe free-tier usage limit for **${modelName}** has been reached for today.${timeHint}\n\n*Tip:* You can select another configured model from the dropdown above to continue immediately.`;
     }
 
-    return content;
+    let processed = content;
+    // Auto-wrap unfenced MCQ questions with Option A/B into interactive mcq blocks
+    if (
+      !processed.includes('```mcq') &&
+      !processed.includes('```choice') &&
+      !processed.includes('```concept') &&
+      /(?:Option\s+A:|A\))\s+/i.test(processed) &&
+      /(?:Option\s+B:|B\))\s+/i.test(processed)
+    ) {
+      const mcqRegex = /([^\n]+\?)\s*\n+((?:(?:\*?\*?Option\s+[A-D]:|\*?\*?[A-D]\))\s+[^\n]+\n*){2,})/i;
+      const match = processed.match(mcqRegex);
+      if (match) {
+        const questionText = match[1].trim();
+        const rawOptions = match[2].trim().split('\n').filter(Boolean);
+        const mcqBlock = `\n\`\`\`mcq\nquestion: "${questionText}"\noptions:\n${rawOptions.map((o) => `  - ${o.trim()}`).join('\n')}\n\`\`\`\n`;
+        processed = processed.replace(match[0], mcqBlock);
+      }
+    }
+
+    return processed;
   }, [content]);
 
   // Code Block Component with Copy Button, Syntax Highlighting & Simulation Sandbox
@@ -224,21 +244,49 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       return <MermaidDiagram code={code} />;
     }
 
-    // Interactive MCQ / Choice Poll Block
+    // Interactive MCQ / Choice Poll / Concept Explanation Tree Block
     if (
       lowerLang === 'mcq' ||
       lowerLang === 'choices' ||
       lowerLang === 'choice' ||
       lowerLang === 'poll' ||
-      lowerLang === 'options'
+      lowerLang === 'options' ||
+      lowerLang === 'concept' ||
+      lowerLang === 'explanation-tree' ||
+      lowerLang === 'explanation' ||
+      lowerLang === 'branch' ||
+      lowerLang === 'branches'
     ) {
       let question = 'Please select an option:';
+      let category = lowerLang.includes('concept') ? 'Course Concept' : 'Clarification & Choice';
+      let typeBadge = lowerLang.includes('concept') ? 'LINK' : 'MCQ';
+      let summary: string | undefined = undefined;
       const options: string[] = [];
+      const customBranches: ExplanationBranch[] = [];
+
       const lines = code.split('\n');
       for (const l of lines) {
         const t = l.trim();
-        if (t.toLowerCase().startsWith('question:')) {
-          question = t.replace(/^question:\s*/i, '').replace(/^["']|["']$/g, '');
+        if (t.toLowerCase().startsWith('question:') || t.toLowerCase().startsWith('title:')) {
+          question = t.replace(/^(question|title):\s*/i, '').replace(/^["']|["']$/g, '');
+        } else if (t.toLowerCase().startsWith('category:') || t.toLowerCase().startsWith('tag:')) {
+          category = t.replace(/^(category|tag):\s*/i, '').replace(/^["']|["']$/g, '');
+        } else if (t.toLowerCase().startsWith('type:') || t.toLowerCase().startsWith('typebadge:')) {
+          typeBadge = t.replace(/^(type|typebadge):\s*/i, '').replace(/^["']|["']$/g, '');
+        } else if (t.toLowerCase().startsWith('summary:') || t.toLowerCase().startsWith('description:')) {
+          summary = t.replace(/^(summary|description):\s*/i, '').replace(/^["']|["']$/g, '');
+        } else if (t.toLowerCase().startsWith('branch:')) {
+          const raw = t.replace(/^branch:\s*/i, '');
+          const parts = raw.split('|').map((s) => s.trim());
+          if (parts.length >= 1) {
+            customBranches.push({
+              id: `custom-branch-${customBranches.length}`,
+              title: parts[0],
+              badge: parts[1] || 'EXPLANATION',
+              summary: parts[2] || parts[0],
+              formula: parts[3] || undefined,
+            });
+          }
         } else if (t.startsWith('- ') || t.startsWith('* ')) {
           options.push(t.slice(2).replace(/^["']|["']$/g, '').trim());
         } else if (/^[A-D]\)\s+/.test(t)) {
@@ -251,8 +299,11 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       return (
         <InteractiveChoiceCard
           question={question}
-          options={options.length > 0 ? options : ['Option A', 'Option B', 'Option C']}
-          category="Clarification & Choice"
+          options={options}
+          category={category}
+          typeBadge={typeBadge}
+          summary={summary}
+          branches={customBranches.length > 0 ? customBranches : undefined}
           onSelectChoice={onSelectChoice}
         />
       );

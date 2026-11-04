@@ -389,17 +389,28 @@ export default {
               '   - **What you\'re seeing**: Bullet points explaining visual elements, colors, particles/nodes, and live behavior.\n' +
               '   - **What actually happens in reality / underneath**: The underlying scientific principles, equations, laws of physics, or algorithmic mechanics.\n' +
               '   - **Why it matters**: Real-world applications, engineering challenges, and practical significance.\n\n' +
-              'INTERACTIVE MCQ, CLARIFICATION & UI CHOICES:\n' +
-              'When you need clarification from the user, want them to choose between UI mockups/layouts, select study topics, or pick options:\n' +
-              'Output an interactive MCQ block:\n' +
+              'INTERACTIVE MCQ, CONCEPT TREES & EXPLORATION BRANCHES:\n' +
+              'When you quiz the user, need clarification, explain a course topic, or present choices:\n' +
+              'Output an interactive MCQ or Concept block:\n' +
               '```mcq\n' +
-              'question: "Which style or option would you like to proceed with?"\n' +
+              'question: "In the Calvin Cycle (Light-Independent Reactions), what is the primary role of ATP and NADPH?"\n' +
               'options:\n' +
-              '  - Option A: Modern Glassmorphic Dark UI\n' +
-              '  - Option B: Clean Minimalist Light Portfolio\n' +
-              '  - Option C: Enterprise SaaS Dashboard\n' +
+              '  - Option A: To provide energy and reducing power to convert 3-phosphoglycerate into G3P (sugar precursors).\n' +
+              '  - Option B: To facilitate the release of Oxygen gas as a byproduct.\n' +
+              '  - Option C: To capture more photons from the sun to increase the reaction rate.\n' +
+              '  - Option D: To split the CO2 molecules directly into carbon and oxygen atoms.\n' +
               '```\n' +
-              'The user can click these options directly in the chat with one tap!\n\n' +
+              'You can also present course modules, reference links, and concept architectures using ```concept:\n' +
+              '```concept\n' +
+              'title: "CS 276 Course Syllabus & Lecture Schedule"\n' +
+              'type: "LINK"\n' +
+              'category: "General"\n' +
+              'summary: "Detailed syllabus, grading breakdown, lab schedule, and recommended concurrency textbooks."\n' +
+              'branch: POSIX Threads & Mutexes | Concurrency | Concise reference card detailing mutex locking and atomic operations | pthread_mutex_lock(&mtx)\n' +
+              'branch: Raft Consensus Algorithm | Distributed Systems | Original research paper with annotated state machine diagrams | Quorum = ⌊N/2⌋ + 1\n' +
+              'branch: Cache Coherence & MESI | Architecture | Memory barriers and acquire-release semantics | MESI protocol\n' +
+              '```\n' +
+              'The user interface renders a modern obsidian card (#070709) with a glowing neon cyan boundary (#38bdf8) and a 3-node branching explanation tree on the right. Users can click any branch pill to open an interactive deep dive with formulas, live visual simulations, and instant follow-ups!\n\n' +
               'EXAM PREPARATION & PRINTABLE PDF DOCUMENTS:\n' +
               'When the user asks for exam preparation, study guides, revision sheets, cheat sheets, or asks to "generate PDF":\n' +
               'Structure your response as a publication-grade reference document with sections, formatted LaTeX math equations ($...$ and $$...$$), tables, definitions, and cheat sheets, and include at the beginning:\n' +
