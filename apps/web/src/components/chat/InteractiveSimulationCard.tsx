@@ -1,3 +1,4 @@
+import { INJECTED_SIMULATION_INSPECTOR_HTML } from './simulationInspector';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './InteractiveSimulationCard.css';
 
@@ -28,6 +29,17 @@ interface CollisionRing {
   color: string;
 }
 
+
+export interface HoveredInfo {
+  x: number;
+  y: number;
+  title: string;
+  category: string;
+  color?: string;
+  description: string;
+  stats?: { label: string; value: string }[];
+}
+
 interface TreeNode {
   val: number;
   left?: TreeNode | null;
@@ -45,6 +57,10 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   const [activeTab, setActiveTab] = useState<'sim' | 'code'>('sim');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  // Hover Inspector State for Canvas & SVG elements
+  const [hoveredInfo, setHoveredInfo] = useState<HoveredInfo | null>(null);
+  const hoveredParticleIdRef = useRef<number | null>(null);
+
 
   // Determine actual simulation type
   const resolvedType = React.useMemo(() => {
@@ -291,6 +307,120 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
       });
     }
     particlesRef.current = [...particlesRef.current, ...newParticles];
+  };
+
+  
+  // Mouse Hover Detection Handler for Canvas Particles
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const particles = particlesRef.current;
+    let closest: Particle | null = null;
+    let minDist = Infinity;
+
+    for (const p of particles) {
+      const dist = Math.hypot(p.x - mouseX, p.y - mouseY);
+      if (dist <= p.radius + 15 && dist < minDist) {
+        closest = p;
+        minDist = dist;
+      }
+    }
+
+    if (closest) {
+      hoveredParticleIdRef.current = closest.id;
+      const spd = Math.hypot(closest.vx, closest.vy);
+      const ke = (0.5 * closest.mass * spd * spd).toFixed(1);
+
+      if (resolvedType === 'nuclear-fusion') {
+        let title = 'Deuterium Nucleus (²H)';
+        let category = 'Hydrogen Isotope';
+        let desc = 'Consists of 1 proton and 1 neutron. In magnetic confinement fusion, it fuses with Tritium at extreme temperatures (>100M K) to overcome Coulomb repulsion.';
+        let color = closest.color;
+        let extraStats = [
+          { label: 'Protons (Z)', value: '1' },
+          { label: 'Neutrons (N)', value: '1' },
+          { label: 'Atomic Mass', value: '2.014 amu' },
+        ];
+
+        if (closest.type === 'T') {
+          title = 'Tritium Nucleus (³H)';
+          category = 'Heavy Hydrogen Isotope';
+          desc = 'Consists of 1 proton and 2 neutrons. Exhibits the largest fusion cross-section with Deuterium at achievable tokamak temperatures.';
+          extraStats = [
+            { label: 'Protons (Z)', value: '1' },
+            { label: 'Neutrons (N)', value: '2' },
+            { label: 'Atomic Mass', value: '3.016 amu' },
+          ];
+        } else if (closest.type === 'He4') {
+          title = 'Helium-4 Nucleus (⁴He Alpha)';
+          category = 'Fusion Ash / Alpha Particle';
+          desc = 'Doubly ionized helium nucleus (2 protons, 2 neutrons) released from D-T fusion, carrying 3.5 MeV of energy that provides self-sustaining plasma heating.';
+          extraStats = [
+            { label: 'Composition', value: '2p + 2n' },
+            { label: 'Energy', value: '3.5 MeV' },
+            { label: 'Role', value: 'Alpha Heating' },
+          ];
+        } else if (closest.type === 'neutron') {
+          title = 'High-Energy Fast Neutron (n)';
+          category = 'Uncharged Baryon';
+          desc = 'High-speed neutral nucleon carrying 14.1 MeV of kinetic energy. Unaffected by the magnetic field, it escapes to deposit thermal heat into the lithium blanket.';
+          extraStats = [
+            { label: 'Electric Charge', value: '0 (Neutral)' },
+            { label: 'Kinetic Energy', value: '14.1 MeV' },
+            { label: 'Confinement', value: 'Escaping Wall' },
+          ];
+        }
+
+        setHoveredInfo({
+          x: mouseX,
+          y: mouseY,
+          title,
+          category,
+          color,
+          description: desc,
+          stats: [
+            ...extraStats,
+            { label: 'Velocity', value: `${spd.toFixed(1)} px/f` },
+            { label: 'Kinetic Energy', value: `${ke} MeV` },
+          ],
+        });
+      } else {
+        // atomic-collision
+        const isHeavy = closest.mass > 2;
+        const title = isHeavy ? 'Heavy Core Atom (4u)' : 'Light Gas Atom (1u)';
+        const category = isHeavy ? 'Heavy Inertial Atom' : 'Light Volatile Atom';
+        const desc = isHeavy
+          ? 'High-mass atom with high momentum and inertia. When colliding with lighter atoms, it deflects slightly while transferring substantial velocity and kinetic energy.'
+          : 'Low-mass gas atom. Bounces off heavier cores with rapid rebound speeds, dispersing kinetic energy throughout the container volume according to elastic collision laws.';
+
+        setHoveredInfo({
+          x: mouseX,
+          y: mouseY,
+          title,
+          category,
+          color: closest.color,
+          description: desc,
+          stats: [
+            { label: 'Atomic Mass', value: `${closest.mass} u` },
+            { label: 'Speed', value: `${spd.toFixed(1)} km/s` },
+            { label: 'Kinetic Energy', value: `${ke} J` },
+            { label: 'Collision Radius', value: `${closest.radius} Å` },
+          ],
+        });
+      }
+    } else {
+      hoveredParticleIdRef.current = null;
+      setHoveredInfo(null);
+    }
+  };
+
+  const handleCanvasMouseLeave = () => {
+    hoveredParticleIdRef.current = null;
+    setHoveredInfo(null);
   };
 
   // Run Canvas Simulation Animation Loop (Atomic Collision OR Nuclear Fusion)
@@ -749,7 +879,28 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
       }
 
       nodes.push(
-        <g key={`node-${node.val}`} className="tree-node-group">
+        <g
+          key={`node-${node.val}`}
+          className="tree-node-group"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : x,
+              y: rect ? e.clientY - rect.top : y,
+              title: `BST Node [${node.val}]`,
+              category: node === treeRoot ? 'Root Node' : !node.left && !node.right ? 'Leaf Node' : 'Internal Branch Node',
+              color: isTarget ? '#10b981' : isHighlighted ? '#3b82f6' : '#818cf8',
+              description: `Binary Search Tree node storing key ${node.val}. All keys in its left subtree are strictly < ${node.val}, while all keys in its right subtree are strictly > ${node.val}.`,
+              stats: [
+                { label: 'Key Value', value: String(node.val) },
+                { label: 'Left Child', value: node.left ? String(node.left.val) : 'null' },
+                { label: 'Right Child', value: node.right ? String(node.right.val) : 'null' },
+                { label: 'Complexity', value: 'O(log N)' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
           <circle
             cx={x}
             cy={y}
@@ -803,7 +954,27 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         <rect x="10" y="10" width="520" height="260" rx="12" fill="#06090d" stroke="rgba(255,255,255,0.08)" />
 
         {/* Sunlight Source */}
-        <g transform="translate(60, 60)">
+        <g
+          transform="translate(60, 60)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 60,
+              y: rect ? e.clientY - rect.top : 60,
+              title: 'Sun (Solar Photon Source)',
+              category: 'Electromagnetic Radiation',
+              color: '#f59e0b',
+              description: 'Continuously radiates electromagnetic energy across the photosynthetically active radiation (PAR) spectrum (400-700 nm) to drive the light reactions.',
+              stats: [
+                { label: 'Energy Flux', value: '1.2 kW/m²' },
+                { label: 'Wavelength', value: '400 - 700 nm' },
+                { label: 'Nuclear Origin', value: 'p-p Fusion Chain' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
           <circle cx="0" cy="0" r="30" fill="url(#sunGlow)" opacity="0.95" />
           <circle cx="0" cy="0" r="42" fill="none" stroke="#fde047" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.6">
             <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="20s" repeatCount="indefinite" />
@@ -818,14 +989,60 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         <line x1="85" y1="95" x2="175" y2="160" stroke="#fef08a" strokeWidth="2" strokeDasharray="6 4">
           <animate attributeName="stroke-dashoffset" from="30" to="0" dur="1.2s" repeatCount="indefinite" />
         </line>
-        <text x="140" y="96" fill="#fde047" fontSize="10" fontFamily="monospace">Photons (hν)</text>
+        <text
+          x="140"
+          y="96"
+          fill="#fde047"
+          fontSize="10"
+          fontFamily="monospace"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 140,
+              y: rect ? e.clientY - rect.top : 96,
+              title: 'Photon Wavepacket (hν)',
+              category: 'Light Energy Quantum',
+              color: '#fde047',
+              description: 'Discrete packet of solar light energy. Absorbed by chlorophyll pigment antennae in Photosystem II (P680) to excite ground-state electrons to higher orbitals.',
+              stats: [
+                { label: 'Photon Energy', value: 'E = hν = 2.8 eV' },
+                { label: 'Quantum Yield', value: '82%' },
+                { label: 'Role', value: 'Photolysis Excitation' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
+          Photons (hν)
+        </text>
 
         {/* Chloroplast Boundary */}
         <rect x="180" y="40" width="330" height="200" rx="16" fill="rgba(6, 78, 59, 0.25)" stroke="#10b981" strokeWidth="1.5" />
         <text x="195" y="60" fill="#34d399" fontSize="11" fontWeight="bold">CHLOROPLAST (Thylakoids &amp; Stroma)</text>
 
         {/* Thylakoid Grana Discs */}
-        <g transform="translate(240, 140)">
+        <g
+          transform="translate(240, 140)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 240,
+              y: rect ? e.clientY - rect.top : 140,
+              title: 'Thylakoid Grana & Photosystem II',
+              category: 'Light-Harvesting Complex',
+              color: '#10b981',
+              description: 'Membrane-bound protein complexes with chlorophyll pigments. Splits water (photolysis) to release protons into lumen, generating proton gradients for ATP synthesis.',
+              stats: [
+                { label: 'Reaction Center', value: 'P680 / P700' },
+                { label: 'Photolysis Eq', value: '2H₂O → 4H⁺ + 4e⁻ + O₂' },
+                { label: 'Product', value: 'ATP + NADPH' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
           <ellipse cx="0" cy="-24" rx="36" ry="12" fill="url(#chloroGrad)" stroke="#34d399" />
           <ellipse cx="0" cy="-12" rx="36" ry="12" fill="url(#chloroGrad)" stroke="#34d399" />
           <ellipse cx="0" cy="0" rx="36" ry="12" fill="url(#chloroGrad)" stroke="#34d399" />
@@ -855,7 +1072,27 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         <text x="335" y="98" fill="#fbbf24" fontSize="10" textAnchor="middle">ATP + NADPH</text>
 
         {/* Calvin Cycle Wheel */}
-        <g transform="translate(425, 140)">
+        <g
+          transform="translate(425, 140)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 425,
+              y: rect ? e.clientY - rect.top : 140,
+              title: 'Calvin-Benson Cycle (Dark Reaction)',
+              category: 'Light-Independent Carbon Fixation',
+              color: '#c084fc',
+              description: 'Occurs in chloroplast stroma. Uses ATP and NADPH from light reactions to enzymatically fix atmospheric CO₂ into 3-carbon sugars and glucose.',
+              stats: [
+                { label: 'Key Enzyme', value: 'RuBisCO' },
+                { label: 'Substrate', value: 'CO₂ + RuBP' },
+                { label: 'Output', value: 'G3P → Glucose' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
           <circle cx="0" cy="0" r="38" fill="none" stroke="#c084fc" strokeWidth="2.5" strokeDasharray="8 4">
             <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite" />
           </circle>
@@ -904,7 +1141,28 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
           }
 
           return (
-            <g key={idx}>
+            <g
+              key={idx}
+              className="sim-svg-interactive"
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+                setHoveredInfo({
+                  x: rect ? e.clientX - rect.left : x,
+                  y: rect ? e.clientY - rect.top : y,
+                  title: `Array Element [${idx}] = ${val}`,
+                  category: isSorted ? 'Sorted In Position' : isComparing ? 'Active Comparison' : 'Unsorted Element',
+                  color: isComparing ? '#f59e0b' : isSorted ? '#10b981' : '#3b82f6',
+                  description: `Represents integer ${val} at index ${idx}. Bubble Sort repeatedly compares adjacent elements and swaps them if they are in the wrong order.`,
+                  stats: [
+                    { label: 'Value', value: String(val) },
+                    { label: 'Array Index', value: `[${idx}]` },
+                    { label: 'Status', value: isSorted ? 'Sorted' : isComparing ? 'Comparing' : 'Pending' },
+                    { label: 'Complexity', value: 'O(N²) Bubble Sort' },
+                  ],
+                });
+              }}
+              onMouseLeave={() => setHoveredInfo(null)}
+            >
               <rect
                 x={x}
                 y={y}
@@ -951,8 +1209,10 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     let cleanCode = code.trim();
     const isFullDoc = cleanCode.includes('<!DOCTYPE') || cleanCode.includes('<html');
 
+    
+
     const styledHtml = isFullDoc
-      ? cleanCode
+      ? cleanCode.replace('</body>', `${INJECTED_SIMULATION_INSPECTOR_HTML}</body>`)
       : `
       <!DOCTYPE html>
       <html>
@@ -986,6 +1246,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         </head>
         <body>
           ${cleanCode}
+          ${INJECTED_SIMULATION_INSPECTOR_HTML}
         </body>
       </html>
     `;
@@ -1258,12 +1519,52 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
           {/* Interactive Simulation Viewport */}
           <div className="sim-viewport">
             {(resolvedType === 'atomic-collision' || resolvedType === 'nuclear-fusion') && (
-              <canvas ref={canvasRef} className="sim-canvas" />
+              <canvas
+                ref={canvasRef}
+                className="sim-canvas"
+                onMouseMove={handleCanvasMouseMove}
+                onMouseLeave={handleCanvasMouseLeave}
+              />
             )}
             {resolvedType === 'binary-tree' && renderTreeSvg()}
             {resolvedType === 'photosynthesis' && renderPhotosynthesisSvg()}
             {resolvedType === 'sorting' && renderSortingSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}
+            {/* Floating Sci-Fi HUD Tooltip Overlay */}
+            {hoveredInfo && (
+              <div
+                className="sim-hover-tooltip"
+                style={{
+                  left: hoveredInfo.x > 260 ? `${Math.max(12, hoveredInfo.x - 270)}px` : `${hoveredInfo.x + 20}px`,
+                  top: hoveredInfo.y > 180 ? `${Math.max(12, hoveredInfo.y - 150)}px` : `${hoveredInfo.y + 16}px`,
+                }}
+              >
+                <div className="sim-hover-tooltip__badge-row">
+                  <span className="sim-hover-tooltip__about-tag">? ABOUT</span>
+                  <span
+                    className="sim-hover-tooltip__cat-badge"
+                    style={{
+                      borderColor: hoveredInfo.color || '#38bdf8',
+                      color: hoveredInfo.color || '#38bdf8',
+                    }}
+                  >
+                    {hoveredInfo.category}
+                  </span>
+                </div>
+                <div className="sim-hover-tooltip__title">{hoveredInfo.title}</div>
+                <div className="sim-hover-tooltip__desc">{hoveredInfo.description}</div>
+                {hoveredInfo.stats && hoveredInfo.stats.length > 0 && (
+                  <div className="sim-hover-tooltip__stats">
+                    {hoveredInfo.stats.map((s, idx) => (
+                      <div key={idx} className="sim-hover-tooltip__stat-item">
+                        <span className="sim-hover-tooltip__stat-label">{s.label}:</span>
+                        <span className="sim-hover-tooltip__stat-val">{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bottom Telemetry Bar for Nuclear Fusion */}

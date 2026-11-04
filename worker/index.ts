@@ -384,7 +384,7 @@ export default {
               '</body>\n' +
               '</html>\n' +
               '```\n' +
-              '(Note: If the topic is nuclear fusion, you can also write: ```interactive-simulation\\ntype: nuclear-fusion\\n```; or if atomic collisions: ```interactive-simulation\\ntype: atomic-collision\\n```; or if binary tree: ```interactive-simulation\\ntype: binary-tree\\n```; or write a complete custom HTML5 Canvas interactive simulation for any other topic!).\n' +
+              '(Note: If the topic is nuclear fusion: ```interactive-simulation\\ntype: nuclear-fusion\\n```; if atomic collisions: ```interactive-simulation\\ntype: atomic-collision\\n```; if binary tree: ```interactive-simulation\\ntype: binary-tree\\n```; if photosynthesis/photochemical: ```interactive-simulation\\ntype: photosynthesis\\n```; if sorting: ```interactive-simulation\\ntype: sorting\\n```; or write a complete custom HTML5 Canvas interactive simulation for any arbitrary topic!). When the user hovers over elements/particles, provide interactive inspection and clear visual feedback.\n' +
               '2. Follow immediately with clear, structured educational explanations:\n' +
               '   - **What you\'re seeing**: Bullet points explaining visual elements, colors, particles/nodes, and live behavior.\n' +
               '   - **What actually happens in reality / underneath**: The underlying scientific principles, equations, laws of physics, or algorithmic mechanics.\n' +

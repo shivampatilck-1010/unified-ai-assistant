@@ -402,3 +402,123 @@
   border-color: #38bdf8;
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
 }
+
+
+/* --- Interactive HUD Hover Tooltip (Obsidian #070709 theme) --- */
+.sim-hover-tooltip {
+  position: absolute;
+  z-index: 80;
+  pointer-events: none;
+  background: rgba(7, 7, 9, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  max-width: 280px;
+  min-width: 210px;
+  color: #f1f5f9;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  animation: simTooltipFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.08s ease-out;
+}
+
+@keyframes simTooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sim-hover-tooltip__badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.sim-hover-tooltip__about-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sim-hover-tooltip__cat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sim-hover-tooltip__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.sim-hover-tooltip__desc {
+  font-size: 11px;
+  color: #cbd5e1;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.sim-hover-tooltip__stats {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3.5px;
+  font-size: 10.5px;
+  font-family: monospace;
+}
+
+.sim-hover-tooltip__stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-hover-tooltip__stat-label {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.sim-hover-tooltip__stat-val {
+  color: #38bdf8;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.tree-node-group, .sim-svg-interactive {
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.tree-node-group:hover circle, .sim-svg-interactive:hover {
+  filter: drop-shadow(0 0 10px #38bdf8);
+}
