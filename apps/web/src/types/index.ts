@@ -44,6 +44,7 @@ export interface ChatRequest {
   research_depth?: 'quick' | 'standard' | 'deep' | string;
   use_orchestration?: boolean;
   project_id?: string | null;
+  custom_api_key?: string | null;
 }
 
 export interface HealthResponse {

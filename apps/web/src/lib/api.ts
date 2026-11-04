@@ -103,6 +103,60 @@ export function setApiBase(url: string | null): void {
   }
 }
 
+export function getCustomApiKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  const key = localStorage.getItem('unified_ai_custom_gemini_key');
+  return key && key.trim() ? key.trim() : null;
+}
+
+export function setCustomApiKey(key: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (key && key.trim()) {
+    localStorage.setItem('unified_ai_custom_gemini_key', key.trim());
+  } else {
+    localStorage.removeItem('unified_ai_custom_gemini_key');
+  }
+}
+
+export async function validateGeminiApiKey(
+  key: string
+): Promise<{ valid: boolean; message: string; models?: string[] }> {
+  if (!key || !key.trim()) {
+    return { valid: false, message: 'Please provide an API key.' };
+  }
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${key.trim()}`
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      try {
+        const errJson = JSON.parse(errText);
+        return {
+          valid: false,
+          message: errJson.error?.message || `Google API rejected the key (HTTP ${res.status})`,
+        };
+      } catch {
+        return { valid: false, message: `Google API rejected the key (HTTP ${res.status})` };
+      }
+    }
+    const data = await res.json();
+    const modelNames: string[] = Array.isArray(data.models)
+      ? data.models.map((m: { name?: string }) => (m.name || '').replace('models/', '')).filter(Boolean)
+      : [];
+    return {
+      valid: true,
+      message: 'API key successfully validated with Google Generative AI!',
+      models: modelNames.slice(0, 5),
+    };
+  } catch (err) {
+    return {
+      valid: false,
+      message: err instanceof Error ? err.message : 'Network error testing API key',
+    };
+  }
+}
+
 const API_BASE = {
   toString: () => getApiBase(),
 };
@@ -256,12 +310,16 @@ export async function sendFollowupEmail(
 
 export function getBaseHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getAuthToken();
+  const customKey = getCustomApiKey();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...extra,
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (customKey) {
+    headers['X-Gemini-Key'] = customKey;
   }
   return headers;
 }

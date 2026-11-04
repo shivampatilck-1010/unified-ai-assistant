@@ -1,7 +1,7 @@
 // SSE streaming client for the chat endpoint
 
 import type { SSEEvent, SSEEventType, ChatRequest, ChunkCitation, ErrorData } from '../types';
-import { getStreamUrl } from './api';
+import { getStreamUrl, getCustomApiKey, getAuthToken } from './api';
 
 export interface StreamCallbacks {
   onMessageStart: (conversationId: string, messageId: string) => void;
@@ -55,13 +55,26 @@ export async function streamChat(
   let response: Response;
 
   try {
+    const customKey = getCustomApiKey();
+    const token = getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+    };
+    if (customKey) {
+      headers['X-Gemini-Key'] = customKey;
+    }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     response = await fetch(getStreamUrl(), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify(request),
+      headers,
+      body: JSON.stringify({
+        ...request,
+        custom_api_key: customKey || undefined,
+      }),
       signal,
     });
   } catch (err) {
@@ -73,8 +86,17 @@ export async function streamChat(
   }
 
   if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const errJson = await response.json();
+      if (errJson && errJson.error) {
+        detail = errJson.error;
+      }
+    } catch {
+      // Ignore JSON parse failure
+    }
     callbacks.onStreamError(
-      new Error(`Server returned ${response.status}: ${response.statusText}`)
+      new Error(`Server error (${response.status}): ${detail}`)
     );
     return;
   }

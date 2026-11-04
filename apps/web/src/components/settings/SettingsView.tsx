@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { fetchHealth, fetchRetentionStatus, getApiBase, purgeAllUserData, setApiBase, triggerRetentionCleanup } from '../../lib/api';
+import {
+  fetchHealth,
+  fetchRetentionStatus,
+  getApiBase,
+  purgeAllUserData,
+  setApiBase,
+  triggerRetentionCleanup,
+  getCustomApiKey,
+  setCustomApiKey,
+  validateGeminiApiKey,
+} from '../../lib/api';
 import type { UnifiedProviderStatusResponse, RetentionStatusResponse, ModelInfo } from '../../types';
 import './SettingsView.css';
 
@@ -20,6 +30,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
   const [backendUrl, setBackendUrl] = useState<string>(getApiBase());
   const [testingBackend, setTestingBackend] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Custom Gemini API Key Configuration
+  const [apiKeyInput, setApiKeyInput] = useState<string>(getCustomApiKey() || '');
+  const [showKey, setShowKey] = useState<boolean>(false);
+  const [testingKey, setTestingKey] = useState<boolean>(false);
+  const [keyResult, setKeyResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (trimmed) {
+      setCustomApiKey(trimmed);
+      setNotification({
+        type: 'success',
+        message: 'Personal Google Gemini API key saved! Chat queries will now connect using your key.',
+      });
+    } else {
+      setCustomApiKey(null);
+      setNotification({
+        type: 'success',
+        message: 'Personal API key cleared. Reverted to default credentials.',
+      });
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    if (!apiKeyInput.trim()) {
+      setKeyResult({ success: false, message: 'Please enter an API key first.' });
+      return;
+    }
+    setTestingKey(true);
+    setKeyResult(null);
+    try {
+      const res = await validateGeminiApiKey(apiKeyInput.trim());
+      setKeyResult({
+        success: res.valid,
+        message: res.valid
+          ? `✓ Verified successfully! Available models: ${res.models?.join(', ') || 'gemini-3.5-flash-lite'}`
+          : `✗ ${res.message}`,
+      });
+    } catch (err) {
+      setKeyResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Validation failed',
+      });
+    } finally {
+      setTestingKey(false);
+    }
+  };
+
+  const handleResetApiKey = () => {
+    setApiKeyInput('');
+    setCustomApiKey(null);
+    setKeyResult(null);
+    setNotification({
+      type: 'success',
+      message: 'Personal API key removed. Reverted to default edge credentials.',
+    });
+  };
 
   const handleSaveBackendUrl = () => {
     setApiBase(backendUrl);
@@ -246,6 +314,150 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
                 }}
               >
                 {testResult.success ? '✓ ' : '✗ '} {testResult.message}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Custom Gemini API Key Configuration */}
+        <section className="settings-section">
+          <div className="settings-section__header">
+            <div className="settings-section__title-group">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="settings-icon">
+                <path d="M21 2l-2 2m-1-1l-3 3 2 2 3-3-2-2z" />
+                <path d="M15 5l4 4-11 11H4v-4l11-11z" />
+              </svg>
+              <div>
+                <h3 className="settings-section__title">Custom Gemini API Key</h3>
+                <span
+                  className="privacy-active-badge"
+                  style={{
+                    background: getCustomApiKey() ? '#064e3b' : '#1e3a5f',
+                    color: getCustomApiKey() ? '#6ee7b7' : '#93c5fd',
+                  }}
+                >
+                  {getCustomApiKey() ? 'Personal Key Active' : 'Default Gateway Active'}
+                </span>
+              </div>
+            </div>
+            <p className="settings-section__desc">
+              Connect your personal Google Gemini API key to query models directly with your own quota. Keys are stored locally in your browser. Get a key free at{' '}
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#38bdf8', textDecoration: 'underline' }}
+              >
+                Google AI Studio ↗
+              </a>
+              .
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="Paste your Gemini API key (AIzaSy... or AQ.Ab8...)"
+                  style={{
+                    width: '100%',
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    padding: '8px 56px 8px 12px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey((v) => !v)}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: '#262626',
+                    border: '1px solid #3d3d3d',
+                    color: '#a3a3a3',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {showKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveApiKey}
+                style={{
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Save Key
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestApiKey}
+                disabled={testingKey || !apiKeyInput.trim()}
+                style={{
+                  background: '#262626',
+                  color: '#e5e5e5',
+                  border: '1px solid #3d3d3d',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontSize: '13px',
+                  cursor: testingKey || !apiKeyInput.trim() ? 'not-allowed' : 'pointer',
+                  opacity: testingKey || !apiKeyInput.trim() ? 0.6 : 1,
+                }}
+              >
+                {testingKey ? 'Testing…' : 'Test Key'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetApiKey}
+                style={{
+                  background: 'transparent',
+                  color: '#a3a3a3',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            </div>
+
+            {keyResult && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: keyResult.success ? '#064e3b' : '#7f1d1d',
+                  color: keyResult.success ? '#6ee7b7' : '#fca5a5',
+                  border: `1px solid ${keyResult.success ? '#059669' : '#b91c1c'}`,
+                }}
+              >
+                {keyResult.message}
               </div>
             )}
           </div>

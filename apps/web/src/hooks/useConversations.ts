@@ -26,7 +26,9 @@ export function useConversations(backendConnected: boolean = true) {
       setIsLoading(true);
       setError(null);
       const res = await fetchConversations(50, 0);
-      setConversations(res.items);
+      if (res.items && res.items.length > 0) {
+        setConversations(res.items);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
     } finally {
@@ -50,7 +52,9 @@ export function useConversations(backendConnected: boolean = true) {
       try {
         setIsLoading(true);
         const detail = await fetchConversation(id);
-        setActiveConversation(detail);
+        if (detail && detail.messages && detail.messages.length > 0) {
+          setActiveConversation(detail);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load conversation');
       } finally {
@@ -140,6 +144,25 @@ export function useConversations(backendConnected: boolean = true) {
       targetAssistantId?: string
     ) => {
       const assistantMsgId = targetAssistantId || crypto.randomUUID();
+      const effectiveConvId = activeId || `conv-${Date.now()}`;
+      if (!activeId) {
+        setActiveId(effectiveConvId);
+      }
+
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content,
+        created_at: new Date().toISOString(),
+      };
+
+      const assistantMsg: ChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString(),
+        isStreaming: true,
+      };
 
       if (targetAssistantId) {
         // Retrying into an existing assistant message bubble without duplicating messages
@@ -165,28 +188,43 @@ export function useConversations(backendConnected: boolean = true) {
           };
         });
       } else {
-        const userMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content,
-          created_at: new Date().toISOString(),
-        };
-
-        const assistantMsg: ChatMessage = {
-          id: assistantMsgId,
-          role: 'assistant',
-          content: '',
-          created_at: new Date().toISOString(),
-          isStreaming: true,
-        };
-
-        // Optimistic update to current view
+        // Optimistic update to current view - initialize conversation if prev is null
         setActiveConversation((prev) => {
-          if (!prev) return null;
+          if (!prev) {
+            return {
+              id: effectiveConvId,
+              owner_id: 'default_user',
+              title: content.slice(0, 32).trim() || 'New Chat',
+              project_id: undefined,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              messages: [userMsg, assistantMsg],
+            };
+          }
           return {
             ...prev,
             messages: [...prev.messages, userMsg, assistantMsg],
           };
+        });
+
+        // Add to sidebar conversation list
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === effectiveConvId)) {
+            return prev.map((c) =>
+              c.id === effectiveConvId ? { ...c, updated_at: new Date().toISOString() } : c
+            );
+          }
+          return [
+            {
+              id: effectiveConvId,
+              owner_id: 'default_user',
+              title: content.slice(0, 32).trim() || 'New Chat',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              message_count: 2,
+            },
+            ...prev,
+          ];
         });
       }
 
@@ -198,7 +236,7 @@ export function useConversations(backendConnected: boolean = true) {
       try {
         await streamChat(
           {
-            conversation_id: activeId,
+            conversation_id: effectiveConvId,
             message: content,
             provider: provider || undefined,
             model: model || undefined,
@@ -217,12 +255,25 @@ export function useConversations(backendConnected: boolean = true) {
             },
             onTextDelta: (text: string) => {
               setActiveConversation((prev) => {
-                if (!prev) return null;
+                if (!prev) {
+                  return {
+                    id: effectiveConvId,
+                    owner_id: 'default_user',
+                    title: content.slice(0, 32).trim() || 'New Chat',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    messages: [userMsg, { ...assistantMsg, content: text }],
+                  };
+                }
+                const hasAssistantMsg = prev.messages.some((m) => m.id === assistantMsgId);
+                const updatedMessages = hasAssistantMsg
+                  ? prev.messages.map((m) =>
+                      m.id === assistantMsgId ? { ...m, content: m.content + text } : m
+                    )
+                  : [...prev.messages, { ...assistantMsg, content: text }];
                 return {
                   ...prev,
-                  messages: prev.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, content: m.content + text } : m
-                  ),
+                  messages: updatedMessages,
                 };
               });
             },
@@ -237,11 +288,32 @@ export function useConversations(backendConnected: boolean = true) {
                 };
               });
               setIsStreaming(false);
-              void refreshList();
             },
             onError: (errData: ErrorData) => {
               setActiveConversation((prev) => {
-                if (!prev) return null;
+                if (!prev) {
+                  return {
+                    id: effectiveConvId,
+                    owner_id: 'default_user',
+                    title: content.slice(0, 32).trim() || 'New Chat',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    messages: [
+                      userMsg,
+                      {
+                        ...assistantMsg,
+                        content: errData.message,
+                        isStreaming: false,
+                        isError: true,
+                        error_code: errData.code,
+                        error_category: errData.category,
+                        retry_after: errData.retry_after,
+                        retryable: errData.retryable,
+                        routed_model: errData.routed_model,
+                      },
+                    ],
+                  };
+                }
                 return {
                   ...prev,
                   messages: prev.messages.map((m) =>
@@ -265,7 +337,24 @@ export function useConversations(backendConnected: boolean = true) {
             },
             onStreamError: (streamErr: Error) => {
               setActiveConversation((prev) => {
-                if (!prev) return null;
+                if (!prev) {
+                  return {
+                    id: effectiveConvId,
+                    owner_id: 'default_user',
+                    title: content.slice(0, 32).trim() || 'New Chat',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    messages: [
+                      userMsg,
+                      {
+                        ...assistantMsg,
+                        content: `Connection error: ${streamErr.message}`,
+                        isStreaming: false,
+                        isError: true,
+                      },
+                    ],
+                  };
+                }
                 return {
                   ...prev,
                   messages: prev.messages.map((m) =>
@@ -289,7 +378,7 @@ export function useConversations(backendConnected: boolean = true) {
         setIsStreaming(false);
       }
     },
-    [activeId, refreshList]
+    [activeId, activeConversation]
   );
 
   const retryMessage = useCallback(

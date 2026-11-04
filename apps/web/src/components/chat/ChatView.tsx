@@ -5,6 +5,8 @@ import { MarkdownContent } from './MarkdownContent';
 import { BrowserLivePreviewCard } from '../browser/BrowserLivePreviewCard';
 import { UnifiedLogo } from '../brand/UnifiedLogo';
 import { FollowupEmailModal } from './FollowupEmailModal';
+import { ApiKeyModal } from '../auth/ApiKeyModal';
+import { getCustomApiKey } from '../../lib/api';
 import './ChatView.css';
 
 interface ChatViewProps {
@@ -53,6 +55,8 @@ export function ChatView({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState<boolean>(false);
   const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [hasCustomKey, setHasCustomKey] = useState<boolean>(Boolean(getCustomApiKey()));
 
   // Detect if user has scrolled up
   const handleScroll = () => {
@@ -249,6 +253,29 @@ export function ChatView({
               <polyline points="22,6 12,13 2,6" />
             </svg>
             <span>Follow-up Email</span>
+          </button>
+
+          <button
+            className="chat-view__apikey-btn"
+            onClick={() => setShowApiKeyModal(true)}
+            title="Configure personal Google Gemini API Key"
+            type="button"
+            style={{
+              background: hasCustomKey ? '#064e3b' : '#262626',
+              border: `1px solid ${hasCustomKey ? '#059669' : '#3d3d3d'}`,
+              color: hasCustomKey ? '#6ee7b7' : '#d4d4d4',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 500,
+            }}
+          >
+            <span>🔑</span>
+            <span>{hasCustomKey ? 'Custom Key' : 'API Key'}</span>
           </button>
 
           {availableModels.length > 0 ? (
@@ -574,6 +601,13 @@ export function ChatView({
         onClose={() => setShowEmailModal(false)}
         conversationId={conversationId ?? null}
         conversationTitle={conversationTitle}
+      />
+
+      {/* User Personal API Key Modal */}
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+        onKeyChange={(has) => setHasCustomKey(has)}
       />
     </div>
   );
