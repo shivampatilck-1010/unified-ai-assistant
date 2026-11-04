@@ -131,6 +131,23 @@ export function Composer({ onSend, isStreaming, onCancel, disabled }: ComposerPr
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
   }, [value]);
 
+  // Listen for direct prompt insert from flashcards
+  useEffect(() => {
+    const handleInsert = (e: any) => {
+      const text = e.detail;
+      if (typeof text === 'string' && text) {
+        setValue(text);
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+        }
+      }
+    };
+    window.addEventListener('insert-into-composer', handleInsert as EventListener);
+    return () => window.removeEventListener('insert-into-composer', handleInsert as EventListener);
+  }, []);
+
   return (
     <div
       className={`composer ${isDragging ? 'composer--dragging' : ''}`}

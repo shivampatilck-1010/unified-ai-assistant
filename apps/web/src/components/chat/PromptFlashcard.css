@@ -1,0 +1,149 @@
+/* ==========================================================================
+   Prompt Flashcard — Direct Copy & Interactive Insert (#070709 Obsidian)
+   ========================================================================== */
+
+.prompt-flashcard {
+  margin: 18px 0;
+  background: #070709;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.prompt-flashcard:hover {
+  border-color: rgba(226, 160, 63, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(226, 160, 63, 0.2);
+}
+
+.prompt-flashcard__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0d0d13;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-flashcard__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prompt-flashcard__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.prompt-flashcard__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  letter-spacing: -0.01em;
+}
+
+.prompt-flashcard__badge {
+  display: inline-block;
+  margin-left: 8px;
+  background: rgba(226, 160, 63, 0.15);
+  border: 1px solid rgba(226, 160, 63, 0.35);
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prompt-flashcard__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prompt-flashcard__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.prompt-flashcard__btn--copy {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.prompt-flashcard__btn--copy:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.prompt-flashcard__btn--copied {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.prompt-flashcard__btn--use {
+  background: rgba(226, 160, 63, 0.15);
+  border: 1px solid rgba(226, 160, 63, 0.35);
+  color: #fbbf24;
+}
+
+.prompt-flashcard__btn--use:hover {
+  background: rgba(226, 160, 63, 0.25);
+  color: #ffffff;
+}
+
+.prompt-flashcard__body {
+  position: relative;
+  padding: 16px 20px 14px;
+  background: #070709;
+}
+
+.prompt-flashcard__quote-mark {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  font-size: 40px;
+  font-family: Georgia, serif;
+  color: rgba(255, 255, 255, 0.08);
+  user-select: none;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.prompt-flashcard__text {
+  margin: 0;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: #f8fafc;
+  word-wrap: break-word;
+  position: relative;
+  z-index: 1;
+}
+
+.prompt-flashcard__footer {
+  padding: 8px 16px;
+  background: #0a0a0f;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.prompt-flashcard__footer strong {
+  color: #cbd5e1;
+}

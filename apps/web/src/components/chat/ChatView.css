@@ -48,6 +48,36 @@
   outline-offset: 1px;
 }
 
+.chat-view__topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-view__topbar-brand {
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.chat-view__topbar-slash {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-view__topbar-conv-title {
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
 .chat-view__model-selector {
   margin-left: auto;
 }

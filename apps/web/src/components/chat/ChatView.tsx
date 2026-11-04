@@ -165,8 +165,25 @@ export function ChatView({
 
   const isEmpty = messages.length === 0;
 
-  const [useResearch, setUseResearch] = useState(false);
-  const [useOrchestration, setUseOrchestration] = useState(false);
+  const [useResearch, setUseResearch] = useState(() => {
+    return localStorage.getItem('unified_ai_pref_research') === 'true';
+  });
+  const [useOrchestration, setUseOrchestration] = useState(() => {
+    return localStorage.getItem('unified_ai_pref_orchestration') === 'true';
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      setUseResearch(localStorage.getItem('unified_ai_pref_research') === 'true');
+      setUseOrchestration(localStorage.getItem('unified_ai_pref_orchestration') === 'true');
+    };
+    window.addEventListener('chat-prefs-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('chat-prefs-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
   const [pendingCalendarData, setPendingCalendarData] = useState<CalendarReminderData | null>(null);
   const [showCalendarCard, setShowCalendarCard] = useState(false);
   const prevStreamingRef = useRef(isStreaming);
@@ -286,100 +303,13 @@ export function ChatView({
           <span>New Chat</span>
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            className={`chat-view__orchestration-toggle ${useOrchestration ? 'chat-view__orchestration-toggle--active' : ''}`}
-            onClick={() => setUseOrchestration((v) => !v)}
-            title="Coordinate multi-step planning, capabilities, and execution"
-            type="button"
-            style={{
-              background: useOrchestration ? '#3b1d5c' : '#262626',
-              border: `1px solid ${useOrchestration ? '#a855f7' : '#3d3d3d'}`,
-              color: useOrchestration ? '#e9d5ff' : '#a3a3a3',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <span>Orchestrate</span>
-            <span style={{ fontSize: '10px', fontWeight: 600 }}>{useOrchestration ? 'ON' : 'OFF'}</span>
-          </button>
+        <div className="chat-view__topbar-title">
+          <span className="chat-view__topbar-brand">Unified AI</span>
+          <span className="chat-view__topbar-slash">/</span>
+          <span className="chat-view__topbar-conv-title">{conversationTitle || 'Chat Workspace'}</span>
+        </div>
 
-          <button
-            className={`chat-view__research-toggle ${useResearch ? 'chat-view__research-toggle--active' : ''}`}
-            onClick={() => setUseResearch((v) => !v)}
-            title="Ground answers in live web research"
-            type="button"
-            style={{
-              background: useResearch ? '#1e3a5f' : '#262626',
-              border: `1px solid ${useResearch ? '#3b82f6' : '#3d3d3d'}`,
-              color: useResearch ? '#93c5fd' : '#a3a3a3',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <span>Web Research</span>
-            <span style={{ fontSize: '10px', fontWeight: 600 }}>{useResearch ? 'ON' : 'OFF'}</span>
-          </button>
-
-          <button
-            className="chat-view__email-followup-btn"
-            onClick={() => setShowEmailModal(true)}
-            title="Dispatch conversation summary & takeaways via email"
-            type="button"
-            style={{
-              background: '#1c2438',
-              border: '1px solid #3b82f6',
-              color: '#93c5fd',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 500,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <polyline points="22,6 12,13 2,6" />
-            </svg>
-            <span>Follow-up Email</span>
-          </button>
-
-          <button
-            className="chat-view__apikey-btn"
-            onClick={() => setShowApiKeyModal(true)}
-            title="Configure personal Google Gemini API Key"
-            type="button"
-            style={{
-              background: hasCustomKey ? '#064e3b' : '#262626',
-              border: `1px solid ${hasCustomKey ? '#059669' : '#3d3d3d'}`,
-              color: hasCustomKey ? '#6ee7b7' : '#d4d4d4',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 500,
-            }}
-          >
-            <span>🔑</span>
-            <span>{hasCustomKey ? 'Custom Key' : 'API Key'}</span>
-          </button>
-
+        <div className="chat-view__topbar-right" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
           {availableModels.length > 0 ? (
             <div className="chat-view__model-selector">
               <select

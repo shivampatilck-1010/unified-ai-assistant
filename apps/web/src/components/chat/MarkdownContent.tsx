@@ -4,6 +4,7 @@ import 'katex/dist/katex.min.css';
 import mermaid from 'mermaid';
 import { ImageGenerationCard } from './ImageGenerationCard';
 import { FileAttachmentCard } from './FileAttachmentCard';
+import { PromptFlashcard } from './PromptFlashcard';
 import './MarkdownContent.css';
 
 // Initialize Mermaid once with dark theme
@@ -334,6 +335,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     let tableLines: string[] = [];
 
     let autoDetectedFile: string | null = null;
+    let isPreviousLinePromptIntro = false;
 
     const flushList = () => {
       if (listItems.length === 0) return;
@@ -575,19 +577,61 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       } else if (line.startsWith('# ')) {
         nodes.push(<h2 key={`h2-${nodes.length}`} className="md-h2">{formatInline(line.slice(2))}</h2>);
       } else if (line.startsWith('> ')) {
-        nodes.push(
-          <blockquote key={`bq-${nodes.length}`} className="md-blockquote">
-            {formatInline(line.slice(2))}
-          </blockquote>
-        );
+        const bqContent = line.slice(2).trim();
+        const isPromptLike =
+          /^(?:["“]|act as|please act as|i have been studying|prompt|quiz me)/i.test(bqContent) ||
+          bqContent.includes('Provide the answers') ||
+          isPreviousLinePromptIntro;
+
+        if (isPromptLike) {
+          nodes.push(
+            <PromptFlashcard
+              key={`pf-${nodes.length}`}
+              promptText={bqContent}
+              title="AI Prompt Flashcard"
+              category="Direct Copy"
+            />
+          );
+        } else {
+          nodes.push(
+            <blockquote key={`bq-${nodes.length}`} className="md-blockquote">
+              {formatInline(bqContent)}
+            </blockquote>
+          );
+        }
+        isPreviousLinePromptIntro = false;
       } else if (line.trim() === '') {
         nodes.push(<div key={`br-${nodes.length}`} className="md-spacer" />);
       } else {
-        nodes.push(
-          <p key={`p-${nodes.length}`} className="md-paragraph">
-            {formatInline(line)}
-          </p>
-        );
+        const trimmed = line.trim();
+        const isPromptIntro =
+          /(?:copy\s+and\s+paste\s+this|prompt\s+for\s+your\s+ai|use\s+this\s+prompt|test\s+you|copy\s+this)/i.test(trimmed);
+
+        const isQuotedPrompt =
+          ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+            (trimmed.startsWith('“') && trimmed.endsWith('”'))) &&
+          trimmed.length >= 30 &&
+          (/\b(?:act as|test my|questions|provide the answers|quiz|explain|prompt|tutor)\b/i.test(trimmed) ||
+            isPreviousLinePromptIntro);
+
+        if (isQuotedPrompt) {
+          nodes.push(
+            <PromptFlashcard
+              key={`pf-${nodes.length}`}
+              promptText={trimmed}
+              title="Interactive Quiz Prompt"
+              category="Study Flashcard"
+            />
+          );
+          isPreviousLinePromptIntro = false;
+        } else {
+          nodes.push(
+            <p key={`p-${nodes.length}`} className="md-paragraph">
+              {formatInline(line)}
+            </p>
+          );
+          isPreviousLinePromptIntro = isPromptIntro;
+        }
       }
     }
 

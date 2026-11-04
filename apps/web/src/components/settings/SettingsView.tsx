@@ -11,6 +11,7 @@ import {
   validateGeminiApiKey,
 } from '../../lib/api';
 import type { UnifiedProviderStatusResponse, RetentionStatusResponse, ModelInfo } from '../../types';
+import { FollowupEmailModal } from '../chat/FollowupEmailModal';
 import './SettingsView.css';
 
 interface SettingsViewProps {
@@ -36,6 +37,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
   const [showKey, setShowKey] = useState<boolean>(false);
   const [testingKey, setTestingKey] = useState<boolean>(false);
   const [keyResult, setKeyResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Chat Capabilities (Shifted from Chat view)
+  const [prefOrchestration, setPrefOrchestration] = useState<boolean>(() => {
+    return localStorage.getItem('unified_ai_pref_orchestration') === 'true';
+  });
+  const [prefResearch, setPrefResearch] = useState<boolean>(() => {
+    return localStorage.getItem('unified_ai_pref_research') === 'true';
+  });
+  const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
+
+  const handleToggleOrchestration = (val: boolean) => {
+    setPrefOrchestration(val);
+    localStorage.setItem('unified_ai_pref_orchestration', String(val));
+    window.dispatchEvent(new CustomEvent('chat-prefs-updated'));
+    setNotification({
+      type: 'success',
+      message: `Autonomous Orchestration has been turned ${val ? 'ON' : 'OFF'}.`,
+    });
+  };
+
+  const handleToggleResearch = (val: boolean) => {
+    setPrefResearch(val);
+    localStorage.setItem('unified_ai_pref_research', String(val));
+    window.dispatchEvent(new CustomEvent('chat-prefs-updated'));
+    setNotification({
+      type: 'success',
+      message: `Live Web Research & Grounding has been turned ${val ? 'ON' : 'OFF'}.`,
+    });
+  };
 
   const handleSaveApiKey = () => {
     const trimmed = apiKeyInput.trim();
@@ -217,6 +247,107 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
             </button>
           </div>
         )}
+
+        {/* Chat Intelligence & Workflow Capabilities (Shifted from Chat view) */}
+        <section className="settings-section">
+          <div className="settings-section__header">
+            <div className="settings-section__title-group">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="settings-icon">
+                <path d="M10 2L12.5 7.5L18.5 8.5L14 12.8L15 18.5L10 15.5L5 18.5L6 12.8L1.5 8.5L7.5 7.5L10 2Z" stroke="#e2a03f" strokeWidth="1.6" strokeLinejoin="round" />
+              </svg>
+              <div>
+                <h3 className="settings-section__title">Chat Intelligence & Capabilities</h3>
+                <span className="privacy-active-badge" style={{ background: '#3b1d5c', color: '#e9d5ff' }}>AI Controls</span>
+              </div>
+            </div>
+            <p className="settings-section__desc">
+              Configure autonomous orchestration, live internet research, and automated email recap dispatching.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+            {/* Orchestration Switch */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#111116', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#f3f4f6' }}>Autonomous Orchestration</div>
+                <div style={{ fontSize: '12px', color: '#94a3b8' }}>Enable multi-step goal planning, dynamic subagent coordination, and automated tool execution.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleOrchestration(!prefOrchestration)}
+                style={{
+                  background: prefOrchestration ? '#7c3aed' : '#262626',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '6px 16px',
+                  borderRadius: '20px',
+                  fontWeight: 600,
+                  fontSize: '12.5px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+              >
+                {prefOrchestration ? 'ACTIVE (ON)' : 'DISABLED (OFF)'}
+              </button>
+            </div>
+
+            {/* Web Research Switch */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#111116', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#f3f4f6' }}>Live Web Research & Grounding</div>
+                <div style={{ fontSize: '12px', color: '#94a3b8' }}>Ground AI responses with live search results, authoritative citations, and fresh web knowledge.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleResearch(!prefResearch)}
+                style={{
+                  background: prefResearch ? '#2563eb' : '#262626',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '6px 16px',
+                  borderRadius: '20px',
+                  fontWeight: 600,
+                  fontSize: '12.5px',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+              >
+                {prefResearch ? 'ACTIVE (ON)' : 'DISABLED (OFF)'}
+              </button>
+            </div>
+
+            {/* Follow-up Email Action */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#111116', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#f3f4f6' }}>Follow-up Executive Recap Email</div>
+                <div style={{ fontSize: '12px', color: '#94a3b8' }}>Send conversation takeaways, action items, and structured briefing notes directly to your email inbox.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(true)}
+                style={{
+                  background: '#1e3a5f',
+                  border: '1px solid #3b82f6',
+                  color: '#93c5fd',
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  fontSize: '12.5px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+                <span>Dispatch Recap</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
         {/* Backend Ingress & Endpoint Configuration */}
         <section className="settings-section">
@@ -672,6 +803,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
           </div>
         </div>
       )}
+
+      {/* Follow-up Email Modal */}
+      <FollowupEmailModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+      />
     </div>
   );
 };
