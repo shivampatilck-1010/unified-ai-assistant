@@ -46,6 +46,7 @@ export interface ChatRequest {
   project_id?: string | null;
   custom_api_key?: string | null;
   messages?: Array<{ role: string; content: string }>;
+  attachments?: ChatAttachment[];
 }
 
 export interface HealthResponse {
@@ -76,6 +77,15 @@ export interface UnifiedProviderStatusResponse {
 
 export type MessageRole = 'user' | 'assistant';
 
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  data: string; // base64 string or data URL
+  previewUrl?: string;
+  size?: number;
+}
+
 export interface ChatMessage {
   id: string;
   conversation_id?: string;
@@ -94,6 +104,7 @@ export interface ChatMessage {
   retryable?: boolean;
   routed_model?: string | null;
   citations?: ChunkCitation[];
+  attachments?: ChatAttachment[];
 }
 
 export interface ConversationSummary {

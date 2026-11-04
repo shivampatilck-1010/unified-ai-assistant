@@ -1,11 +1,13 @@
 import { useRef, useEffect, useState } from 'react';
-import type { ChatMessage, ModelInfo } from '../../types';
+import type { ChatMessage, ModelInfo, ChatAttachment } from '../../types';
 import { Composer } from '../composer/Composer';
 import { MarkdownContent } from './MarkdownContent';
 import { BrowserLivePreviewCard } from '../browser/BrowserLivePreviewCard';
 import { UnifiedLogo } from '../brand/UnifiedLogo';
 import { FollowupEmailModal } from './FollowupEmailModal';
 import { ApiKeyModal } from '../auth/ApiKeyModal';
+import { CalendarReminderCard, type CalendarReminderData } from '../calendar/CalendarReminderCard';
+import { detectCalendarIntent } from '../../utils/calendarIntentDetector';
 import { getCustomApiKey } from '../../lib/api';
 import './ChatView.css';
 
@@ -19,7 +21,8 @@ interface ChatViewProps {
     selectedFileIds?: string[],
     useResearch?: boolean,
     researchDepth?: string,
-    useOrchestration?: boolean
+    useOrchestration?: boolean,
+    attachments?: ChatAttachment[]
   ) => void;
   onRetry?: (messageId: string, provider?: string | null, model?: string | null) => void;
   isStreaming: boolean;
@@ -164,12 +167,40 @@ export function ChatView({
 
   const [useResearch, setUseResearch] = useState(false);
   const [useOrchestration, setUseOrchestration] = useState(false);
+  const [pendingCalendarData, setPendingCalendarData] = useState<CalendarReminderData | null>(null);
+  const [showCalendarCard, setShowCalendarCard] = useState(false);
+  const prevStreamingRef = useRef(isStreaming);
   const currentModel = availableModels.find((m) => m.id === selectedModelId) ?? availableModels[0];
 
-  const handleSend = (text: string) => {
+  // When the thinking process and model stream completes, pop up the calendar card in front
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming && pendingCalendarData) {
+      setShowCalendarCard(true);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming, pendingCalendarData]);
+
+  const handleSend = (text: string, attachments?: ChatAttachment[]) => {
     isUserScrolledUp.current = false;
     setShowScrollBottomBtn(false);
-    onSend(text, currentModel?.provider, currentModel?.id, false, undefined, useResearch, 'standard', useOrchestration);
+
+    // Detect if user is asking to schedule, remind, or set a task
+    const detected = detectCalendarIntent(text);
+    if (detected) {
+      setPendingCalendarData(detected);
+    }
+
+    onSend(
+      text,
+      currentModel?.provider,
+      currentModel?.id,
+      false,
+      undefined,
+      useResearch,
+      'standard',
+      useOrchestration,
+      attachments
+    );
     requestAnimationFrame(() => {
       if (containerRef.current) {
         containerRef.current.scrollTop = containerRef.current.scrollHeight;
@@ -523,7 +554,32 @@ export function ChatView({
                         <MarkdownContent content={cleanContent} />
                       </>
                     ) : (
-                      <span>{msg.content}</span>
+                      <div className="chat-message__user-body">
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="chat-message__attachments-grid">
+                            {msg.attachments.map((att) => (
+                              <div key={att.id} className="chat-message__attachment-item">
+                                {att.previewUrl || (att.mimeType && att.mimeType.startsWith('image/')) ? (
+                                  <img
+                                    src={att.previewUrl || att.data}
+                                    alt={att.name}
+                                    className="chat-message__attachment-img"
+                                  />
+                                ) : (
+                                  <div className="chat-message__attachment-file">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                                      <path d="M4 2h5.5L13 5.5V14a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4" />
+                                      <path d="M9 2v4h4" stroke="currentColor" strokeWidth="1.4" />
+                                    </svg>
+                                    <span>{att.name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {msg.content && <span>{msg.content}</span>}
+                      </div>
                     )}
 
                     {msg.isStreaming && (
@@ -679,6 +735,16 @@ export function ChatView({
         isOpen={showApiKeyModal}
         onClose={() => setShowApiKeyModal(false)}
         onKeyChange={(has) => setHasCustomKey(has)}
+      />
+
+      {/* Smart Calendar & Tasks Reminder Card Modal */}
+      <CalendarReminderCard
+        isOpen={showCalendarCard}
+        onClose={() => {
+          setShowCalendarCard(false);
+          setPendingCalendarData(null);
+        }}
+        initialData={pendingCalendarData}
       />
     </div>
   );

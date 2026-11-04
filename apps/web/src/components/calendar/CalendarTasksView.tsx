@@ -128,6 +128,19 @@ export function CalendarTasksView() {
         search: taskSearch.trim() || undefined,
       });
       setTasks(res.items);
+      let localTasks: Task[] = [];
+      try {
+        const raw = localStorage.getItem('unified_ai_tasks_v1');
+        if (raw) localTasks = JSON.parse(raw);
+      } catch {}
+      if (localTasks.length > 0) {
+        setTasks((prev) => {
+          const map = new Map<string, Task>();
+          prev.forEach((t) => map.set(t.id, t));
+          localTasks.forEach((t) => map.set(t.id, t));
+          return Array.from(map.values());
+        });
+      }
     } catch (err) {
       console.error('Failed to load tasks:', err);
     } finally {
@@ -140,8 +153,30 @@ export function CalendarTasksView() {
     try {
       setCalendarLoading(true);
       const res = await fetchCalendarEvents();
-      setEvents(res.events);
-      setOccurrences(res.occurrences);
+      setEvents(res.events || []);
+      setOccurrences(res.occurrences || []);
+      try {
+        const raw = localStorage.getItem('unified_ai_calendar_events_v1');
+        if (raw) {
+          const localEvents = JSON.parse(raw);
+          if (Array.isArray(localEvents) && localEvents.length > 0) {
+            setEvents((prev) => {
+              const map = new Map();
+              prev.forEach((e) => map.set(e.id, e));
+              localEvents.forEach((e) => map.set(e.id, e));
+              const list = Array.from(map.values());
+              setOccurrences(
+                list.map((e) => ({
+                  event: e,
+                  start_time: e.start_time,
+                  end_time: e.end_time,
+                }))
+              );
+              return list;
+            });
+          }
+        }
+      } catch {}
     } catch (err) {
       console.error('Failed to load calendar events:', err);
     } finally {

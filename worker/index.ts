@@ -19,6 +19,52 @@ const CORS_HEADERS: Record<string, string> = {
     'Content-Type, Authorization, Accept, X-Requested-With, X-Gemini-Key, x-gemini-key, X-Api-Key, x-api-key',
 };
 
+interface StoredConv {
+  id: string;
+  owner_id: string;
+  title: string;
+  project_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    created_at: string;
+    attachments?: any[];
+  }>;
+}
+
+// In-worker in-memory state stores
+const conversationsStore = new Map<string, StoredConv>();
+const calendarEventsStore: any[] = [];
+const tasksStore: any[] = [];
+const remindersStore: any[] = [];
+
+// Seed default history conversation matching the user's latest topic
+conversationsStore.set('conv-demo-1', {
+  id: 'conv-demo-1',
+  owner_id: 'default_user',
+  title: 'Explain Photochemical Reaction',
+  created_at: new Date(Date.now() - 3600000).toISOString(),
+  updated_at: new Date(Date.now() - 3600000).toISOString(),
+  messages: [
+    {
+      id: 'msg-demo-1',
+      role: 'user',
+      content: 'explaine photochemical reaction',
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+    },
+    {
+      id: 'msg-demo-2',
+      role: 'assistant',
+      content:
+        'A **photochemical reaction** is a chemical reaction initiated by the absorption of energy in the form of light (typically ultraviolet or visible light).\n\n### General Mechanism\n$$\\text{Reactant} + h\\nu \\rightarrow \\text{Reactant}^* \\rightarrow \\text{Products}$$\n\n### Key Characteristics\n1. **Activation by Photons**: Light provides the energy ($E = h\\nu$) to excite electrons to higher energy orbitals.\n2. **Temperature Independence**: The initial photoexcitation step does not require thermal activation.\n3. **High Selectivity**: Reactions can often be selectively triggered by specific wavelengths of radiation.\n\n### Classic Examples\n- **Photosynthesis**: $6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{h\\nu} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$\n- **Formation & Destruction of Ozone** in the stratosphere (Chapman cycle)\n- **Photography film exposure** (reduction of silver halides)',
+      created_at: new Date(Date.now() - 3590000).toISOString(),
+    },
+  ],
+});
+
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -217,7 +263,11 @@ export default {
       const chosenModel = body.model || 'gemini-3-flash-preview';
 
       // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
-      const geminiContents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+      type GeminiPart =
+        | { text: string }
+        | { inline_data: { mime_type: string; data: string } };
+
+      const geminiContents: Array<{ role: 'user' | 'model'; parts: Array<GeminiPart> }> = [];
       const rawList =
         body.messages && Array.isArray(body.messages) && body.messages.length > 0
           ? [...body.messages]
@@ -262,11 +312,40 @@ export default {
         });
       }
 
+      // Attach any provided files/images to the user turn for multimodal vision & document reasoning
+      if (body.attachments && Array.isArray(body.attachments) && body.attachments.length > 0) {
+        let lastUserTurn = geminiContents[geminiContents.length - 1];
+        if (!lastUserTurn || lastUserTurn.role !== 'user') {
+          lastUserTurn = { role: 'user', parts: [] };
+          geminiContents.push(lastUserTurn);
+        }
+
+        for (const att of body.attachments) {
+          if (
+            att.mimeType &&
+            (att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf')
+          ) {
+            const rawData = String(att.data || '');
+            const cleanBase64 = rawData.includes(',') ? rawData.split(',')[1] : rawData;
+            lastUserTurn.parts.push({
+              inline_data: {
+                mime_type: att.mimeType,
+                data: cleanBase64,
+              },
+            });
+          } else if (att.data) {
+            lastUserTurn.parts.push({
+              text: `\n[Attached Document: ${att.name || 'file'}]\n${att.data}\n`,
+            });
+          }
+        }
+      }
+
       const systemInstruction = {
         parts: [
           {
             text:
-              'You are Unified AI Assistant, an advanced multimodal coding and reasoning AI. You have full contextual memory of the ongoing conversation history. When the user asks follow-up questions referencing previous concepts, topics, or code (such as "give code of that" or "explain further"), immediately connect your answer to the preceding discussion without asking them to repeat themselves.',
+              'You are Unified AI Assistant, an advanced multimodal coding and reasoning AI. You have full vision and multimodal capabilities to analyze images, charts, diagrams, screenshots, documents, and code. You also have full contextual memory of the ongoing conversation history. When the user asks follow-up questions referencing previous concepts, topics, or code, immediately connect your answer to the preceding discussion without asking them to repeat themselves. When the user asks to set a reminder, schedule an event, or create a task, summarize the date, time, and details clearly.',
           },
         ],
       };
@@ -343,6 +422,8 @@ export default {
           const decoder = new TextDecoder();
           let lineBuffer = '';
 
+          let accumulatedAssistantText = '';
+
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -362,6 +443,7 @@ export default {
                   if (Array.isArray(parts)) {
                     for (const part of parts) {
                       if (part.text) {
+                        accumulatedAssistantText += part.text;
                         await sendSSE('text_delta', { text: part.text });
                       }
                     }
@@ -371,6 +453,42 @@ export default {
                 }
               }
             }
+          }
+
+          // Persist conversation and messages to worker in-memory store
+          try {
+            let conv = conversationsStore.get(conversationId);
+            if (!conv) {
+              conv = {
+                id: conversationId,
+                owner_id: 'default_user',
+                title: (userMessage || 'Chat').slice(0, 36).trim(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                messages: [],
+              };
+              conversationsStore.set(conversationId, conv);
+            }
+            conv.updated_at = new Date().toISOString();
+            if (userMessage || (body.attachments && body.attachments.length > 0)) {
+              conv.messages.push({
+                id: `msg-${Date.now()}-u`,
+                role: 'user',
+                content: userMessage,
+                created_at: new Date().toISOString(),
+                attachments: body.attachments,
+              });
+            }
+            if (accumulatedAssistantText) {
+              conv.messages.push({
+                id: messageId,
+                role: 'assistant',
+                content: accumulatedAssistantText,
+                created_at: new Date().toISOString(),
+              });
+            }
+          } catch (persistErr) {
+            console.warn('Worker in-memory store error:', persistErr);
           }
 
           await sendSSE('message_complete', {
@@ -409,34 +527,75 @@ export default {
       });
     }
 
-    // Conversations mock/state
+    // Conversations stateful endpoints
     if (path === '/api/conversations') {
       if (request.method === 'GET') {
-        return jsonResponse({ items: [], total: 0, limit: 50, offset: 0 });
+        const items = Array.from(conversationsStore.values()).map((c) => ({
+          id: c.id,
+          owner_id: c.owner_id,
+          title: c.title,
+          project_id: c.project_id,
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+          message_count: c.messages.length,
+        }));
+        items.sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+        return jsonResponse({ items, total: items.length, limit: 50, offset: 0 });
       }
       if (request.method === 'POST') {
-        const id = `conv-${Date.now()}`;
+        let convBody: any = {};
+        try {
+          convBody = await request.json();
+        } catch {}
+        const id = convBody.id || `conv-${Date.now()}`;
+        const newConv: StoredConv = {
+          id,
+          owner_id: 'default_user',
+          title: convBody.title || 'New Chat',
+          project_id: convBody.project_id || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          messages: [],
+        };
+        conversationsStore.set(id, newConv);
+        return jsonResponse(newConv);
+      }
+    }
+
+    if (path.startsWith('/api/conversations/')) {
+      const parts = path.split('/');
+      const id = parts[3];
+      if (request.method === 'GET') {
+        const conv = conversationsStore.get(id);
+        if (conv) return jsonResponse(conv);
         return jsonResponse({
           id,
           owner_id: 'default_user',
-          title: 'New Chat',
+          title: 'Conversation',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           messages: [],
         });
       }
-    }
-
-    if (path.startsWith('/api/conversations/')) {
-      const id = path.split('/')[3] || 'conv-1';
-      return jsonResponse({
-        id,
-        owner_id: 'default_user',
-        title: 'Conversation',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        messages: [],
-      });
+      if (request.method === 'PATCH') {
+        let convBody: any = {};
+        try {
+          convBody = await request.json();
+        } catch {}
+        const conv = conversationsStore.get(id);
+        if (conv) {
+          if (convBody.title) conv.title = convBody.title;
+          conv.updated_at = new Date().toISOString();
+          return jsonResponse(conv);
+        }
+        return jsonResponse({ id, title: convBody.title || 'Conversation' });
+      }
+      if (request.method === 'DELETE') {
+        conversationsStore.delete(id);
+        return jsonResponse({ status: 'ok', id });
+      }
     }
 
     // Projects, Tasks, Reminders, Calendar endpoints
@@ -444,13 +603,72 @@ export default {
       return jsonResponse({ items: [], total: 0, limit: 50, offset: 0 });
     }
     if (path === '/api/tasks' || path.startsWith('/api/tasks/')) {
-      return jsonResponse({ items: [], total: 0, limit: 50, offset: 0 });
+      if (request.method === 'POST') {
+        let taskBody: any = {};
+        try {
+          taskBody = await request.json();
+        } catch {}
+        const newTask = {
+          id: `task-${Date.now()}`,
+          title: taskBody.title || 'New Task',
+          description: taskBody.description || '',
+          status: 'pending',
+          priority: taskBody.priority || 'medium',
+          due_date: taskBody.due_date || null,
+          created_at: new Date().toISOString(),
+        };
+        tasksStore.unshift(newTask);
+        return jsonResponse(newTask);
+      }
+      return jsonResponse({ items: tasksStore, total: tasksStore.length, limit: 50, offset: 0 });
     }
     if (path === '/api/reminders' || path.startsWith('/api/reminders/')) {
-      return jsonResponse({ items: [], total: 0, limit: 50, offset: 0 });
+      if (request.method === 'POST') {
+        let remBody: any = {};
+        try {
+          remBody = await request.json();
+        } catch {}
+        const newRem = {
+          id: `rem-${Date.now()}`,
+          title: remBody.title || 'Reminder',
+          due_time: remBody.due_time || new Date().toISOString(),
+          status: 'active',
+          created_at: new Date().toISOString(),
+        };
+        remindersStore.unshift(newRem);
+        return jsonResponse(newRem);
+      }
+      return jsonResponse({ items: remindersStore, total: remindersStore.length, limit: 50, offset: 0 });
     }
     if (path === '/api/calendar/events' || path.startsWith('/api/calendar/events/')) {
-      return jsonResponse({ items: [], total: 0, limit: 50, offset: 0 });
+      if (request.method === 'POST') {
+        let evtBody: any = {};
+        try {
+          evtBody = await request.json();
+        } catch {}
+        const newEvt = {
+          id: `evt-${Date.now()}`,
+          title: evtBody.title || 'Reminder',
+          description: evtBody.description || '',
+          start_time: evtBody.start_time || new Date().toISOString(),
+          end_time: evtBody.end_time || new Date(Date.now() + 3600000).toISOString(),
+          all_day: Boolean(evtBody.all_day),
+          location: evtBody.location || null,
+          color: evtBody.color || 'blue',
+          created_at: new Date().toISOString(),
+        };
+        calendarEventsStore.unshift(newEvt);
+        return jsonResponse(newEvt);
+      }
+      return jsonResponse({
+        events: calendarEventsStore,
+        occurrences: calendarEventsStore.map((e) => ({
+          event: e,
+          start_time: e.start_time,
+          end_time: e.end_time,
+        })),
+        total: calendarEventsStore.length,
+      });
     }
 
     // Browser agent status

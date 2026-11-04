@@ -1,5 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ConversationSummary, ConversationDetail, ChatMessage, ChunkCitation, ErrorData } from '../types';
+import type {
+  ConversationSummary,
+  ConversationDetail,
+  ChatMessage,
+  ChunkCitation,
+  ErrorData,
+  ChatAttachment,
+} from '../types';
 import {
   fetchConversations,
   fetchConversation,
@@ -9,17 +16,97 @@ import {
 } from '../lib/api';
 import { streamChat } from '../lib/streaming';
 
+const STORAGE_KEY_CONVS = 'unified_ai_conversations_v2';
+const STORAGE_KEY_ACTIVE_ID = 'unified_ai_active_id_v2';
+const STORAGE_PREFIX_MSGS = 'unified_ai_conv_messages_v2_';
+
+function loadStoredConversations(): ConversationSummary[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CONVS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function saveStoredConversations(list: ConversationSummary[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_CONVS, JSON.stringify(list));
+  } catch {}
+}
+
+function loadStoredMessages(convId: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX_MSGS}${convId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function saveStoredMessages(convId: string, msgs: ChatMessage[]) {
+  try {
+    localStorage.setItem(`${STORAGE_PREFIX_MSGS}${convId}`, JSON.stringify(msgs));
+  } catch {}
+}
+
 export function useConversations(backendConnected: boolean = true) {
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [activeConversation, setActiveConversation] = useState<ConversationDetail | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>(() => {
+    return loadStoredConversations();
+  });
+
+  const [activeId, setActiveId] = useState<string | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
+    const stored = loadStoredConversations();
+    if (saved && stored.some((c) => c.id === saved)) return saved;
+    return stored[0]?.id || null;
+  });
+
+  const [activeConversation, setActiveConversation] = useState<ConversationDetail | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
+    const stored = loadStoredConversations();
+    const effectiveId = saved || stored[0]?.id;
+    if (effectiveId) {
+      const msgs = loadStoredMessages(effectiveId);
+      const match = stored.find((c) => c.id === effectiveId);
+      return {
+        id: effectiveId,
+        owner_id: match?.owner_id || 'default_user',
+        title: match?.title || 'Conversation',
+        project_id: match?.project_id || undefined,
+        created_at: match?.created_at || new Date().toISOString(),
+        updated_at: match?.updated_at || new Date().toISOString(),
+        messages: msgs,
+      };
+    }
+    return null;
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
-  // Load conversation list from backend
+  // Sync activeId to localStorage
+  useEffect(() => {
+    if (activeId) {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_ID, activeId);
+    }
+  }, [activeId]);
+
+  // Sync conversations list to localStorage
+  useEffect(() => {
+    if (conversations.length > 0) {
+      saveStoredConversations(conversations);
+    }
+  }, [conversations]);
+
+  // Load conversation list from backend and merge with local store
   const refreshList = useCallback(async () => {
     if (!backendConnected) return;
     try {
@@ -27,7 +114,18 @@ export function useConversations(backendConnected: boolean = true) {
       setError(null);
       const res = await fetchConversations(50, 0);
       if (res.items && res.items.length > 0) {
-        setConversations(res.items);
+        setConversations((prev) => {
+          const map = new Map<string, ConversationSummary>();
+          // Server items
+          res.items.forEach((item) => map.set(item.id, item));
+          // Local items (preserve local-first)
+          prev.forEach((item) => {
+            if (!map.has(item.id)) map.set(item.id, item);
+          });
+          const merged = Array.from(map.values());
+          saveStoredConversations(merged);
+          return merged;
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
@@ -42,26 +140,42 @@ export function useConversations(backendConnected: boolean = true) {
     }
   }, [backendConnected, refreshList]);
 
-  // Load active conversation messages from backend
+  // Select active conversation: Instant restore from localStorage, then verify with backend
   const selectConversation = useCallback(
     async (id: string) => {
       abortRef.current?.abort();
       setIsStreaming(false);
       setActiveId(id);
 
+      // Instant local cache restoration
+      const cachedMsgs = loadStoredMessages(id);
+      const summary = conversations.find((c) => c.id === id);
+      if (cachedMsgs && cachedMsgs.length > 0) {
+        setActiveConversation({
+          id,
+          owner_id: summary?.owner_id || 'default_user',
+          title: summary?.title || 'Conversation',
+          created_at: summary?.created_at || new Date().toISOString(),
+          updated_at: summary?.updated_at || new Date().toISOString(),
+          messages: cachedMsgs,
+        });
+      }
+
       try {
         setIsLoading(true);
         const detail = await fetchConversation(id);
         if (detail && detail.messages && detail.messages.length > 0) {
           setActiveConversation(detail);
+          saveStoredMessages(id, detail.messages);
         }
       } catch (err) {
+        // If server returns error, local cache remains displayed safely
         setError(err instanceof Error ? err.message : 'Failed to load conversation');
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [conversations]
   );
 
   const startNewChat = useCallback(async (projectId?: string | null) => {
@@ -81,20 +195,34 @@ export function useConversations(backendConnected: boolean = true) {
         updated_at: created.updated_at,
         messages: [],
       });
+      saveStoredMessages(created.id, []);
       return created.id;
     } catch {
-      // In case backend is unreachable, prepare local draft
-      const tempId = crypto.randomUUID();
+      // Offline fallback
+      const tempId = `conv-${Date.now()}`;
       setActiveId(tempId);
-      setActiveConversation({
+      const newDraft: ConversationDetail = {
         id: tempId,
-        owner_id: 'local',
+        owner_id: 'default_user',
         title: 'New conversation',
         project_id: projectId || undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         messages: [],
-      });
+      };
+      setActiveConversation(newDraft);
+      setConversations((prev) => [
+        {
+          id: tempId,
+          owner_id: 'default_user',
+          title: 'New conversation',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          message_count: 0,
+        },
+        ...prev,
+      ]);
+      saveStoredMessages(tempId, []);
       return tempId;
     }
   }, []);
@@ -102,9 +230,11 @@ export function useConversations(backendConnected: boolean = true) {
   const rename = useCallback(async (id: string, newTitle: string) => {
     try {
       const updated = await apiRenameConversation(id, newTitle);
-      setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c))
-      );
+      setConversations((prev) => {
+        const next = prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c));
+        saveStoredConversations(next);
+        return next;
+      });
       setActiveConversation((prev) =>
         prev && prev.id === id ? { ...prev, title: updated.title } : prev
       );
@@ -123,10 +253,15 @@ export function useConversations(backendConnected: boolean = true) {
       }
       try {
         await apiDeleteConversation(id);
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete conversation');
+      } catch {
+        // Fallback
       }
+      localStorage.removeItem(`${STORAGE_PREFIX_MSGS}${id}`);
+      setConversations((prev) => {
+        const next = prev.filter((c) => c.id !== id);
+        saveStoredConversations(next);
+        return next;
+      });
     },
     [activeId]
   );
@@ -141,6 +276,7 @@ export function useConversations(backendConnected: boolean = true) {
       useResearch?: boolean,
       researchDepth?: string,
       useOrchestration?: boolean,
+      attachments?: ChatAttachment[],
       targetAssistantId?: string
     ) => {
       const assistantMsgId = targetAssistantId || crypto.randomUUID();
@@ -154,6 +290,7 @@ export function useConversations(backendConnected: boolean = true) {
         role: 'user',
         content,
         created_at: new Date().toISOString(),
+        attachments,
       };
 
       const assistantMsg: ChatMessage = {
@@ -191,7 +328,7 @@ export function useConversations(backendConnected: boolean = true) {
         // Optimistic update to current view - initialize conversation if prev is null
         setActiveConversation((prev) => {
           if (!prev) {
-            return {
+            const initialDetail = {
               id: effectiveConvId,
               owner_id: 'default_user',
               title: content.slice(0, 32).trim() || 'New Chat',
@@ -200,31 +337,40 @@ export function useConversations(backendConnected: boolean = true) {
               updated_at: new Date().toISOString(),
               messages: [userMsg, assistantMsg],
             };
+            saveStoredMessages(effectiveConvId, initialDetail.messages);
+            return initialDetail;
           }
-          return {
+          const nextDetail = {
             ...prev,
             messages: [...prev.messages, userMsg, assistantMsg],
           };
+          saveStoredMessages(effectiveConvId, nextDetail.messages);
+          return nextDetail;
         });
 
         // Add to sidebar conversation list
         setConversations((prev) => {
+          const nextTitle = content.slice(0, 32).trim() || 'New Chat';
           if (prev.some((c) => c.id === effectiveConvId)) {
-            return prev.map((c) =>
+            const nextList = prev.map((c) =>
               c.id === effectiveConvId ? { ...c, updated_at: new Date().toISOString() } : c
             );
+            saveStoredConversations(nextList);
+            return nextList;
           }
-          return [
+          const nextList = [
             {
               id: effectiveConvId,
               owner_id: 'default_user',
-              title: content.slice(0, 32).trim() || 'New Chat',
+              title: nextTitle,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
               message_count: 2,
             },
             ...prev,
           ];
+          saveStoredConversations(nextList);
+          return nextList;
         });
       }
 
@@ -257,6 +403,7 @@ export function useConversations(backendConnected: boolean = true) {
             conversation_id: effectiveConvId,
             message: content,
             messages: fullHistory,
+            attachments,
             provider: provider || undefined,
             model: model || undefined,
             use_knowledge: useKnowledge,
@@ -299,11 +446,13 @@ export function useConversations(backendConnected: boolean = true) {
             onMessageComplete: (_finishReason: string, citations?: ChunkCitation[]) => {
               setActiveConversation((prev) => {
                 if (!prev) return null;
+                const nextMessages = prev.messages.map((m) =>
+                  m.id === assistantMsgId ? { ...m, isStreaming: false, citations } : m
+                );
+                saveStoredMessages(prev.id, nextMessages);
                 return {
                   ...prev,
-                  messages: prev.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, isStreaming: false, citations } : m
-                  ),
+                  messages: nextMessages,
                 };
               });
               setIsStreaming(false);
@@ -333,23 +482,25 @@ export function useConversations(backendConnected: boolean = true) {
                     ],
                   };
                 }
+                const nextMessages = prev.messages.map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: errData.message,
+                        isStreaming: false,
+                        isError: true,
+                        error_code: errData.code,
+                        error_category: errData.category,
+                        retry_after: errData.retry_after,
+                        retryable: errData.retryable,
+                        routed_model: errData.routed_model,
+                      }
+                    : m
+                );
+                saveStoredMessages(prev.id, nextMessages);
                 return {
                   ...prev,
-                  messages: prev.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content: errData.message,
-                          isStreaming: false,
-                          isError: true,
-                          error_code: errData.code,
-                          error_category: errData.category,
-                          retry_after: errData.retry_after,
-                          retryable: errData.retryable,
-                          routed_model: errData.routed_model,
-                        }
-                      : m
-                  ),
+                  messages: nextMessages,
                 };
               });
               setIsStreaming(false);
@@ -374,18 +525,20 @@ export function useConversations(backendConnected: boolean = true) {
                     ],
                   };
                 }
+                const nextMessages = prev.messages.map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: `Connection error: ${streamErr.message}`,
+                        isStreaming: false,
+                        isError: true,
+                      }
+                    : m
+                );
+                saveStoredMessages(prev.id, nextMessages);
                 return {
                   ...prev,
-                  messages: prev.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content: `Connection error: ${streamErr.message}`,
-                          isStreaming: false,
-                          isError: true,
-                        }
-                      : m
-                  ),
+                  messages: nextMessages,
                 };
               });
               setIsStreaming(false);
@@ -417,6 +570,7 @@ export function useConversations(backendConnected: boolean = true) {
         undefined,
         undefined,
         undefined,
+        userMsg.attachments,
         failedMsgId
       );
     },
@@ -428,11 +582,13 @@ export function useConversations(backendConnected: boolean = true) {
     setIsStreaming(false);
     setActiveConversation((prev) => {
       if (!prev) return null;
+      const nextMessages = prev.messages.map((m) =>
+        m.isStreaming ? { ...m, isStreaming: false } : m
+      );
+      saveStoredMessages(prev.id, nextMessages);
       return {
         ...prev,
-        messages: prev.messages.map((m) =>
-          m.isStreaming ? { ...m, isStreaming: false } : m
-        ),
+        messages: nextMessages,
       };
     });
   }, []);
@@ -444,13 +600,13 @@ export function useConversations(backendConnected: boolean = true) {
     isLoading,
     isStreaming,
     error,
-    refreshList,
+    sendMessage,
+    retryMessage,
+    cancelStream,
     selectConversation,
     startNewChat,
     renameConversation: rename,
     deleteConversation: deleteConv,
-    sendMessage,
-    retryMessage,
-    cancelStream,
+    refreshList,
   };
 }

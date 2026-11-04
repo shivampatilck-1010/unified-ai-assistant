@@ -8,8 +8,7 @@
 
 .composer__inner {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
   background: #070709;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
@@ -18,9 +17,86 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+.composer--dragging .composer__inner {
+  border-color: #e2a03f;
+  background: #0e0e14;
+  box-shadow: 0 0 0 2px rgba(226, 160, 63, 0.4);
+}
+
 .composer__inner:focus-within {
   border-color: var(--accent-muted);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent-muted);
+}
+
+.composer__attachments-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 6px;
+}
+
+.composer__attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #14141a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px 8px 4px 6px;
+  max-width: 220px;
+}
+
+.composer__attachment-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.composer__attachment-icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.composer__attachment-name {
+  font-size: 12px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.composer__attachment-remove-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composer__attachment-remove-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.composer__input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
 }
 
 .composer__input {
