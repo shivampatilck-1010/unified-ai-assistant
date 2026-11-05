@@ -1,0 +1,251 @@
+/* ==========================================================================
+   UniversalDiagramCard.css — Claude Editorial Vector Diagram & Schematic Card
+   ========================================================================== */
+
+.universal-diagram-card {
+  width: 100%;
+  max-width: 780px;
+  margin: 18px auto;
+  background: var(--surface-card, #1f1e1c);
+  border: 1px solid var(--border, rgba(240, 237, 230, 0.09));
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.universal-diagram-card:hover {
+  border-color: rgba(217, 119, 87, 0.35);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+}
+
+/* Header */
+.universal-diagram-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #181715;
+  border-bottom: 1px solid rgba(240, 237, 230, 0.07);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.universal-diagram-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.universal-diagram-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2.5px 7px;
+  border-radius: 4px;
+  background: rgba(217, 119, 87, 0.12);
+  border: 1px solid rgba(217, 119, 87, 0.3);
+  color: #d97757;
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+}
+
+.universal-diagram-title {
+  font-family: var(--font-serif, 'Newsreader', 'Lora', Georgia, serif);
+  font-size: 15px;
+  font-weight: 500;
+  color: #faf9f5;
+  letter-spacing: -0.01em;
+}
+
+/* Actions Toolbar */
+.universal-diagram-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.universal-diagram-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(240, 237, 230, 0.04);
+  border: 1px solid rgba(240, 237, 230, 0.09);
+  color: #b0aca2;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.universal-diagram-btn:hover {
+  background: rgba(217, 119, 87, 0.12);
+  border-color: rgba(217, 119, 87, 0.35);
+  color: #faf9f5;
+}
+
+.universal-diagram-btn--active {
+  background: rgba(217, 119, 87, 0.2);
+  border-color: #d97757;
+  color: #faf9f5;
+}
+
+/* Presets Bar */
+.universal-diagram-presets-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #151412;
+  border-bottom: 1px solid rgba(240, 237, 230, 0.05);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.universal-diagram-presets-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.universal-diagram-presets-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #7d7971;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.universal-diagram-preset-pill {
+  background: rgba(240, 237, 230, 0.04);
+  border: 1px solid rgba(240, 237, 230, 0.08);
+  color: #b0aca2;
+  font-size: 11px;
+  padding: 2.5px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: var(--font-mono, monospace);
+}
+
+.universal-diagram-preset-pill:hover {
+  background: rgba(240, 237, 230, 0.08);
+  color: #faf9f5;
+}
+
+.universal-diagram-preset-pill--active {
+  background: rgba(217, 119, 87, 0.15);
+  border-color: #d97757;
+  color: #d97757;
+  font-weight: 600;
+}
+
+/* Viewport Canvas */
+.universal-diagram-viewport {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 380px;
+  max-height: 520px;
+  padding: 16px;
+  background: #141311;
+  overflow: hidden;
+  user-select: none;
+}
+
+.universal-diagram-svg-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.universal-diagram-svg-wrap svg {
+  max-width: 100%;
+  max-height: 460px;
+  height: auto;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+}
+
+/* Telemetry & Key Legend Footer */
+.universal-diagram-footer {
+  padding: 12px 16px;
+  background: #181715;
+  border-top: 1px solid rgba(240, 237, 230, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.universal-diagram-metrics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.universal-diagram-metric-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.universal-diagram-metric-label {
+  color: #7d7971;
+  font-size: 11px;
+}
+
+.universal-diagram-metric-value {
+  color: #ede8df;
+  font-family: var(--font-mono, monospace);
+  font-weight: 500;
+}
+
+.universal-diagram-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #b0aca2;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(240, 237, 230, 0.06);
+}
+
+.universal-diagram-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.universal-diagram-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .universal-diagram-viewport {
+    min-height: 300px;
+    padding: 10px;
+  }
+
+  .universal-diagram-header {
+    padding: 8px 12px;
+  }
+
+  .universal-diagram-footer {
+    padding: 10px 12px;
+  }
+}

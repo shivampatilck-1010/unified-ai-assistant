@@ -8,6 +8,7 @@ import { PromptFlashcard } from './PromptFlashcard';
 import { InteractiveSimulationCard } from './InteractiveSimulationCard';
 import { PdfExportCard } from './PdfExportCard';
 import { InteractiveChoiceCard } from './InteractiveChoiceCard';
+import { UniversalDiagramCard } from './UniversalDiagramCard';
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import './MarkdownContent.css';
@@ -304,6 +305,41 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
           typeBadge={typeBadge}
           summary={summary}
           onSelectChoice={onSelectChoice}
+        />
+      );
+    }
+
+    // Universal Scientific & Technical Vector Diagram / Picture Block
+    if (
+      lowerLang === 'svg' ||
+      lowerLang === 'diagram' ||
+      lowerLang === 'visual-diagram' ||
+      lowerLang === 'schematic' ||
+      lowerLang === 'illustration' ||
+      lowerLang === 'atom' ||
+      lowerLang === 'molecule' ||
+      lowerLang === 'neural-net' ||
+      (code.trim().startsWith('<svg') && (code.trim().includes('</svg>') || code.trim().endsWith('>')))
+    ) {
+      let diagType: string = lowerLang;
+      let diagTitle: string | undefined = undefined;
+      let diagElement: string = 'Carbon';
+
+      const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
+      if (typeMatch) diagType = typeMatch[1].toLowerCase();
+
+      const titleMatch = code.match(/title:\s*([^\n]+)/i);
+      if (titleMatch) diagTitle = titleMatch[1].replace(/^["']|["']$/g, '').trim();
+
+      const elemMatch = code.match(/element:\s*([a-zA-Z0-9_-]+)/i);
+      if (elemMatch) diagElement = elemMatch[1].trim();
+
+      return (
+        <UniversalDiagramCard
+          type={diagType}
+          title={diagTitle}
+          code={code}
+          element={diagElement}
         />
       );
     }

@@ -578,6 +578,13 @@ export default {
               '   - For Atomic Collisions & Thermal Gas: ```interactive-simulation\\ntype: atomic-collision\\n```\n' +
               '   - For Photosynthesis & Photolysis: ```interactive-simulation\\ntype: photosynthesis\\n```\n' +
               '   - For arbitrary physics/math/canvas simulations: provide clean, working HTML5 Canvas or SVG code in ```canvas or ```html.\n\n' +
+              '4. UNIVERSAL SCIENTIFIC DIAGRAMS & SCHEMATICS (WHEN SIMULATION IS NOT REQUIRED):\n' +
+              '   Often an interactive physics simulation with sliders is unnecessary, and the user simply needs a crisp, publication-grade visual diagram or picture (e.g., atom diagram, molecular bond, cell structure, neural net, electrical circuit, or any universal concept).\n' +
+              '   - For Atom Diagrams: output ```visual-diagram\\ntype: atom\\nelement: Carbon\\n``` (supports any element like Hydrogen, Helium, Carbon, Oxygen, Sodium, Silicon, Chlorine, Calcium).\n' +
+              '   - For Molecules: output ```visual-diagram\\ntype: molecule\\n``` (Water H2O dipole, Benzene C6H6 aromatic ring, etc.).\n' +
+              '   - For Neural Networks: output ```visual-diagram\\ntype: neural-net\\n```.\n' +
+              '   - For any other universal diagram (optics, anatomy, cosmology, system architecture, flowcharts): output an SVG block ```svg\\n<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">...\\n</svg>\\n```.\n' +
+              '   The chat interface automatically renders these in a dedicated high-resolution visual diagram card with Retina PNG export, SVG download, zoom, and interactive element switchers.\n\n' +
               'INTERACTIVE INQUIRY & CONCEPTUAL EXPLORATION CARDS:\n' +
               'When assessing understanding, exploring branching topics, or clarifying intent:\n' +
               'Output an interactive MCQ block:\n' +
