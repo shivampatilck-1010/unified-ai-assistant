@@ -449,11 +449,11 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ onHover, onSta
       {/* Status & Priority Queue Telemetry Bar */}
       <div
         style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          borderLeft: '3px solid #38bdf8',
+          background: 'rgba(36, 34, 32, 0.85)',
+          borderLeft: '3px solid #d97757',
           padding: '6px 12px',
           fontSize: '11.5px',
-          color: '#cbd5e1',
+          color: '#ede8df',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -462,7 +462,7 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ onHover, onSta
       >
         <span>{stepMessage}</span>
         {pqView.length > 0 && (
-          <span style={{ color: '#fbbf24', fontSize: '10.5px' }}>
+          <span style={{ color: '#e08365', fontSize: '10.5px' }}>
             {algorithm === 'bfs' ? 'Queue' : algorithm === 'dfs' ? 'Stack' : 'PQ'}: [
             {pqView.map((item) => `${item.id}:${item.val}`).join(', ')}]
           </span>
@@ -476,7 +476,7 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ onHover, onSta
         height="280"
         viewBox="0 0 540 280"
         style={{
-          background: '#070709',
+          background: '#141312',
           touchAction: 'none',
           cursor: draggingNodeId ? 'grabbing' : 'default',
         }}
@@ -554,20 +554,20 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ onHover, onSta
           const isPath = node.inPath;
           const isVisited = node.visited;
 
-          let strokeColor = '#38bdf8';
-          let fillColor = '#0f172a';
+          let strokeColor = '#d97757';
+          let fillColor = '#1e1c1a';
 
           if (isPath) {
-            strokeColor = '#c084fc';
-            fillColor = '#3b0764';
+            strokeColor = '#e08365';
+            fillColor = '#38221b';
           } else if (isActive) {
-            strokeColor = '#fbbf24';
-            fillColor = '#78350f';
+            strokeColor = '#f59e0b';
+            fillColor = '#451a03';
           } else if (isVisited) {
             strokeColor = '#34d399';
             fillColor = '#064e3b';
           } else if (isStart) {
-            strokeColor = '#38bdf8';
+            strokeColor = '#d97757';
           }
 
           return (
@@ -638,7 +638,7 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ onHover, onSta
               <text
                 x={node.x}
                 y={node.y + 34}
-                fill={node.dist === Infinity ? '#64748b' : '#38bdf8'}
+                fill={node.dist === Infinity ? '#8c877d' : '#e08365'}
                 fontSize="9"
                 fontWeight="bold"
                 textAnchor="middle"
@@ -650,7 +650,7 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ onHover, onSta
 
               {/* Start / Target Badges */}
               {isStart && (
-                <text x={node.x} y={node.y - 25} fill="#38bdf8" fontSize="9" fontWeight="bold" textAnchor="middle">
+                <text x={node.x} y={node.y - 25} fill="#e08365" fontSize="9" fontWeight="bold" textAnchor="middle">
                   START
                 </text>
               )}

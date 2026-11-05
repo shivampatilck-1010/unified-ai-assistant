@@ -213,19 +213,19 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
           ↺ Reset
         </button>
 
-        <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: 'auto' }}>
-          Size: <strong style={{ color: '#38bdf8' }}>{mode === 'stack' ? stackItems.length : queueItems.length}</strong> / {MAX_CAPACITY}
+        <span style={{ fontSize: '11px', color: '#b0aca2', marginLeft: 'auto' }}>
+          Size: <strong style={{ color: '#e08365' }}>{mode === 'stack' ? stackItems.length : queueItems.length}</strong> / {MAX_CAPACITY}
         </span>
       </div>
 
       {/* Telemetry Status Banner */}
       <div
         style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          borderLeft: '3px solid #38bdf8',
+          background: 'rgba(36, 34, 32, 0.85)',
+          borderLeft: '3px solid #d97757',
           padding: '6px 12px',
           fontSize: '11.5px',
-          color: '#cbd5e1',
+          color: '#ede8df',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -233,16 +233,16 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
         }}
       >
         <span>{statusMsg}</span>
-        <span style={{ color: '#fbbf24', fontSize: '10.5px' }}>
+        <span style={{ color: '#e08365', fontSize: '10.5px' }}>
           {mode === 'stack' ? 'Discipline: LIFO (Last In First Out)' : 'Discipline: FIFO (First In First Out)'}
         </span>
       </div>
 
       {/* SVG Memory Canvas */}
-      <svg width="100%" height="280" viewBox="0 0 540 280" style={{ background: '#070709' }}>
+      <svg width="100%" height="280" viewBox="0 0 540 280" style={{ background: '#141312' }}>
         <defs>
           <marker id="arrow-sq" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#d97757" />
           </marker>
         </defs>
 
@@ -252,8 +252,8 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
             {/* Stack Boundaries & Base */}
             <line x1={80} y1={10} x2={80} y2={230} stroke="rgba(255,255,255,0.25)" strokeWidth={2} />
             <line x1={320} y1={10} x2={320} y2={230} stroke="rgba(255,255,255,0.25)" strokeWidth={2} />
-            <line x1={70} y1={230} x2={330} y2={230} stroke="#38bdf8" strokeWidth={4} strokeLinecap="round" />
-            <text x={200} y={248} fill="#64748b" fontSize="10.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            <line x1={70} y1={230} x2={330} y2={230} stroke="#d97757" strokeWidth={4} strokeLinecap="round" />
+            <text x={200} y={248} fill="#8c877d" fontSize="10.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
               STACK BOTTOM (0x7FFF00)
             </text>
 
@@ -277,7 +277,7 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
                       y: rect ? e.clientY - rect.top : y,
                       title: `Stack Frame [${item.val}] (Index ${idx})`,
                       category: isTop ? 'Top of Stack' : 'Stack Activation Frame',
-                      color: isHighlighted ? '#fbbf24' : '#38bdf8',
+                      color: isHighlighted ? '#e08365' : '#d97757',
                       description: `LIFO Stack element. Stored in memory at address ${item.addr}. Next pop operation will return this frame if at TOP.`,
                       stats: [
                         { label: 'Value', value: String(item.val) },
@@ -295,8 +295,8 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
                     width={224}
                     height={itemHeight}
                     rx={5}
-                    fill={isHighlighted ? '#1e293b' : isTop ? '#0c4a6e' : '#0f172a'}
-                    stroke={isHighlighted ? '#fbbf24' : isTop ? '#38bdf8' : 'rgba(255,255,255,0.2)'}
+                    fill={isHighlighted ? '#38221b' : isTop ? '#2d1e18' : '#1e1c1a'}
+                    stroke={isHighlighted ? '#e08365' : isTop ? '#d97757' : 'rgba(255,255,255,0.2)'}
                     strokeWidth={isHighlighted || isTop ? 2 : 1}
                   />
                   <text
@@ -314,11 +314,11 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
                   {/* Top Pointer Badge */}
                   {isTop && (
                     <g>
-                      <rect x={335} y={y + 4} width={58} height={20} rx={4} fill="#0284c7" />
+                      <rect x={335} y={y + 4} width={58} height={20} rx={4} fill="#d97757" />
                       <text x={364} y={y + 18} fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
                         TOP ➔
                       </text>
-                      <line x1={335} y1={y + 14} x2={314} y2={y + 14} stroke="#38bdf8" strokeWidth={2} markerEnd="url(#arrow-sq)" />
+                      <line x1={335} y1={y + 14} x2={314} y2={y + 14} stroke="#d97757" strokeWidth={2} markerEnd="url(#arrow-sq)" />
                     </g>
                   )}
                 </g>
@@ -334,7 +334,7 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
 
             {/* HEAD Label */}
             <g transform="translate(40, 20)">
-              <rect x={0} y={0} width={50} height={22} rx={4} fill="#0284c7" />
+              <rect x={0} y={0} width={50} height={22} rx={4} fill="#d97757" />
               <text x={25} y={15} fill="#ffffff" fontSize="10.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
                 HEAD ⬇
               </text>
@@ -342,7 +342,7 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
 
             {/* TAIL Label */}
             <g transform={`translate(${Math.max(120, 40 + queueItems.length * 64)}, 20)`}>
-              <rect x={0} y={0} width={50} height={22} rx={4} fill="#0d9488" />
+              <rect x={0} y={0} width={50} height={22} rx={4} fill="#c96442" />
               <text x={25} y={15} fill="#ffffff" fontSize="10.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
                 TAIL ⬇
               </text>
@@ -368,7 +368,7 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
                       y: rect ? e.clientY - rect.top : 110,
                       title: `Queue Item [${item.val}] (Index ${idx})`,
                       category: isHead ? 'Front / Head' : isTail ? 'Rear / Tail' : 'Buffered Item',
-                      color: isHighlighted ? '#fbbf24' : '#38bdf8',
+                      color: isHighlighted ? '#e08365' : '#d97757',
                       description: `FIFO Queue element. Dequeued next if at HEAD. Enqueued elements attach at TAIL.`,
                       stats: [
                         { label: 'Value', value: String(item.val) },
@@ -386,8 +386,8 @@ export const StackQueueVisualizer: React.FC<StackQueueVisualizerProps> = ({ onHo
                     width={56}
                     height={60}
                     rx={6}
-                    fill={isHighlighted ? '#1e293b' : isHead ? '#0c4a6e' : '#0f172a'}
-                    stroke={isHighlighted ? '#fbbf24' : isHead ? '#38bdf8' : 'rgba(255,255,255,0.25)'}
+                    fill={isHighlighted ? '#38221b' : isHead ? '#2d1e18' : '#1e1c1a'}
+                    stroke={isHighlighted ? '#e08365' : isHead ? '#d97757' : 'rgba(255,255,255,0.25)'}
                     strokeWidth={isHighlighted || isHead ? 2 : 1}
                   />
                   <text

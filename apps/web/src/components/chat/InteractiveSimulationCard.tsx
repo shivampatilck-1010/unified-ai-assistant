@@ -16,6 +16,9 @@ export interface InteractiveSimulationCardProps {
     | 'merge-sort'
     | 'quick-sort'
     | 'photosynthesis'
+    | 'photochemical'
+    | 'photochemical-reaction'
+    | 'photolysis'
     | 'graph'
     | 'dijkstra'
     | 'bfs-dfs'
@@ -170,12 +173,25 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
       return 'nuclear-fusion';
     }
     if (
+      declaredType === 'photochemical' ||
+      declaredType === 'photochemical-reaction' ||
+      declaredType === 'photolysis' ||
+      declaredType === 'radical' ||
+      lowerCode.includes('photochemical') ||
+      lowerCode.includes('photolysis') ||
+      lowerCode.includes('homolytic') ||
+      lowerCode.includes('free radical') ||
+      lowerCode.includes('quantum yield') ||
+      lowerCode.includes('beer-lambert')
+    ) {
+      return 'photochemical';
+    }
+    if (
       declaredType === 'photosynthesis' ||
       declaredType === 'photo' ||
       lowerCode.includes('photosynthesis') ||
       lowerCode.includes('chlorophyll') ||
-      lowerCode.includes('chloroplast') ||
-      lowerCode.includes('photolysis')
+      lowerCode.includes('chloroplast')
     ) {
       return 'photosynthesis';
     }
@@ -229,6 +245,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     if (resolvedType === 'hash-table') return 'Hash Table & Separate Chaining Collision Visualizer';
     if (resolvedType === 'stack-queue') return 'LIFO Stack & FIFO Buffer Memory Visualizer';
     if (resolvedType === 'photosynthesis') return 'Photosynthesis & Solar Photolysis Simulation';
+    if (resolvedType === 'photochemical') return 'Photochemical Reaction & UV Photolysis Simulator';
     if (resolvedType === 'merge-sort') return 'Merge Sort (Divide & Conquer O(n log n)) Visualizer';
     if (resolvedType === 'quick-sort') return 'Quick Sort (Partition O(n log n)) Visualizer';
     if (resolvedType === 'sorting') return 'Sorting Algorithm Visualizer';
@@ -369,6 +386,28 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     }, 700);
     return () => clearInterval(interval);
   }, [resolvedType, isPaused, lightIntensity, co2Level]);
+
+  // --- Photochemical Reaction Simulation State ---
+  const [uvWavelengthNm, setUvWavelengthNm] = useState<number>(310);
+  const [uvFluxPct, setUvFluxPct] = useState<number>(80);
+  const [reactantCount, setReactantCount] = useState<number>(14);
+  const [photonsAbsorbed, setPhotonsAbsorbed] = useState<number>(48);
+  const [radicalsFormed, setRadicalsFormed] = useState<number>(96);
+
+  // Photochemical live loop
+  useEffect(() => {
+    if (resolvedType !== 'photochemical' || isPaused) return;
+    const isThresholdMet = uvWavelengthNm <= 494;
+    const interval = setInterval(() => {
+      if (isThresholdMet) {
+        const fluxFactor = uvFluxPct / 100;
+        const absorbedInc = Math.max(1, Math.round(2 * fluxFactor * (reactantCount / 14)));
+        setPhotonsAbsorbed((prev) => prev + absorbedInc);
+        setRadicalsFormed((prev) => prev + absorbedInc * 2);
+      }
+    }, 850);
+    return () => clearInterval(interval);
+  }, [resolvedType, isPaused, uvWavelengthNm, uvFluxPct, reactantCount]);
 
   // --- Sorting Algorithm Visualizer State ---
   const [sortArray, setSortArray] = useState<number[]>([45, 12, 85, 32, 64, 21, 93, 54, 76, 18, 41, 60]);
@@ -1791,6 +1830,310 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   };
 
   // =========================================================================
+  // PHOTOCHEMICAL REACTION & HOMOLYTIC PHOTOLYSIS SIMULATION ENGINE
+  // =========================================================================
+  const renderPhotochemicalSvg = () => {
+    // Photon Energy: E = hc / λ (eV) = 1239.84 / λ
+    const photonEnergyEv = +(1239.84 / uvWavelengthNm).toFixed(2);
+    const photonEnergyKj = +(photonEnergyEv * 96.485).toFixed(1);
+    const isCleavagePermitted = uvWavelengthNm <= 494; // Threshold for Cl2 bond (242 kJ/mol = 2.51 eV)
+
+    // Molecular coordinates inside the reaction cell
+    const moleculePositions = [
+      { x: 160, y: 80, angle: 25 },
+      { x: 230, y: 70, angle: -40 },
+      { x: 310, y: 85, angle: 60 },
+      { x: 380, y: 75, angle: -15 },
+      { x: 180, y: 140, angle: -30 },
+      { x: 260, y: 135, angle: 45 },
+      { x: 340, y: 145, angle: -60 },
+      { x: 155, y: 200, angle: 70 },
+      { x: 230, y: 215, angle: -10 },
+      { x: 310, y: 205, angle: 35 },
+      { x: 385, y: 210, angle: -50 },
+      { x: 200, y: 105, angle: 15 },
+      { x: 280, y: 175, angle: -25 },
+      { x: 360, y: 115, angle: 40 },
+    ].slice(0, reactantCount);
+
+    return (
+      <svg width="100%" height="280" viewBox="0 0 540 280">
+        <defs>
+          <linearGradient id="laserDiodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#d97757" />
+            <stop offset="100%" stopColor="#7c2d12" />
+          </linearGradient>
+          <radialGradient id="chlorineAtomSphere" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#6ee7b7" />
+            <stop offset="50%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#047857" />
+          </radialGradient>
+          <radialGradient id="radicalAtomSphere" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#fed7aa" />
+            <stop offset="45%" stopColor="#f97316" />
+            <stop offset="100%" stopColor="#c2410c" />
+          </radialGradient>
+          <linearGradient id="uvBeamGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#d97757" stopOpacity={0.85 * (uvFluxPct / 100)} />
+            <stop offset="60%" stopColor="#f59e0b" stopOpacity={0.45 * (uvFluxPct / 100)} />
+            <stop offset="100%" stopColor="#d97757" stopOpacity={0.05} />
+          </linearGradient>
+        </defs>
+
+        <rect x="8" y="8" width="524" height="264" rx="10" fill="#141312" stroke="rgba(255,255,255,0.06)" />
+
+        {/* 1. UV Laser / Radiation Emitter (Left Dock) */}
+        <g
+          transform="translate(18, 55)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 65,
+              y: rect ? e.clientY - rect.top : 120,
+              title: `Pulsed UV Laser Emitter (λ = ${uvWavelengthNm} nm)`,
+              category: 'Electromagnetic Radiation Source',
+              color: '#d97757',
+              description: 'Generates coherent monochromatic ultraviolet photons. If photon energy hν exceeds molecular bond dissociation energy D₀ (242 kJ/mol for Cl₂), homolytic cleavage occurs.',
+              stats: [
+                { label: 'Wavelength (λ)', value: `${uvWavelengthNm} nm` },
+                { label: 'Photon Energy (E = hν)', value: `${photonEnergyEv} eV (${photonEnergyKj} kJ/mol)` },
+                { label: 'Frequency (ν)', value: `${(3e8 / (uvWavelengthNm * 1e-9) / 1e14).toFixed(2)} × 10¹⁴ Hz` },
+                { label: 'Threshold Condition', value: isCleavagePermitted ? 'hν ≥ D₀ (Cleavage Allowed)' : 'hν < D₀ (Sub-Threshold)' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
+          <rect x="0" y="20" width="60" height="130" rx="8" fill="#1e1c1a" stroke="rgba(217,119,87,0.4)" strokeWidth="1.5" />
+          <rect x="52" y="55" width="14" height="60" rx="3" fill="url(#laserDiodeGrad)" stroke="#e08365" strokeWidth="1" />
+          <text x="30" y="44" fill="#faf9f5" fontSize="9.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            UV LASER
+          </text>
+          <text x="30" y="60" fill="#e08365" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            {uvWavelengthNm} nm
+          </text>
+          <text x="30" y="135" fill="#8c877d" fontSize="8" textAnchor="middle" fontFamily="monospace">
+            {photonEnergyEv} eV
+          </text>
+        </g>
+
+        {/* Propagating Photon Wave-Packets */}
+        <g opacity={uvFluxPct / 100}>
+          <polygon points="66,85 430,45 430,225 66,185" fill="url(#uvBeamGrad)" />
+
+          <path
+            d="M 68 115 Q 85 95, 105 115 T 145 115 T 185 115 T 225 115 T 265 115 T 305 115 T 345 115 T 385 115 T 425 115"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="1.8"
+            strokeDasharray="12 6"
+          >
+            <animate attributeName="stroke-dashoffset" from="36" to="0" dur="0.8s" repeatCount="indefinite" />
+          </path>
+          <path
+            d="M 68 145 Q 85 125, 105 145 T 145 145 T 185 145 T 225 145 T 265 145 T 305 145 T 345 145 T 385 145 T 425 145"
+            fill="none"
+            stroke="#d97757"
+            strokeWidth="1.8"
+            strokeDasharray="14 7"
+          >
+            <animate attributeName="stroke-dashoffset" from="42" to="0" dur="0.9s" repeatCount="indefinite" />
+          </path>
+          <path
+            d="M 68 175 Q 85 155, 105 175 T 145 175 T 185 175 T 225 175 T 265 175 T 305 175 T 345 175 T 385 175 T 425 175"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="1.8"
+            strokeDasharray="12 6"
+          >
+            <animate attributeName="stroke-dashoffset" from="36" to="0" dur="0.85s" repeatCount="indefinite" />
+          </path>
+        </g>
+
+        {/* 2. Reaction Chamber / Quartz Cuvette */}
+        <g>
+          <rect
+            x="120"
+            y="35"
+            width="310"
+            height="210"
+            rx="12"
+            fill="rgba(36, 34, 32, 0.45)"
+            stroke="rgba(217, 119, 87, 0.35)"
+            strokeWidth="1.5"
+          />
+          <text x="135" y="55" fill="#faf9f5" fontSize="10.5" fontWeight="600" fontFamily="'Newsreader', Georgia, serif">
+            Quartz Photolysis Cell (Cl₂ Gas, Optical Pathlength l = 1.0 cm)
+          </text>
+          <text x="360" y="55" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            D₀(Cl₂) = 242 kJ/mol
+          </text>
+
+          {/* Diatomic Reactant Molecules & Photolysis Cleavage */}
+          {moleculePositions.map((mol, idx) => {
+            const isCleaved = isCleavagePermitted && idx % 3 === 0;
+            const separation = isCleaved ? 22 : 9;
+
+            return (
+              <g
+                key={`mol-${idx}`}
+                transform={`translate(${mol.x}, ${mol.y}) rotate(${mol.angle})`}
+                className="sim-svg-interactive"
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+                  if (isCleaved) {
+                    setHoveredInfo({
+                      x: rect ? e.clientX - rect.left : mol.x,
+                      y: rect ? e.clientY - rect.top : mol.y,
+                      title: 'Chlorine Free Radical Pair (2 Cl•)',
+                      category: 'Homolytic Cleavage Product',
+                      color: '#e08365',
+                      description: 'Homolytic bond fission caused by UV photon absorption (hν ≥ 2.51 eV). Each chlorine atom retains one unpaired valence electron (•) with extreme chemical reactivity.',
+                      stats: [
+                        { label: 'Spin State', value: 'Doublet (1 Unpaired Electron •)' },
+                        { label: 'Propagation Rate', value: 'k = 1.3 × 10¹⁰ M⁻¹s⁻¹' },
+                        { label: 'Free Energy', value: 'ΔG > 0 (High Chemical Potential)' },
+                        { label: 'Role', value: 'Chain Reaction Carrier' },
+                      ],
+                    });
+                  } else {
+                    setHoveredInfo({
+                      x: rect ? e.clientX - rect.left : mol.x,
+                      y: rect ? e.clientY - rect.top : mol.y,
+                      title: 'Chlorine Molecule (Cl₂)',
+                      category: 'Ground State Reactant (S₀)',
+                      color: '#10b981',
+                      description: 'Diatomic covalent molecule. Covalent single σ bond between 3p orbitals. Absorbs UV photons in the 250–400 nm band to promote electrons into σ* antibonding orbitals.',
+                      stats: [
+                        { label: 'Bond Energy', value: '242 kJ/mol (2.51 eV)' },
+                        { label: 'Threshold λ_max', value: '494 nm' },
+                        { label: 'State', value: isCleavagePermitted ? 'Excited / Cleaving' : 'Stable Ground State' },
+                      ],
+                    });
+                  }
+                }}
+                onMouseLeave={() => setHoveredInfo(null)}
+              >
+                {!isCleaved ? (
+                  <line
+                    x1={-separation}
+                    y1={0}
+                    x2={separation}
+                    y2={0}
+                    stroke="#6ee7b7"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <g>
+                    <circle cx="0" cy="0" r="16" fill="rgba(245, 158, 11, 0.22)" stroke="#f59e0b" strokeWidth="0.8" strokeDasharray="3 3">
+                      <animate attributeName="r" values="8;18;8" dur="1.2s" repeatCount="indefinite" />
+                    </circle>
+                    <text x="0" y="3.5" fill="#fef08a" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+                      hν
+                    </text>
+                  </g>
+                )}
+
+                {/* Left Atom */}
+                <g transform={`translate(${-separation}, 0)`}>
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="8.5"
+                    fill={isCleaved ? 'url(#radicalAtomSphere)' : 'url(#chlorineAtomSphere)'}
+                    stroke={isCleaved ? '#f97316' : '#059669'}
+                    strokeWidth="1"
+                  />
+                  <text x="0" y="3.5" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+                    Cl
+                  </text>
+                  {isCleaved && (
+                    <circle cx="-6" cy="-6" r="2.5" fill="#fef08a" stroke="#d97757" strokeWidth="0.8" />
+                  )}
+                </g>
+
+                {/* Right Atom */}
+                <g transform={`translate(${separation}, 0)`}>
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="8.5"
+                    fill={isCleaved ? 'url(#radicalAtomSphere)' : 'url(#chlorineAtomSphere)'}
+                    stroke={isCleaved ? '#f97316' : '#059669'}
+                    strokeWidth="1"
+                  />
+                  <text x="0" y="3.5" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+                    Cl
+                  </text>
+                  {isCleaved && (
+                    <circle cx="6" cy="-6" r="2.5" fill="#fef08a" stroke="#d97757" strokeWidth="0.8" />
+                  )}
+                </g>
+              </g>
+            );
+          })}
+
+          {!isCleavagePermitted && (
+            <g transform="translate(140, 120)">
+              <rect x="0" y="0" width="270" height="42" rx="6" fill="rgba(18, 17, 16, 0.94)" stroke="#f59e0b" strokeWidth="1" />
+              <text x="135" y="18" fill="#f59e0b" fontSize="10.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+                ⚠️ SUB-THRESHOLD WAVELENGTH (λ = {uvWavelengthNm} nm)
+              </text>
+              <text x="135" y="32" fill="#ede8df" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                E = {photonEnergyEv} eV &lt; D₀ (2.51 eV). Pure Transmission (No Cleavage).
+              </text>
+            </g>
+          )}
+        </g>
+
+        {/* 3. Chain Propagation & Alkane Product Chamber (Right Dock) */}
+        <g
+          transform="translate(440, 55)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 480,
+              y: rect ? e.clientY - rect.top : 120,
+              title: 'Propagation Phase (CH₄ Methane Scavenger)',
+              category: 'Chain Reaction Kinetics',
+              color: '#d97757',
+              description: 'Free radicals rapidly abstract hydrogen from alkanes to form hydrogen chloride and alkyl radicals: Cl• + CH₄ ⟶ HCl + •CH₃.',
+              stats: [
+                { label: 'Reaction 1', value: 'Cl• + CH₄ ⟶ HCl + •CH₃' },
+                { label: 'Reaction 2', value: '•CH₃ + Cl₂ ⟶ CH₃Cl + Cl•' },
+                { label: 'Activation Barrier', value: 'E_a ≈ 16 kJ/mol' },
+                { label: 'Quantum Yield', value: 'Φ ≈ 10⁴ (Chain Multiplication)' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
+          <rect x="0" y="20" width="84" height="130" rx="8" fill="#1e1c1a" stroke="rgba(217,119,87,0.35)" strokeWidth="1.5" />
+          <text x="42" y="42" fill="#faf9f5" fontSize="9.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            PROPAGATION
+          </text>
+          <text x="42" y="60" fill="#e08365" fontSize="8" textAnchor="middle" fontFamily="monospace">
+            Cl• + CH₄
+          </text>
+
+          <rect x="8" y="70" width="68" height="24" rx="4" fill="#242220" stroke="rgba(255,255,255,0.1)" />
+          <text x="42" y="86" fill="#34d399" fontSize="9.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            HCl (Gas)
+          </text>
+
+          <rect x="8" y="102" width="68" height="24" rx="4" fill="#242220" stroke="rgba(255,255,255,0.1)" />
+          <text x="42" y="118" fill="#f59e0b" fontSize="9.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            •CH₃ Radical
+          </text>
+        </g>
+      </svg>
+    );
+  };
+
+  // =========================================================================
   // SORTING ALGORITHM ENGINE (Merge Sort, Quick Sort, Bubble Sort)
   // =========================================================================
   const renderSortingSvg = () => {
@@ -2043,6 +2386,13 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             >
               🌿 Photosynthesis
             </button>
+            <button
+              type="button"
+              className="sim-btn"
+              onClick={() => setActiveSimOverride('photochemical')}
+            >
+              ☀️ UV Photolysis
+            </button>
           </div>
         </div>
       );
@@ -2065,23 +2415,23 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             body {
               margin: 0;
               padding: 12px;
-              background: #050608;
-              color: #f1f5f9;
+              background: #141312;
+              color: #faf9f5;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
               overflow-x: hidden;
             }
             button {
-              background: #1e2230;
-              color: #f1f5f9;
-              border: 1px solid rgba(255,255,255,0.15);
+              background: #242220;
+              color: #faf9f5;
+              border: 1px solid rgba(255,255,255,0.12);
               padding: 6px 14px;
               border-radius: 6px;
               cursor: pointer;
               font-size: 12px;
               transition: all 0.15s;
             }
-            button:hover { background: #2d3345; border-color: rgba(255,255,255,0.3); }
-            input[type="range"] { accent-color: #818cf8; cursor: pointer; }
+            button:hover { background: #33302c; border-color: rgba(217,119,87,0.4); color: #ffffff; }
+            input[type="range"] { accent-color: #d97757; cursor: pointer; }
             canvas { display: block; border-radius: 8px; }
           </style>
         </head>
@@ -2367,6 +2717,65 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             </div>
           )}
 
+          {/* Controls Bar for Photochemical Reaction */}
+          {resolvedType === 'photochemical' && (
+            <div className="sim-controls-bar">
+              <div className="sim-slider-group">
+                <label>UV Wavelength (λ)</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="200"
+                  max="520"
+                  step="5"
+                  value={uvWavelengthNm}
+                  onChange={(e) => setUvWavelengthNm(parseInt(e.target.value, 10))}
+                />
+                <span className="sim-slider-val">{uvWavelengthNm} nm</span>
+              </div>
+
+              <div className="sim-slider-group">
+                <label>Laser Intensity</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="20"
+                  max="100"
+                  step="5"
+                  value={uvFluxPct}
+                  onChange={(e) => setUvFluxPct(parseInt(e.target.value, 10))}
+                />
+                <span className="sim-slider-val">{uvFluxPct}%</span>
+              </div>
+
+              <div className="sim-slider-group">
+                <label>Concentration [Cl₂]</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="6"
+                  max="14"
+                  step="1"
+                  value={reactantCount}
+                  onChange={(e) => setReactantCount(parseInt(e.target.value, 10))}
+                />
+                <span className="sim-slider-val">{reactantCount} mol</span>
+              </div>
+
+              <div className="sim-legend">
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#d97757' }} /> UV Laser (hν)
+                </span>
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#10b981' }} /> Cl₂ Reactant
+                </span>
+                <span className="sim-legend__item">
+                  <span className="sim-legend__dot" style={{ background: '#f97316' }} /> Cl• Free Radical
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Controls Bar for Sorting */}
           {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && (
             <div className="tree-controls-bar" style={{ flexWrap: 'wrap', gap: '8px' }}>
@@ -2507,6 +2916,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               <StackQueueVisualizer onHover={setHoveredInfo} onStateChange={() => setHasSavedState(true)} />
             )}
             {resolvedType === 'photosynthesis' && renderPhotosynthesisSvg()}
+            {resolvedType === 'photochemical' && renderPhotochemicalSvg()}
             {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && renderSortingSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}
             {/* Floating Sci-Fi HUD Tooltip Overlay */}
@@ -2519,7 +2929,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                 }}
               >
                 <div className="sim-hover-tooltip__badge-row">
-                  <span className="sim-hover-tooltip__about-tag">? ABOUT</span>
+                  <span className="sim-hover-tooltip__about-tag">INSPECT</span>
                   <span
                     className="sim-hover-tooltip__cat-badge"
                     style={{
@@ -2705,8 +3115,111 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                   className={`sim-btn ${showDetails ? 'sim-btn--primary' : ''}`}
                   onClick={() => setShowDetails(!showDetails)}
                 >
-                  Photochemical Mechanism
+                  Photosynthesis Kinetics
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Telemetry Bar for Photochemical Reaction */}
+          {resolvedType === 'photochemical' && (
+            <div className="sim-telemetry">
+              <div className="sim-stats">
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Photon Energy (hν)</span>
+                  <span className="sim-stat-value" style={{ color: '#e08365' }}>
+                    {(1239.84 / uvWavelengthNm).toFixed(2)} eV
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Radicals Formed</span>
+                  <span className="sim-stat-value" style={{ color: '#faf9f5' }}>
+                    {radicalsFormed} Cl•
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Photons Absorbed</span>
+                  <span className="sim-stat-value" style={{ color: '#f59e0b' }}>
+                    {photonsAbsorbed}
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Dissociation Status</span>
+                  <span
+                    className="sim-stat-value"
+                    style={{ color: uvWavelengthNm <= 494 ? '#10b981' : '#f59e0b', fontSize: '13px' }}
+                  >
+                    {uvWavelengthNm <= 494 ? 'Active (hν ≥ D₀)' : 'Sub-Threshold'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="sim-actions">
+                <button
+                  type="button"
+                  className="sim-btn sim-btn--primary"
+                  onClick={() => {
+                    if (uvWavelengthNm <= 494) {
+                      setPhotonsAbsorbed((prev) => prev + 12);
+                      setRadicalsFormed((prev) => prev + 24);
+                    }
+                  }}
+                >
+                  ⚡ Pulse Laser
+                </button>
+                <button
+                  type="button"
+                  className="sim-btn"
+                  onClick={() => setIsPaused(!isPaused)}
+                >
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button
+                  type="button"
+                  className="sim-btn"
+                  onClick={() => {
+                    setPhotonsAbsorbed(48);
+                    setRadicalsFormed(96);
+                    setUvWavelengthNm(310);
+                  }}
+                >
+                  Reset Cell
+                </button>
+                <button
+                  type="button"
+                  className={`sim-btn ${showDetails ? 'sim-btn--primary' : ''}`}
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  Photochemical Laws & Proofs
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Photochemical Deep Dive Drawer */}
+          {showDetails && resolvedType === 'photochemical' && (
+            <div className="sim-details-drawer">
+              <div className="sim-details-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97757" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                Governing Physical Chemistry Laws of Photochemical Reactions:
+              </div>
+              <div className="sim-details-content">
+                <p>
+                  • <strong>Grotthuss-Draper Law (First Law of Photochemistry):</strong> Only radiation absorbed by a reacting chemical system is effective in producing a photochemical transformation; transmitted or scattered light causes zero chemical change.
+                </p>
+                <p>
+                  • <strong>Stark-Einstein Law of Photochemical Equivalence:</strong> Every primary photochemical activation process involves the absorption of exactly one quantum (photon) of light: <em>E = hν = hc / λ</em>.
+                </p>
+                <p>
+                  • <strong>Bond Dissociation Threshold:</strong> For molecular chlorine (Cl₂), the homolytic bond dissociation energy is <em>D₀ = 242.0 kJ/mol (2.51 eV)</em>. This establishes an absolute threshold wavelength of <em>λ_max = 494 nm</em>. Wavelengths longer than 494 nm have insufficient quantum energy to break the σ-bond.
+                </p>
+                <p>
+                  • <strong>Free Radical Chain Kinetics:</strong> Upon primary homolytic photolysis (<em>Cl₂ + hν ⟶ 2 Cl•</em>), highly reactive chlorine radicals initiate high-speed propagation with organic alkanes (<em>Cl• + CH₄ ⟶ HCl + •CH₃</em>, followed by <em>•CH₃ + Cl₂ ⟶ CH₃Cl + Cl•</em>), yielding quantum yields (Φ) of 10³ to 10⁶.
+                </p>
               </div>
             </div>
           )}

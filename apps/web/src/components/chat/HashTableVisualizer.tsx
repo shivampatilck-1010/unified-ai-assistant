@@ -263,19 +263,19 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
           ↺ Reset
         </button>
 
-        <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: 'auto' }}>
-          Entries: <strong style={{ color: '#38bdf8' }}>{totalEntries}</strong> | Collisions: <strong style={{ color: '#fbbf24' }}>{collisionCount}</strong> | Load Factor: <strong style={{ color: Number(loadFactor) > 0.75 ? '#f43f5e' : '#34d399' }}>{loadFactor}</strong>
+        <span style={{ fontSize: '11px', color: '#b0aca2', marginLeft: 'auto' }}>
+          Entries: <strong style={{ color: '#e08365' }}>{totalEntries}</strong> | Collisions: <strong style={{ color: '#d97757' }}>{collisionCount}</strong> | Load Factor: <strong style={{ color: Number(loadFactor) > 0.75 ? '#f43f5e' : '#34d399' }}>{loadFactor}</strong>
         </span>
       </div>
 
       {/* Live Hash Calculation & Telemetry Banner */}
       <div
         style={{
-          background: 'rgba(15, 23, 42, 0.7)',
-          borderLeft: '3px solid #fbbf24',
+          background: 'rgba(36, 34, 32, 0.85)',
+          borderLeft: '3px solid #d97757',
           padding: '6px 12px',
           fontSize: '11.5px',
-          color: '#cbd5e1',
+          color: '#ede8df',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -283,14 +283,14 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
         }}
       >
         <span>{statusMessage}</span>
-        {lastHashCalc && <span style={{ color: '#38bdf8', fontSize: '10.5px' }}>{lastHashCalc}</span>}
+        {lastHashCalc && <span style={{ color: '#e08365', fontSize: '10.5px' }}>{lastHashCalc}</span>}
       </div>
 
       {/* SVG Hash Table Canvas */}
-      <svg width="100%" height="280" viewBox="0 0 540 280" style={{ background: '#070709' }}>
+      <svg width="100%" height="280" viewBox="0 0 540 280" style={{ background: '#141312' }}>
         <defs>
           <marker id="arrow-hash" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#d97757" />
           </marker>
         </defs>
 
@@ -308,14 +308,14 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
                 width={70}
                 height={26}
                 rx={4}
-                fill={isActive ? '#78350f' : '#0f172a'}
-                stroke={isActive ? '#fbbf24' : 'rgba(255,255,255,0.18)'}
+                fill={isActive ? '#38221b' : '#242220'}
+                stroke={isActive ? '#d97757' : 'rgba(255,255,255,0.18)'}
                 strokeWidth={isActive ? 2 : 1}
               />
               <text
                 x={51}
                 y={y + 17}
-                fill={isActive ? '#fbbf24' : '#94a3b8'}
+                fill={isActive ? '#e08365' : '#b0aca2'}
                 fontSize="11"
                 fontWeight="bold"
                 textAnchor="middle"
@@ -330,7 +330,7 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
                 y1={y + 13}
                 x2={104}
                 y2={y + 13}
-                stroke={chain.length > 0 ? '#38bdf8' : 'rgba(255,255,255,0.12)'}
+                stroke={chain.length > 0 ? '#d97757' : 'rgba(255,255,255,0.12)'}
                 strokeWidth={1.5}
                 markerEnd={chain.length > 0 ? 'url(#arrow-hash)' : undefined}
               />
@@ -358,7 +358,7 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
                           y: rect ? e.clientY - rect.top : y,
                           title: `Entry: "${entry.key}" ➔ "${entry.value}"`,
                           category: 'Hash Table Bucket Entry',
-                          color: isHighlighted ? '#fbbf24' : '#38bdf8',
+                          color: isHighlighted ? '#e08365' : '#d97757',
                           description: `Key "${entry.key}" hashed to bucket ${idx}. Memory allocated at heap address ${entry.addr}. Next in chain: ${entry.nextAddr || 'NULL'}.`,
                           stats: [
                             { label: 'Key', value: entry.key },
@@ -379,8 +379,8 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
                         width={95}
                         height={26}
                         rx={5}
-                        fill={isHighlighted ? '#1e293b' : '#090d16'}
-                        stroke={isHighlighted ? '#fbbf24' : '#38bdf8'}
+                        fill={isHighlighted ? '#38221b' : '#1f1e1c'}
+                        stroke={isHighlighted ? '#e08365' : '#d97757'}
                         strokeWidth={isHighlighted ? 2 : 1.2}
                       />
                       {/* Key:Value Text */}
@@ -403,7 +403,7 @@ export const HashTableVisualizer: React.FC<HashTableVisualizerProps> = ({ onHove
                           y1={y + 13}
                           x2={entryX + 130}
                           y2={y + 13}
-                          stroke="#38bdf8"
+                          stroke="#d97757"
                           strokeWidth={1.5}
                           markerEnd="url(#arrow-hash)"
                         />

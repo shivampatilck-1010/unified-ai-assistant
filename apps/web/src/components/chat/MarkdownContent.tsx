@@ -372,6 +372,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         | 'merge-sort'
         | 'quick-sort'
         | 'photosynthesis'
+        | 'photochemical'
         | 'graph'
         | 'hash-table'
         | 'stack-queue'
@@ -458,12 +459,26 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       ) {
         simType = 'atomic-collision';
       } else if (
+        declaredType === 'photochemical' ||
+        declaredType === 'photochemical-reaction' ||
+        declaredType === 'photolysis' ||
+        declaredType === 'radical' ||
+        lowerLang.includes('photochem') ||
+        lowerLang.includes('photolysis') ||
+        lowerCode.includes('photochemical') ||
+        lowerCode.includes('photolysis') ||
+        lowerCode.includes('homolytic') ||
+        lowerCode.includes('free radical') ||
+        lowerCode.includes('quantum yield')
+      ) {
+        simType = 'photochemical';
+      } else if (
         declaredType === 'photosynthesis' ||
         declaredType === 'photo' ||
         lowerLang.includes('photo') ||
         lowerCode.includes('photosynthesis') ||
         lowerCode.includes('chlorophyll') ||
-        lowerCode.includes('photolysis')
+        lowerCode.includes('chloroplast')
       ) {
         simType = 'photosynthesis';
       } else if (
@@ -667,9 +682,16 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         text
       );
 
+    const hasPhotochemicalMention =
+      !hasExplicitSimBlock &&
+      /(?:photochemical\s+reaction|photolysis|homolytic\s+cleavage|free\s+radical\s+chain)/i.test(
+        text
+      );
+
     const hasPhotoMention =
       !hasExplicitSimBlock &&
-      /(?:photosynthesis.*(?:live\s+visual|with\s+visual|simulation)|photochemical\s+reaction.*(?:visual|simulation)|here['’]?s\s+a\s+simulation\s+of\s+photosynthesis)/i.test(
+      !hasPhotochemicalMention &&
+      /(?:photosynthesis.*(?:live\s+visual|with\s+visual|simulation)|here['’]?s\s+a\s+simulation\s+of\s+photosynthesis)/i.test(
         text
       );
 
@@ -708,6 +730,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     let injectedNuclearSim = false;
     let injectedAtomicSim = false;
     let injectedTreeSim = false;
+    let injectedPhotochemicalSim = false;
     let injectedPhotoSim = false;
     let injectedSortSim = false;
     let injectedGraphSim = false;
@@ -1092,6 +1115,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         <InteractiveSimulationCard key="auto-tree-sim-fallback" type="binary-tree" />
       );
       injectedTreeSim = true;
+    }
+    if (hasPhotochemicalMention && !injectedPhotochemicalSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-photochem-sim-fallback" type="photochemical" />
+      );
+      injectedPhotochemicalSim = true;
     }
     if (hasPhotoMention && !injectedPhotoSim) {
       nodes.unshift(

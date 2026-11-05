@@ -1,22 +1,22 @@
 // Universal Sandboxed Generative UI Simulation Inspector
-// Injected into iframe srcDoc to provide [? ABOUT] hover cards & precision reticle targeting
+// Injected into iframe srcDoc to provide Claude Editorial inspection & precision reticle targeting
 
 export const INJECTED_INSPECTOR_STYLE = `
   #sim-hud-tooltip {
     position: fixed;
     z-index: 999999;
     pointer-events: none;
-    background: rgba(7, 7, 9, 0.96);
+    background: rgba(26, 25, 23, 0.96);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(56, 189, 248, 0.5);
-    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.2);
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
-    color: #f1f5f9;
-    max-width: 280px;
-    min-width: 210px;
+    border: 1px solid rgba(217, 119, 87, 0.4);
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85), 0 0 16px rgba(217, 119, 87, 0.15);
+    border-radius: 9px;
+    padding: 11px 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #faf9f5;
+    max-width: 270px;
+    min-width: 200px;
     display: none;
     transition: opacity 0.12s ease;
   }
@@ -24,51 +24,52 @@ export const INJECTED_INSPECTOR_STYLE = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 7px;
+    margin-bottom: 6px;
     gap: 6px;
   }
   .sim-hud-about-tag {
-    background: rgba(56, 189, 248, 0.18);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.45);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    padding: 2px 7px;
+    background: rgba(217, 119, 87, 0.18);
+    color: #e08365;
+    border: 1px solid rgba(217, 119, 87, 0.4);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
   }
   .sim-hud-cat-tag {
-    font-size: 9.5px;
-    font-weight: 700;
-    color: #a5b4fc;
-    background: rgba(99, 102, 241, 0.15);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    padding: 2px 7px;
+    font-size: 9px;
+    font-weight: 600;
+    color: #b0aca2;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
   }
   .sim-hud-title {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    color: #faf9f5;
     margin-bottom: 4px;
     line-height: 1.3;
+    font-family: 'Newsreader', Georgia, serif;
   }
   .sim-hud-desc {
-    font-size: 11px;
-    color: #cbd5e1;
+    font-size: 10.5px;
+    color: #b0aca2;
     line-height: 1.45;
-    margin-bottom: 8px;
+    margin-bottom: 7px;
   }
   .sim-hud-stats {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: 6px;
+    padding-top: 5px;
     display: flex;
     flex-direction: column;
-    gap: 3.5px;
-    font-size: 10.5px;
-    font-family: monospace;
+    gap: 3px;
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
   .sim-hud-stat-item {
     display: flex;
@@ -77,13 +78,13 @@ export const INJECTED_INSPECTOR_STYLE = `
     gap: 8px;
   }
   .sim-hud-stat-label {
-    color: #94a3b8;
-    font-size: 10px;
+    color: #8c877d;
+    font-size: 9.5px;
   }
   .sim-hud-stat-val {
-    color: #38bdf8;
+    color: #e08365;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 10.5px;
   }
 `;
 
@@ -142,18 +143,18 @@ export const INJECTED_INSPECTOR_SCRIPT = `
       ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
       if (!x) return;
       ctx.save();
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#d97757';
+      ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.arc(x, y, r + 9, 0, Math.PI * 2);
+      ctx.arc(x, y, r + 7, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.setLineDash([]);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      var tick = 6;
-      var d = r + 9;
+      ctx.strokeStyle = '#faf9f5';
+      ctx.lineWidth = 1.5;
+      var tick = 5;
+      var d = r + 7;
       ctx.beginPath();
       ctx.moveTo(x, y - d); ctx.lineTo(x, y - d - tick);
       ctx.moveTo(x, y + d); ctx.lineTo(x, y + d + tick);
@@ -183,7 +184,7 @@ export const INJECTED_INSPECTOR_SCRIPT = `
       for (var i = recordedShapes.length - 1; i >= 0; i--) {
         var s = recordedShapes[i];
         var d = Math.hypot(s.x - canvasX, s.y - canvasY);
-        if (d <= (s.r * scaleX) + 16 && d < minD) {
+        if (d <= (s.r * scaleX) + 14 && d < minD) {
           found = s;
           minD = d;
         }
@@ -194,43 +195,14 @@ export const INJECTED_INSPECTOR_SCRIPT = `
       if (found) {
         if (oCtx) drawReticle(oCtx, found.x, found.y, found.r);
 
-        var cStr = String(found.color).toLowerCase();
-        var title = "Reactant Atom / Radical (•R)";
-        var cat = "Chemical Molecule";
-        var desc = "Ground-state reactant particle. In photochemical reactions, absorbing light photons (hν) excites electrons to initiate chemical bond breakage and radical formation.";
+        var title = "Render Node (Particle)";
+        var cat = "Canvas Object";
+        var desc = "Dynamic graphic primitive in simulation viewport. Radius: " + Math.round(found.r) + "px.";
         var stats = [
-          { label: "State", value: "Ground State (S₀)" },
-          { label: "Photoreactivity", value: "Active" },
-          { label: "Bond Type", value: "Covalent" }
+          { label: "Position", value: "(" + Math.round(found.x) + ", " + Math.round(found.y) + ")" },
+          { label: "Radius", value: Math.round(found.r) + " px" },
+          { label: "Fill Color", value: String(found.color).slice(0, 16) }
         ];
-
-        if (cStr.includes('fde047') || cStr.includes('fef08a') || cStr.includes('yellow') || cStr.includes('gold') || found.r < 5) {
-          title = "Photon Packet (hν)";
-          cat = "Light Quantum";
-          desc = "Quantized unit of electromagnetic radiation. Transfers energy (E = hν) to reactant molecules upon absorption, inducing electronic excitation.";
-          stats = [
-            { label: "Energy", value: "E = hν" },
-            { label: "Speed", value: "c (Light Speed)" },
-            { label: "Role", value: "Photolysis Initiator" }
-          ];
-        } else if (cStr.includes('818cf8') || cStr.includes('purple') || cStr.includes('violet') || found.r > 12) {
-          title = "Excited Intermediate / Heavy Core";
-          cat = "Excited State (S₁)";
-          desc = "Molecule with electrons promoted to antibonding orbitals via photon absorption, lowering the activation energy barrier for subsequent reactions.";
-          stats = [
-            { label: "Energy Level", value: "Excited (S₁)" },
-            { label: "Lifetime", value: "~10⁻⁹ s" },
-            { label: "Stability", value: "Transient" }
-          ];
-        } else if (cStr.includes('38bdf8') || cStr.includes('cyan') || cStr.includes('blue')) {
-          title = "Reaction Product / Free Radical";
-          cat = "Reaction Product";
-          desc = "Free radical or molecular product formed following photolytic cleavage of the reactant bond.";
-          stats = [
-            { label: "Spin State", value: "Radical (•)" },
-            { label: "Reactivity", value: "Extremely High" }
-          ];
-        }
 
         var statsHtml = stats.map(function(s) {
           return '<div class="sim-hud-stat-item"><span class="sim-hud-stat-label">' + s.label + ':</span><span class="sim-hud-stat-val">' + s.value + '</span></div>';
@@ -238,7 +210,7 @@ export const INJECTED_INSPECTOR_SCRIPT = `
 
         tooltip.innerHTML = 
           '<div class="sim-hud-badge-row">' +
-            '<span class="sim-hud-about-tag">? ABOUT</span>' +
+            '<span class="sim-hud-about-tag">INSPECT</span>' +
             '<span class="sim-hud-cat-tag">' + cat + '</span>' +
           '</div>' +
           '<div class="sim-hud-title">' + title + '</div>' +
@@ -246,7 +218,7 @@ export const INJECTED_INSPECTOR_SCRIPT = `
           '<div class="sim-hud-stats">' + statsHtml + '</div>';
 
         tooltip.style.display = 'block';
-        var tipW = 270;
+        var tipW = 260;
         var posX = e.clientX + 16 + tipW > window.innerWidth ? e.clientX - tipW - 12 : e.clientX + 16;
         var posY = e.clientY + 14;
         tooltip.style.left = Math.max(8, posX) + 'px';

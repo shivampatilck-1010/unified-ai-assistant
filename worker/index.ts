@@ -576,7 +576,9 @@ export default {
               '   - For Binary Search Trees (BST): ```interactive-simulation\\ntype: binary-tree\\n```\n' +
               '   - For Nuclear Fusion & Plasma Physics: ```interactive-simulation\\ntype: nuclear-fusion\\n```\n' +
               '   - For Atomic Collisions & Thermal Gas: ```interactive-simulation\\ntype: atomic-collision\\n```\n' +
-              '   - For Photosynthesis & Photolysis: ```interactive-simulation\\ntype: photosynthesis\\n```\n' +
+              '   - For Photosynthesis (Thylakoids & Calvin Cycle): ```interactive-simulation\\ntype: photosynthesis\\n```\n' +
+              '   - For Photochemical Reactions, UV Photolysis, and Free Radical Reactions: ```interactive-simulation\\ntype: photochemical\\n```\n' +
+              '   - CRITICAL RULE: NEVER output rocket engines, thruster nozzles, or unrelated aerospace machinery when the user asks about chemistry, photochemistry, photolysis, or molecular mechanisms! Always use ```interactive-simulation\\ntype: photochemical\\n```.\n' +
               '   - For arbitrary physics/math/canvas simulations: provide clean, working HTML5 Canvas or SVG code in ```canvas or ```html.\n\n' +
               '4. UNIVERSAL SCIENTIFIC DIAGRAMS & SCHEMATICS (WHEN SIMULATION IS NOT REQUIRED):\n' +
               '   Often an interactive physics simulation with sliders is unnecessary, and the user simply needs a crisp, publication-grade visual diagram or picture (e.g., atom diagram, molecular bond, cell structure, neural net, electrical circuit, or any universal concept).\n' +

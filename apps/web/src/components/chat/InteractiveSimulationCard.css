@@ -1,20 +1,20 @@
-/* InteractiveSimulationCard.css — Premium Obsidian UI Simulation Widget */
+/* InteractiveSimulationCard.css — Claude Warm Editorial Simulation Widget */
 
 .sim-card {
   margin: 18px 0;
-  background: #070709;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1f1e1c;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   position: relative;
   transition: all 0.25s ease;
 }
 
 .sim-card:hover {
-  border-color: rgba(99, 102, 241, 0.35);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(99, 102, 241, 0.08);
+  border-color: rgba(217, 119, 87, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(217, 119, 87, 0.08);
 }
 
 .sim-card--fullscreen {
@@ -24,8 +24,8 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.85);
+  border-color: rgba(217, 119, 87, 0.5);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.88);
 }
 
 /* --- Header --- */
@@ -33,7 +33,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #0d0d14;
+  background: #242220;
   padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   user-select: none;
@@ -55,17 +55,17 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(217, 119, 87, 0.12);
+  color: #e08365;
+  border: 1px solid rgba(217, 119, 87, 0.3);
 }
 
 .sim-header__badge-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: #d97757;
+  box-shadow: 0 0 8px rgba(217, 119, 87, 0.7);
   animation: simPulse 2s infinite ease-in-out;
 }
 
@@ -75,9 +75,10 @@
 }
 
 .sim-header__title {
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 600;
-  color: #f1f5f9;
+  color: #faf9f5;
+  font-family: 'Newsreader', Georgia, serif;
 }
 
 .sim-header__right {
@@ -89,7 +90,7 @@
 .sim-tab-btn {
   background: transparent;
   border: 1px solid transparent;
-  color: #94a3b8;
+  color: #b0aca2;
   font-size: 12px;
   font-weight: 500;
   padding: 4px 10px;
@@ -102,20 +103,20 @@
 }
 
 .sim-tab-btn:hover {
-  color: #f8fafc;
+  color: #faf9f5;
   background: rgba(255, 255, 255, 0.06);
 }
 
 .sim-tab-btn--active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.12);
+  color: #faf9f5;
+  background: rgba(217, 119, 87, 0.15);
+  border-color: rgba(217, 119, 87, 0.35);
 }
 
 .sim-icon-btn {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #b0aca2;
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -127,7 +128,7 @@
 }
 
 .sim-icon-btn:hover {
-  color: #f8fafc;
+  color: #faf9f5;
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -137,8 +138,8 @@
   align-items: center;
   gap: 24px;
   padding: 10px 18px;
-  background: #0a0b10;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: #191817;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-wrap: wrap;
 }
 
@@ -147,12 +148,12 @@
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: #cbd5e1;
+  color: #ede8df;
 }
 
 .sim-slider-group label {
   font-weight: 500;
-  color: #94a3b8;
+  color: #b0aca2;
   min-width: 80px;
 }
 
@@ -162,7 +163,7 @@
   width: 140px;
   height: 5px;
   border-radius: 4px;
-  background: #1e2230;
+  background: #2e2c29;
   outline: none;
   cursor: pointer;
   transition: background 0.15s;
@@ -174,21 +175,21 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #818cf8;
-  box-shadow: 0 0 10px rgba(129, 140, 248, 0.6);
+  background: #d97757;
+  box-shadow: 0 0 10px rgba(217, 119, 87, 0.5);
   cursor: pointer;
   transition: transform 0.1s, background-color 0.1s;
 }
 
 .sim-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  background: #a5b4fc;
+  background: #e08365;
 }
 
 .sim-slider-val {
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11.5px;
-  color: #38bdf8;
+  color: #e08365;
   min-width: 32px;
 }
 
@@ -198,7 +199,7 @@
   align-items: center;
   gap: 14px;
   font-size: 11px;
-  color: #94a3b8;
+  color: #b0aca2;
 }
 
 .sim-legend__item {
@@ -215,8 +216,8 @@
 }
 
 .sim-legend__dot--heavy {
-  background: #818cf8;
-  box-shadow: 0 0 6px rgba(129, 140, 248, 0.5);
+  background: #d97757;
+  box-shadow: 0 0 6px rgba(217, 119, 87, 0.5);
 }
 
 .sim-legend__dot--light {
@@ -227,7 +228,7 @@
 /* --- Canvas Area --- */
 .sim-viewport {
   position: relative;
-  background: #050608;
+  background: #141312;
   overflow: hidden;
   height: 340px;
   min-height: 280px;
@@ -251,7 +252,7 @@
   width: 100%;
   height: 100%;
   border: none;
-  background: #050608;
+  background: #141312;
 }
 
 /* --- Bottom Telemetry Bar --- */
@@ -259,7 +260,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #090a0f;
+  background: #191817;
   padding: 12px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   flex-wrap: wrap;
@@ -283,14 +284,14 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: #8c877d;
 }
 
 .sim-stat-value {
   font-size: 19px;
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: #f8fafc;
+  color: #faf9f5;
   line-height: 1.1;
 }
 
@@ -301,9 +302,9 @@
 }
 
 .sim-btn {
-  background: #12141c;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
+  background: #282623;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #ede8df;
   padding: 6px 14px;
   border-radius: 7px;
   font-size: 12px;
@@ -316,29 +317,29 @@
 }
 
 .sim-btn:hover {
-  background: #1c202e;
-  border-color: rgba(255, 255, 255, 0.16);
+  background: #33302c;
+  border-color: rgba(255, 255, 255, 0.18);
   color: #ffffff;
 }
 
 .sim-btn--primary {
-  background: rgba(99, 102, 241, 0.16);
-  border-color: rgba(99, 102, 241, 0.4);
-  color: #c7d2fe;
+  background: rgba(217, 119, 87, 0.18);
+  border-color: rgba(217, 119, 87, 0.4);
+  color: #f5ece6;
 }
 
 .sim-btn--primary:hover {
-  background: rgba(99, 102, 241, 0.28);
-  border-color: rgba(99, 102, 241, 0.6);
+  background: rgba(217, 119, 87, 0.3);
+  border-color: rgba(217, 119, 87, 0.6);
   color: #ffffff;
 }
 
 /* --- Deep Dive Drawer --- */
 .sim-details-drawer {
-  background: #08090d;
+  background: #181716;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 14px 18px;
-  color: #cbd5e1;
+  color: #ede8df;
   font-size: 12.5px;
   line-height: 1.6;
   animation: slideDown 0.2s ease-out;
@@ -352,7 +353,7 @@
 .sim-details-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #faf9f5;
   margin-bottom: 6px;
   display: flex;
   align-items: center;
@@ -361,16 +362,16 @@
 
 .sim-details-content p {
   margin: 4px 0;
-  color: #94a3b8;
+  color: #b0aca2;
 }
 
 .sim-details-content strong {
-  color: #f1f5f9;
+  color: #faf9f5;
 }
 
 /* --- Code View Area --- */
 .sim-code-view {
-  background: #070709;
+  background: #141312;
   padding: 14px 18px;
   max-height: 380px;
   overflow: auto;
@@ -382,15 +383,15 @@
   align-items: center;
   gap: 10px;
   padding: 10px 18px;
-  background: #0a0b10;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: #191817;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-wrap: wrap;
 }
 
 .tree-input {
-  background: #11131a;
+  background: #242220;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f8fafc;
+  color: #faf9f5;
   padding: 5px 10px;
   border-radius: 6px;
   font-size: 12px;
@@ -399,26 +400,25 @@
 }
 
 .tree-input:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  border-color: #d97757;
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.25);
 }
 
-
-/* --- Interactive HUD Hover Tooltip (Obsidian #070709 theme) --- */
+/* --- Interactive HUD Hover Tooltip (Claude Warm Editorial) --- */
 .sim-hover-tooltip {
   position: absolute;
   z-index: 80;
   pointer-events: none;
-  background: rgba(7, 7, 9, 0.96);
+  background: rgba(26, 25, 23, 0.96);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(56, 189, 248, 0.5);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.2);
-  border-radius: 10px;
+  border: 1px solid rgba(217, 119, 87, 0.4);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85), 0 0 16px rgba(217, 119, 87, 0.15);
+  border-radius: 9px;
   padding: 12px 14px;
   max-width: 280px;
   min-width: 210px;
-  color: #f1f5f9;
+  color: #faf9f5;
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   animation: simTooltipFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   transition: transform 0.08s ease-out;
@@ -449,9 +449,9 @@
   gap: 3px;
   padding: 2px 7px;
   border-radius: 4px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(217, 119, 87, 0.18);
+  color: #e08365;
+  border: 1px solid rgba(217, 119, 87, 0.4);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -465,6 +465,7 @@
   border-radius: 4px;
   font-size: 9.5px;
   font-weight: 700;
+  color: #b0aca2;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.15);
   text-transform: uppercase;
@@ -474,14 +475,15 @@
 .sim-hover-tooltip__title {
   font-size: 13.5px;
   font-weight: 700;
-  color: #ffffff;
+  color: #faf9f5;
   margin-bottom: 4px;
   line-height: 1.3;
+  font-family: 'Newsreader', Georgia, serif;
 }
 
 .sim-hover-tooltip__desc {
   font-size: 11px;
-  color: #cbd5e1;
+  color: #b0aca2;
   line-height: 1.45;
   margin-bottom: 8px;
 }
@@ -493,7 +495,7 @@
   flex-direction: column;
   gap: 3.5px;
   font-size: 10.5px;
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .sim-hover-tooltip__stat-item {
@@ -504,12 +506,12 @@
 }
 
 .sim-hover-tooltip__stat-label {
-  color: #94a3b8;
+  color: #8c877d;
   font-size: 10px;
 }
 
 .sim-hover-tooltip__stat-val {
-  color: #38bdf8;
+  color: #e08365;
   font-weight: 600;
   font-size: 11px;
 }
@@ -521,7 +523,7 @@
 }
 
 .tree-node-group:hover circle, .sim-svg-interactive:hover {
-  filter: drop-shadow(0 0 10px #38bdf8);
+  filter: drop-shadow(0 0 8px rgba(217, 119, 87, 0.6));
 }
 
 /* --- Mobile Touch & Responsive Canvas Optimizations --- */
