@@ -2935,40 +2935,102 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
 
     const isFullDoc = cleanCode.includes('<!DOCTYPE') || cleanCode.includes('<html');
 
-    
+    const injectedGlobalOverrides = `
+      <style>
+        * { box-sizing: border-box !important; }
+        body {
+          margin: 0 !important;
+          padding: 12px 14px !important;
+          background: #141312 !important;
+          color: #faf9f5 !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          min-height: 100vh !important;
+        }
+        /* Neatly arrange upper controls into a balanced, centered flex toolbar */
+        .controls, .control-bar, .controls-bar, .toolbar, header, div:has(> button), [class*="control"], [class*="toolbar"] {
+          display: flex !important;
+          flex-wrap: wrap !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 8px 12px !important;
+          margin: 0 auto 12px auto !important;
+          padding: 8px 14px !important;
+          background: #191817 !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          border-radius: 8px !important;
+          width: 100% !important;
+          max-width: 680px !important;
+        }
+        /* Replace ugly neon cyan pills with Claude Warm Editorial buttons */
+        button {
+          background: #242220 !important;
+          color: #faf9f5 !important;
+          border: 1px solid rgba(217, 119, 87, 0.35) !important;
+          padding: 6px 14px !important;
+          border-radius: 6px !important;
+          cursor: pointer !important;
+          font-size: 11.5px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.02em !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          transition: all 0.15s ease !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+        }
+        button:hover {
+          background: #2e2a27 !important;
+          border-color: #d97757 !important;
+          color: #ffffff !important;
+          transform: translateY(-1px) !important;
+        }
+        button:active {
+          transform: translateY(0) !important;
+        }
+        select {
+          background: #1f1e1c !important;
+          color: #faf9f5 !important;
+          border: 1px solid rgba(255, 255, 255, 0.15) !important;
+          padding: 5px 10px !important;
+          border-radius: 6px !important;
+          font-size: 11.5px !important;
+          cursor: pointer !important;
+          outline: none !important;
+        }
+        select:focus {
+          border-color: #d97757 !important;
+        }
+        input[type="range"] {
+          accent-color: #d97757 !important;
+          cursor: pointer !important;
+        }
+        /* Prevent canvas or SVG from being truncated at the bottom */
+        canvas, svg {
+          display: block !important;
+          border-radius: 8px !important;
+          max-width: 100% !important;
+          max-height: 290px !important;
+          object-fit: contain !important;
+          margin: 0 auto !important;
+        }
+      </style>
+    `;
 
     const styledHtml = isFullDoc
-      ? cleanCode.replace('</body>', `${INJECTED_SIMULATION_INSPECTOR_HTML}</body>`)
+      ? (cleanCode.includes('</head>')
+          ? cleanCode.replace('</head>', `${injectedGlobalOverrides}</head>`).replace('</body>', `${INJECTED_SIMULATION_INSPECTOR_HTML}</body>`)
+          : cleanCode.replace('</body>', `${injectedGlobalOverrides}${INJECTED_SIMULATION_INSPECTOR_HTML}</body>`))
       : `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <style>
-            * { box-sizing: border-box; }
-            body {
-              margin: 0;
-              padding: 12px;
-              background: #141312;
-              color: #faf9f5;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              overflow-x: hidden;
-            }
-            button {
-              background: #242220;
-              color: #faf9f5;
-              border: 1px solid rgba(255,255,255,0.12);
-              padding: 6px 14px;
-              border-radius: 6px;
-              cursor: pointer;
-              font-size: 12px;
-              transition: all 0.15s;
-            }
-            button:hover { background: #33302c; border-color: rgba(217,119,87,0.4); color: #ffffff; }
-            input[type="range"] { accent-color: #d97757; cursor: pointer; }
-            canvas { display: block; border-radius: 8px; }
-          </style>
+          ${injectedGlobalOverrides}
         </head>
         <body>
           ${cleanCode}

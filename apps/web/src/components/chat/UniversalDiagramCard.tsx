@@ -4,7 +4,7 @@ import 'katex/dist/katex.min.css';
 import './UniversalDiagramCard.css';
 
 export interface UniversalDiagramProps {
-  type?: 'atom' | 'molecule' | 'cell' | 'circuit' | 'neural-net' | 'custom-svg' | string;
+  type?: 'atom' | 'molecule' | 'cell' | 'circuit' | 'neural-net' | 'architecture' | 'microcontroller' | 'custom-svg' | string;
   title?: string;
   code?: string;
   element?: string;
@@ -76,6 +76,22 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     if (lower.includes('atom') || lowerCode.includes('type: atom') || lowerCode.includes('bohr')) return 'atom';
     if (lower.includes('molecule') || lowerCode.includes('type: molecule') || lowerCode.includes('benzene') || lowerCode.includes('water')) return 'molecule';
     if (lower.includes('neural') || lowerCode.includes('type: neural')) return 'neural-net';
+    if (
+      lower.includes('architecture') ||
+      lower.includes('microcontroller') ||
+      lower.includes('esp32') ||
+      lower.includes('cpu') ||
+      lower.includes('soc') ||
+      lower.includes('hardware') ||
+      lowerCode.includes('type: architecture') ||
+      lowerCode.includes('type: microcontroller') ||
+      lowerCode.includes('esp32') ||
+      lowerCode.includes('pro_cpu') ||
+      lowerCode.includes('app_cpu') ||
+      lowerCode.includes('xtensa')
+    ) {
+      return 'architecture';
+    }
     if (code && code.trim().startsWith('<svg')) return 'custom-svg';
     return 'atom';
   }, [type, code]);
@@ -551,6 +567,182 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     );
   };
 
+  // Render High-Precision Microcontroller / SoC System Architecture SVG
+  const renderArchitectureSvg = () => {
+    return (
+      <svg width="100%" height="340" viewBox="0 0 720 370">
+        <defs>
+          <linearGradient id="busGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#d97757" stopOpacity="0.8" />
+            <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#d97757" stopOpacity="0.8" />
+          </linearGradient>
+          <filter id="glowSubtle" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.5" />
+          </filter>
+        </defs>
+
+        {/* Outer Canvas Boundary */}
+        <rect x="8" y="8" width="704" height="354" rx="10" fill="#141312" stroke="rgba(255,255,255,0.06)" />
+
+        {/* Central 32-bit Internal System Crossbar Bus */}
+        <g transform="translate(30, 172)">
+          <rect x="0" y="0" width="660" height="20" rx="5" fill="#242220" stroke="url(#busGrad)" strokeWidth="1.8" filter="url(#glowSubtle)" />
+          <text x="330" y="14" fill="#faf9f5" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace" letterSpacing="0.05em">
+            32-BIT INTERNAL SYSTEM CROSSBAR & ADVANCED PERIPHERAL BUS (APB / DMA)
+          </text>
+          {/* Animated Glowing Data Packets Traveling the Bus */}
+          <circle cx="60" cy="10" r="3.5" fill="#fde047">
+            <animate attributeName="cx" from="60" to="620" dur="2.2s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="580" cy="10" r="3" fill="#38bdf8">
+            <animate attributeName="cx" from="580" to="80" dur="2.8s" repeatCount="indefinite" />
+          </circle>
+        </g>
+
+        {/* Vertical Bus Interconnect Lines */}
+        {/* Core 0 */}
+        <line x1="130" y1="125" x2="130" y2="172" stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="3 2" />
+        {/* Core 1 */}
+        <line x1="130" y1="192" x2="130" y2="235" stroke="#34d399" strokeWidth="2.5" strokeDasharray="3 2" />
+        {/* System Memory */}
+        <line x1="360" y1="125" x2="360" y2="172" stroke="#c084fc" strokeWidth="2.5" strokeDasharray="3 2" />
+        {/* ULP Coprocessor */}
+        <line x1="360" y1="192" x2="360" y2="235" stroke="#f43f5e" strokeWidth="2.5" strokeDasharray="3 2" />
+        {/* Wi-Fi PHY */}
+        <line x1="590" y1="125" x2="590" y2="172" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="3 2" />
+        {/* GPIO Matrix */}
+        <line x1="590" y1="192" x2="590" y2="235" stroke="#e879f9" strokeWidth="2.5" strokeDasharray="3 2" />
+
+        {/* 1. Core 0: PRO_CPU (Top Left) */}
+        <g transform="translate(35, 35)" filter="url(#glowSubtle)">
+          <rect x="0" y="0" width="190" height="90" rx="8" fill="#1b1a18" stroke="#38bdf8" strokeWidth="1.6" />
+          <rect x="0" y="0" width="190" height="26" rx="8" fill="rgba(56, 189, 248, 0.14)" />
+          <text x="12" y="17" fill="#38bdf8" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+            Core 0: PRO_CPU
+          </text>
+          <text x="178" y="17" fill="#94a3b8" fontSize="9" textAnchor="end" fontFamily="monospace">
+            240 MHz
+          </text>
+          <text x="12" y="44" fill="#faf9f5" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+            Xtensa 32-bit LX6 Core
+          </text>
+          <text x="12" y="60" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • 4-Stage Pipeline | FPU Unit
+          </text>
+          <text x="12" y="75" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • Wi-Fi/BT Protocol & RTOS Stack
+          </text>
+        </g>
+
+        {/* 2. System Memory (Top Center) */}
+        <g transform="translate(265, 35)" filter="url(#glowSubtle)">
+          <rect x="0" y="0" width="190" height="90" rx="8" fill="#1b1a18" stroke="#c084fc" strokeWidth="1.6" />
+          <rect x="0" y="0" width="190" height="26" rx="8" fill="rgba(192, 132, 252, 0.14)" />
+          <text x="12" y="17" fill="#c084fc" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+            System Memory & MMU
+          </text>
+          <text x="178" y="17" fill="#94a3b8" fontSize="9" textAnchor="end" fontFamily="monospace">
+            520 KB
+          </text>
+          <text x="12" y="44" fill="#faf9f5" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+            SRAM (520KB) & ROM (448KB)
+          </text>
+          <text x="12" y="60" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • Dedicated DMA Controller
+          </text>
+          <text x="12" y="75" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • Instruction & Data MMU Cache
+          </text>
+        </g>
+
+        {/* 3. Wi-Fi / Bluetooth Radio PHY (Top Right) */}
+        <g transform="translate(495, 35)" filter="url(#glowSubtle)">
+          <rect x="0" y="0" width="190" height="90" rx="8" fill="#1b1a18" stroke="#fbbf24" strokeWidth="1.6" />
+          <rect x="0" y="0" width="190" height="26" rx="8" fill="rgba(251, 191, 36, 0.14)" />
+          <text x="12" y="17" fill="#fbbf24" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+            Wi-Fi / BT Baseband PHY
+          </text>
+          <text x="178" y="17" fill="#94a3b8" fontSize="9" textAnchor="end" fontFamily="monospace">
+            2.4 GHz
+          </text>
+          <text x="12" y="44" fill="#faf9f5" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+            802.11 b/g/n & BLE 5.0
+          </text>
+          <text x="12" y="60" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • 150 Mbps PHY Data Rate
+          </text>
+          <text x="12" y="75" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • Hardware Cryptographic Accel
+          </text>
+        </g>
+
+        {/* 4. Core 1: APP_CPU (Bottom Left) */}
+        <g transform="translate(35, 235)" filter="url(#glowSubtle)">
+          <rect x="0" y="0" width="190" height="90" rx="8" fill="#1b1a18" stroke="#34d399" strokeWidth="1.6" />
+          <rect x="0" y="0" width="190" height="26" rx="8" fill="rgba(52, 211, 153, 0.14)" />
+          <text x="12" y="17" fill="#34d399" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+            Core 1: APP_CPU
+          </text>
+          <text x="178" y="17" fill="#94a3b8" fontSize="9" textAnchor="end" fontFamily="monospace">
+            240 MHz
+          </text>
+          <text x="12" y="44" fill="#faf9f5" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+            Xtensa 32-bit LX6 Core
+          </text>
+          <text x="12" y="60" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • User Application Thread
+          </text>
+          <text x="12" y="75" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • DSP Vector Extension Math
+          </text>
+        </g>
+
+        {/* 5. ULP Coprocessor & RTC (Bottom Center - ZERO TRUNCATION, FULLY VISIBLE) */}
+        <g transform="translate(265, 235)" filter="url(#glowSubtle)">
+          <rect x="0" y="0" width="190" height="90" rx="8" fill="#1b1a18" stroke="#f43f5e" strokeWidth="1.6" />
+          <rect x="0" y="0" width="190" height="26" rx="8" fill="rgba(244, 63, 94, 0.14)" />
+          <text x="12" y="17" fill="#f43f5e" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+            ULP Coprocessor & RTC
+          </text>
+          <text x="178" y="17" fill="#94a3b8" fontSize="9" textAnchor="end" fontFamily="monospace">
+            8 MHz
+          </text>
+          <text x="12" y="44" fill="#faf9f5" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+            Ultra-Low Power Controller
+          </text>
+          <text x="12" y="60" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • Deep-Sleep ADC / Touch Sensing
+          </text>
+          <text x="12" y="75" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • 8 KB Fast/Slow RTC Memory
+          </text>
+        </g>
+
+        {/* 6. GPIO Matrix & Peripherals (Bottom Right) */}
+        <g transform="translate(495, 235)" filter="url(#glowSubtle)">
+          <rect x="0" y="0" width="190" height="90" rx="8" fill="#1b1a18" stroke="#e879f9" strokeWidth="1.6" />
+          <rect x="0" y="0" width="190" height="26" rx="8" fill="rgba(232, 121, 249, 0.14)" />
+          <text x="12" y="17" fill="#e879f9" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+            GPIO Matrix & Peripheral Bus
+          </text>
+          <text x="178" y="17" fill="#94a3b8" fontSize="9" textAnchor="end" fontFamily="monospace">
+            36× I/O
+          </text>
+          <text x="12" y="44" fill="#faf9f5" fontSize="10" fontWeight="600" fontFamily="sans-serif">
+            Hardware Peripheral Interfaces
+          </text>
+          <text x="12" y="60" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • 4× SPI, 2× I2C, 3× UART, 2× I2S
+          </text>
+          <text x="12" y="75" fill="#b0aca2" fontSize="9" fontFamily="monospace">
+            • 12-bit SAR ADC & 8-bit DAC
+          </text>
+        </g>
+      </svg>
+    );
+  };
+
   // Render Raw/Custom SVG string
   const renderCustomSvg = () => {
     if (!code) return <div style={{ color: '#b0aca2', padding: '20px' }}>No SVG code provided</div>;
@@ -574,6 +766,8 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
               ? 'MOLECULAR STRUCTURE'
               : normalizedType === 'neural-net'
               ? 'NEURAL ARCHITECTURE'
+              : normalizedType === 'architecture'
+              ? 'SYSTEM ARCHITECTURE'
               : 'SCIENTIFIC SCHEMATIC'}
           </span>
           <span className="universal-diagram-title">
@@ -584,6 +778,8 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
                 ? `Molecular Geometry: ${moleculePreset.toUpperCase()}`
                 : normalizedType === 'neural-net'
                 ? 'Deep Neural Network Topology'
+                : normalizedType === 'architecture'
+                ? 'Dual-Core Microcontroller Architecture (SoC Crossbar Bus)'
                 : 'Universal Visual Schematic')}
           </span>
         </div>
@@ -691,6 +887,28 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
         </div>
       )}
 
+      {/* Row 2: Subsystem Badges for Architecture */}
+      {normalizedType === 'architecture' && (
+        <div className="universal-diagram-presets-bar">
+          <span className="universal-diagram-presets-label">Subsystems:</span>
+          <span className="universal-diagram-preset-pill universal-diagram-preset-pill--active">
+            Dual Xtensa LX6 (240 MHz)
+          </span>
+          <span className="universal-diagram-preset-pill">
+            520KB SRAM MMU
+          </span>
+          <span className="universal-diagram-preset-pill">
+            Wi-Fi / BT 5.0 PHY
+          </span>
+          <span className="universal-diagram-preset-pill">
+            ULP Coprocessor (Deep Sleep)
+          </span>
+          <span className="universal-diagram-preset-pill">
+            GPIO Matrix (36× I/O)
+          </span>
+        </div>
+      )}
+
       {/* Visual Canvas Stage (Scalable Transform) */}
       <div className="universal-diagram-viewport" ref={svgContainerRef}>
         <div
@@ -700,9 +918,63 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
           {normalizedType === 'atom' && renderAtomSvg()}
           {normalizedType === 'molecule' && renderMoleculeSvg()}
           {normalizedType === 'neural-net' && renderNeuralNetSvg()}
+          {normalizedType === 'architecture' && renderArchitectureSvg()}
           {normalizedType === 'custom-svg' && renderCustomSvg()}
         </div>
       </div>
+
+      {/* Editorial Scientific Data Cards for Microcontroller Architecture */}
+      {normalizedType === 'architecture' && (
+        <div className="universal-diagram-editorial-panel">
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">CPU Compute Architecture</span>
+            <span className="universal-diagram-col-headline" style={{ color: '#38bdf8' }}>
+              Dual 32-bit Xtensa LX6
+            </span>
+            <div className="universal-diagram-col-metric">
+              Clock Speed: 240 MHz (up to 600 DMIPS)
+            </div>
+            <div className="universal-diagram-col-metric">
+              Core Roles: PRO_CPU (Protocol) & APP_CPU (App)
+            </div>
+            <div className="universal-diagram-col-metric">
+              Pipeline: 4-stage pipeline with hardware FPU
+            </div>
+          </div>
+
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Memory & Bus Hierarchy</span>
+            <span className="universal-diagram-col-headline" style={{ color: '#c084fc' }}>
+              520 KB SRAM / 448 KB ROM
+            </span>
+            <div className="universal-diagram-col-metric">
+              Crossbar Bus: 32-bit Multi-Master APB/DMA
+            </div>
+            <div className="universal-diagram-col-metric">
+              Memory MMU: Flash & PSRAM external caching
+            </div>
+            <div className="universal-diagram-col-metric">
+              Throughput: Zero-wait state internal SRAM
+            </div>
+          </div>
+
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Ultra-Low Power & Sensing</span>
+            <span className="universal-diagram-col-headline" style={{ color: '#f43f5e' }}>
+              ULP Coprocessor & RTC
+            </span>
+            <div className="universal-diagram-col-metric">
+              Deep Sleep Current: &lt; 5 µA continuous
+            </div>
+            <div className="universal-diagram-col-metric">
+              Sensing: Autonomous ADC / Touch polling
+            </div>
+            <div className="universal-diagram-col-metric">
+              Wakeup: Threshold interrupt to main cores
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Editorial Scientific Data Cards (HTML + KaTeX: ZERO TEXT COLLAPSING) */}
       {normalizedType === 'atom' && (

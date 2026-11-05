@@ -391,13 +391,34 @@ export default {
         configured: hasKey,
         provider: 'gemini',
         active_provider: 'gemini',
-        active_model: 'gemini-3.8-flash',
+        active_model: 'gemini-2.5-pro',
         available_models: [
           {
-            id: 'gemini-3.8-flash',
-            name: 'Gemini 3.8 Flash (Ultra Fast & Latest Generation)',
+            id: 'gemini-2.5-pro',
+            name: 'Gemini 2.5 Pro (Flagship Large-Parameter Cognitive Model)',
             provider: 'gemini',
             is_default: true,
+            context_window: 2097152,
+          },
+          {
+            id: 'gemini-2.5-flash',
+            name: 'Gemini 2.5 Flash (Ultra Fast & High Reasoning)',
+            provider: 'gemini',
+            is_default: false,
+            context_window: 1048576,
+          },
+          {
+            id: 'gemini-1.5-pro',
+            name: 'Gemini 1.5 Pro (Deep Multimodal Architecture)',
+            provider: 'gemini',
+            is_default: false,
+            context_window: 2097152,
+          },
+          {
+            id: 'gemini-3.8-flash',
+            name: 'Gemini 3.8 Flash (Edge Streamed)',
+            provider: 'gemini',
+            is_default: false,
             context_window: 1048576,
           },
           {
@@ -410,13 +431,6 @@ export default {
           {
             id: 'gemini-3.5-flash',
             name: 'Gemini 3.5 Flash',
-            provider: 'gemini',
-            is_default: false,
-            context_window: 1048576,
-          },
-          {
-            id: 'gemini-3.1-flash-lite',
-            name: 'Gemini 3.1 Flash Lite',
             provider: 'gemini',
             is_default: false,
             context_window: 1048576,
@@ -470,12 +484,9 @@ export default {
       const messageId = `msg-${Date.now()}`;
       const userMessage = body.message || '';
       const chosenModel =
-        body.model &&
-        !body.model.includes('2.0') &&
-        !body.model.includes('1.5') &&
-        !body.model.includes('2.5')
-          ? body.model
-          : 'gemini-3.8-flash';
+        body.model && body.model.trim().length > 0 && !body.model.includes('2.0-flash-exp')
+          ? body.model.trim()
+          : env.DEFAULT_MODEL || 'gemini-2.5-pro';
 
       // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
       type GeminiPart =
@@ -583,12 +594,16 @@ export default {
               '   - CRITICAL RULE: NEVER output rocket engines, thruster nozzles, or unrelated aerospace machinery when the user asks about chemistry, photochemistry, photolysis, or molecular mechanisms! Always use ```interactive-simulation\\ntype: photochemical\\n```.\n' +
               '   - For arbitrary physics/math/canvas simulations: provide clean, working HTML5 Canvas or SVG code in ```canvas or ```html.\n\n' +
               '4. UNIVERSAL SCIENTIFIC DIAGRAMS & SCHEMATICS (WHEN SIMULATION IS NOT REQUIRED):\n' +
-              '   Often an interactive physics simulation with sliders is unnecessary, and the user simply needs a crisp, publication-grade visual diagram or picture (e.g., atom diagram, molecular bond, cell structure, neural net, electrical circuit, or any universal concept).\n' +
+              '   Often an interactive physics simulation with sliders is unnecessary, and the user simply needs a crisp, publication-grade visual diagram or picture (e.g., atom diagram, molecular bond, cell structure, neural net, electrical circuit, SoC/microcontroller architecture, or any universal concept).\n' +
               '   - For Atom Diagrams: output ```visual-diagram\\ntype: atom\\nelement: Carbon\\n``` (supports any element like Hydrogen, Helium, Carbon, Oxygen, Sodium, Silicon, Chlorine, Calcium).\n' +
               '   - For Molecules: output ```visual-diagram\\ntype: molecule\\n``` (Water H2O dipole, Benzene C6H6 aromatic ring, etc.).\n' +
               '   - For Neural Networks: output ```visual-diagram\\ntype: neural-net\\n```.\n' +
+              '   - For Microcontroller, ESP32, SoC, CPU, and Embedded Hardware Architecture: output ```visual-diagram\\ntype: architecture\\n``` or clean static vector SVG block ```svg ... ```. NEVER generate toy simulation buttons (such as "Run Task on Core 0", "Toggle Wi-Fi Burst") or canvas particle loops for static hardware block diagrams.\n' +
               '   - For any other universal diagram (optics, anatomy, cosmology, system architecture, flowcharts): output an SVG block ```svg\\n<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">...\\n</svg>\\n```.\n' +
               '   The chat interface automatically renders these in a dedicated high-resolution visual diagram card with Retina PNG export, SVG download, zoom, and interactive element switchers.\n\n' +
+              '5. SCIENTIFIC TELEMETRY & GENUINE PHYSICAL ACCURACY:\n' +
+              '   - SCIENTIFIC INSPECTION INTEGRITY: When users interact with or inspect visual simulations, cards must display rigorous domain-specific physics or chemistry metrics (e.g. molar masses, thermodynamic enthalpies, chemical formulas, gas compositions, quantum states). NEVER show canvas implementation artifacts or programming terms like "Render Node (Particle)", "Canvas Object", "dynamic graphic primitive", or "Position: (x, y)".\n' +
+              '   - GENERATIVE UI CONTROLS FORMATTING: When generating custom HTML/Canvas widgets, arrange controls horizontally in a flex toolbar centered above or below the canvas using Claude Warm Editorial palette (background #1f1e1c, terracotta #d97757 accents, cream #faf9f5 text; NEVER use jarring neon cyan #00b4d8 buttons). Ensure ample canvas padding (min 40px) so bottom elements and coprocessor labels are never cut off.\n\n' +
               'INTERACTIVE INQUIRY & CONCEPTUAL EXPLORATION CARDS:\n' +
               'When assessing understanding, exploring branching topics, or clarifying intent:\n' +
               'Output an interactive MCQ block:\n' +
@@ -636,6 +651,9 @@ export default {
           const candidateModels = Array.from(
             new Set([
               chosenModel,
+              'gemini-2.5-pro',
+              'gemini-2.5-flash',
+              'gemini-1.5-pro',
               'gemini-3.8-flash',
               'gemini-flash-latest',
               'gemini-3.5-flash',

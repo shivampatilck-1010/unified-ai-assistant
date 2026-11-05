@@ -354,6 +354,10 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       const elemMatch = code.match(/element:\s*([a-zA-Z0-9_-]+)/i);
       if (elemMatch) diagElement = elemMatch[1].trim();
 
+      if (/esp32|pro_cpu|app_cpu|xtensa|microcontroller|ulp\s*coprocessor|system\s*memory|soc/i.test(code)) {
+        diagType = 'architecture';
+      }
+
       return (
         <UniversalDiagramCard
           type={diagType}
@@ -401,6 +405,17 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       const lowerCode = code.toLowerCase().trim();
       const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
       const declaredType = typeMatch ? typeMatch[1].toLowerCase() : '';
+
+      // Direct architecture diagram routing: Microcontroller / ESP32 / SoC architecture
+      if (/esp32|pro_cpu|app_cpu|xtensa|microcontroller|ulp\s*coprocessor/i.test(lowerCode)) {
+        return (
+          <UniversalDiagramCard
+            type="architecture"
+            title="Dual-Core Microcontroller Architecture (SoC Crossbar Bus)"
+            code={code}
+          />
+        );
+      }
 
       if (
         declaredType === 'graph' ||
