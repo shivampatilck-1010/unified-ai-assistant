@@ -27,6 +27,62 @@ export function inferExplanationBranches(
 ): ExplanationBranch[] {
   const normalized = `${text} ${(options || []).join(' ')} ${category || ''}`.toLowerCase();
 
+  // 0. Astronomy, Optics, Telescopes, Mirrors vs Lenses
+  if (
+    normalized.includes('telescope') ||
+    normalized.includes('observator') ||
+    normalized.includes('mirror') ||
+    normalized.includes('lens') ||
+    normalized.includes('astronomic') ||
+    normalized.includes('chromatic') ||
+    normalized.includes('aberration') ||
+    normalized.includes('refraction') ||
+    normalized.includes('reflection') ||
+    normalized.includes('optics') ||
+    normalized.includes('james webb') ||
+    normalized.includes('jwst') ||
+    normalized.includes('focal')
+  ) {
+    return [
+      {
+        id: 'branch-chromatic-aberration',
+        title: "Chromatic Dispersion & Snell's Law",
+        badge: 'OPTICS & WAVE PHYSICS',
+        iconType: 'compass',
+        summary:
+          'Glass lenses refract different wavelengths at different focal lengths (n(λ) dispersion), causing color fringing. Curved mirrors reflect all wavelengths at identical angles (θᵢ = θᵣ) with zero chromatic aberration.',
+        formula: 'Cauchy Dispersion: n(λ) = A + B/λ² ⟹ f_blue ≠ f_red (Lenses) vs θᵢ = θᵣ (Mirrors)',
+        deepDive:
+          'Correcting chromatic aberration in large lenses requires complex multi-element achromatic doublets/triplets, which dramatically increase mass, optical distortion, and internal absorption.',
+        actionPrompt: 'Explain chromatic aberration and why law of reflection θ_i = θ_r has zero dispersion across all wavelengths.',
+      },
+      {
+        id: 'branch-mechanical-support',
+        title: 'Gravitational Sagging & Back-Surface Support',
+        badge: 'STRUCTURAL ENGINEERING',
+        iconType: 'layers',
+        summary:
+          'Lenses can only be mechanically mounted along their perimeter rims, causing thick glass to sag under its own weight. Mirrors can be rigidly supported across their entire back surface by active pneumatic actuators.',
+        formula: 'Structural Sag Deflection: δ ∝ (ρ · g · R⁴) / (E · h²)',
+        deepDive:
+          'The 40-inch Yerkes refractor (1897) represents the physical limit of glass lenses. Modern observatories (VLT 8.2m, JWST 6.5m, ELT 39m) utilize segmented primary mirrors with active optics correcting gravitational flexure hundreds of times per second.',
+        actionPrompt: 'Detail the mechanical scaling limits of refractor telescopes vs reflector telescopes with active optics.',
+      },
+      {
+        id: 'branch-infrared-transmission',
+        title: 'Infrared Transparency & Bulk Absorption',
+        badge: 'ASTROPHYSICS & SPECTROSCOPY',
+        iconType: 'atom',
+        summary:
+          'Thick glass lenses absorb infrared and ultraviolet photons essential for deep cosmological redshift spectroscopy (z > 6). Front-surface gold/aluminum mirrors achieve >98% broadband reflectivity without transmission attenuation.',
+        formula: 'Beer-Lambert Absorption: I(x) = I₀ · e^(-α(λ) · x)',
+        deepDive:
+          'Cosmic expansion shifts ancient starlight into the near- and mid-infrared (1–28 µm). Because glass is opaque at these wavelengths, space observatories like JWST utilize gold-coated beryllium mirrors cooled to 40 K.',
+        actionPrompt: 'Why is infrared transparency critical for space telescopes studying high-redshift early galaxies?',
+      },
+    ];
+  }
+
   // 1. Photosynthesis, Photochemical Reactions, Calvin Cycle
   if (
     normalized.includes('calvin') ||

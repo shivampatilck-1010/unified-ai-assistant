@@ -37,6 +37,13 @@
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
 }
 
+.cortex-card-main--collapsed {
+  padding: 14px 18px;
+  background: #181715;
+  border-color: rgba(240, 237, 230, 0.1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Header Row: Badge & Category */
 .cortex-card-header {
   display: flex;
@@ -44,6 +51,102 @@
   justify-content: space-between;
   margin-bottom: 14px;
   gap: 12px;
+}
+
+.cortex-card-main--collapsed .cortex-card-header {
+  margin-bottom: 8px;
+}
+
+.cortex-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cortex-card-collapse-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(240, 237, 230, 0.05);
+  border: 1px solid rgba(240, 237, 230, 0.1);
+  color: #b0aca2;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+}
+
+.cortex-card-collapse-toggle-btn:hover {
+  background: rgba(217, 119, 87, 0.15);
+  border-color: rgba(217, 119, 87, 0.4);
+  color: #faf9f5;
+}
+
+/* Collapsed Compact Preview Bar */
+.cortex-collapsed-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0 2px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cortex-collapsed-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.cortex-collapsed-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #faf9f5;
+  font-family: var(--font-serif, 'Newsreader', 'Lora', Georgia, serif);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.cortex-collapsed-badge {
+  font-size: 10.5px;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+}
+
+.cortex-collapsed-badge--count {
+  color: #7d7971;
+}
+
+.cortex-collapsed-badge--answered {
+  color: #34d399;
+  font-weight: 500;
+}
+
+.cortex-expand-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(217, 119, 87, 0.12);
+  border: 1px solid rgba(217, 119, 87, 0.35);
+  color: #d97757;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cortex-expand-pill:hover {
+  background: rgba(217, 119, 87, 0.22);
+  color: #ffffff;
 }
 
 .cortex-header-meta {
