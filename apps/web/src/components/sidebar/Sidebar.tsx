@@ -161,36 +161,43 @@ export function Sidebar({
         {/* Header */}
         <div className="sidebar__header">
           {!collapsed ? (
-            <div
-              className="sidebar__brand"
-              onClick={onNewChat}
-              style={{ cursor: 'pointer' }}
-              title="New conversation"
-            >
-              <span className="sidebar__brand-icon" aria-hidden="true" style={{ display: 'flex', alignItems: 'center' }}>
-                <UnifiedLogo size={28} />
-              </span>
-              <span className="sidebar__brand-name">Unified AI</span>
-            </div>
+            <>
+              <div
+                className="sidebar__brand"
+                onClick={onNewChat}
+                style={{ cursor: 'pointer' }}
+                title="New conversation"
+              >
+                <span className="sidebar__brand-icon" aria-hidden="true" style={{ display: 'flex', alignItems: 'center' }}>
+                  <UnifiedLogo size={28} />
+                </span>
+                <span className="sidebar__brand-name">Unified AI</span>
+              </div>
+              <button
+                className="sidebar__collapse-btn"
+                onClick={onToggleCollapse}
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M11 3L6 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: '4px' }}>
-              <UnifiedLogo size={24} onClick={onNewChat} />
+            <div className="sidebar__collapsed-header">
+              <button
+                className="sidebar__collapse-btn sidebar__collapse-btn--docked"
+                onClick={onToggleCollapse}
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
           )}
-          <button
-            className="sidebar__collapse-btn"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              {collapsed ? (
-                <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              ) : (
-                <path d="M11 3L6 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              )}
-            </svg>
-          </button>
         </div>
 
         {/* Navigation */}

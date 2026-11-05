@@ -1,24 +1,24 @@
 /**
  * explanationBranches.ts
- * Provides intelligent, domain-grounded explanation branch synthesis
- * for InteractiveChoiceCard and ConceptCards.
+ * Provides intelligent, domain-grounded conceptual deep dives and reference branches
+ * formatted with Claude-style editorial clarity and rigorous technical grounding.
  */
 
 export interface ExplanationBranch {
   id: string;
   title: string;
   badge?: string;
-  icon?: string;
+  iconType?: 'compass' | 'formula' | 'application' | 'code' | 'atom' | 'database' | 'cpu' | 'layers' | 'tree';
   summary: string;
   formula?: string;
   deepDive?: string;
-  interactiveSimType?: 'nuclear-fusion' | 'atomic-collision' | 'binary-tree' | 'photosynthesis' | 'sorting';
+  interactiveSimType?: 'nuclear-fusion' | 'atomic-collision' | 'binary-tree' | 'photosynthesis' | 'sorting' | 'graph-traversal' | 'hash-table';
   actionPrompt?: string;
 }
 
 /**
  * Infer 3 rich, contextual explanation branches from a question,
- * prompt, or concept summary.
+ * prompt, or concept summary with domain-specific depth.
  */
 export function inferExplanationBranches(
   text: string,
@@ -27,7 +27,7 @@ export function inferExplanationBranches(
 ): ExplanationBranch[] {
   const normalized = `${text} ${(options || []).join(' ')} ${category || ''}`.toLowerCase();
 
-  // 1. Photosynthesis, Photochemical Reactions, Calvin Cycle, Chlorophyll
+  // 1. Photosynthesis, Photochemical Reactions, Calvin Cycle
   if (
     normalized.includes('calvin') ||
     normalized.includes('photosynthesis') ||
@@ -40,240 +40,344 @@ export function inferExplanationBranches(
     return [
       {
         id: 'branch-photolysis',
-        title: 'Light Reactions (Photolysis)',
+        title: 'Light Reactions & Photolysis',
         badge: 'BIOPHYSICS',
-        icon: '☀️',
+        iconType: 'atom',
         summary:
-          'Photons hit Photosystem II (P680), boosting electrons to high-energy states. Water molecules are split to release Oxygen gas and pump protons into the thylakoid lumen.',
-        formula: '2H₂O + 4 photons → O₂ + 4H⁺ + 4e⁻',
+          'Photons hit Photosystem II (P680), exciting electrons to high-energy states. Water is split to release diatomic oxygen and pump protons into the thylakoid lumen.',
+        formula: '2H₂O + 4 photons ⟶ O₂ + 4H⁺ + 4e⁻',
         deepDive:
-          'Chemiosmotic proton gradient drives ATP Synthase rotor to generate ATP, while ferredoxin-NADP⁺ reductase yields high-energy NADPH.',
+          'The resulting electrochemical proton gradient (ΔpH ≈ 3.0) powers ATP Synthase rotatory catalysis, producing ATP while ferredoxin-NADP⁺ reductase yields NADPH.',
         interactiveSimType: 'photosynthesis',
-        actionPrompt: 'Explain the detailed photolysis and electron transport chain mechanism in Photosystem II.',
+        actionPrompt: 'Detail the photolysis mechanism and the Z-scheme electron transport chain in Photosystem II.',
       },
       {
         id: 'branch-energy-flow',
-        title: 'ATP & NADPH Energy Transfer',
+        title: 'ATP & NADPH Energy Coupling',
         badge: 'BIOCHEMISTRY',
-        icon: '⚡',
+        iconType: 'formula',
         summary:
-          'ATP provides phosphorylation energy, and NADPH supplies reducing electrons to reduce 3-PGA into glyceraldehyde-3-phosphate (G3P) sugar building blocks.',
-        formula: '3-PGA + ATP + NADPH → G3P + ADP + NADP⁺ + Pi',
+          'ATP provides substrate phosphorylation and NADPH supplies reducing equivalents to convert 3-PGA into glyceraldehyde-3-phosphate (G3P).',
+        formula: '3-PGA + ATP + NADPH ⟶ G3P + ADP + NADP⁺ + Pᵢ',
         deepDive:
-          'Without the light-dependent phase charging ATP and NADPH, the Calvin cycle halts because carbon cannot be chemically reduced into carbohydrates.',
+          'Without the light-dependent phase regenerating ATP and NADPH, the Calvin cycle halts because carbon skeletons cannot be chemically reduced into hexose sugars.',
         interactiveSimType: 'photosynthesis',
         actionPrompt: 'Why does the Calvin cycle depend on ATP and NADPH even though it is light-independent?',
       },
       {
         id: 'branch-rubisco-fixation',
-        title: 'RuBisCO & Carbon Fixation',
+        title: 'RuBisCO Catalysis & Carbon Fixation',
         badge: 'ENZYMOLOGY',
-        icon: '🧬',
+        iconType: 'compass',
         summary:
-          'RuBisCO enzyme captures atmospheric CO₂ and fixes it onto Ribulose-1,5-bisphosphate (RuBP), yielding unstable 6-carbon intermediates that split into 3-PGA.',
-        formula: 'CO₂ + RuBP ⟶ (RuBisCO) ⟶ 2 × 3-PGA',
+          'RuBisCO fixes atmospheric CO₂ onto Ribulose-1,5-bisphosphate (RuBP), yielding an unstable 6-carbon enediolate intermediate that hydrolyzes into two 3-PGA molecules.',
+        formula: 'CO₂ + RuBP ⟶ [6C Intermediate] ⟶ 2 × 3-PGA',
         deepDive:
-          'Every 3 turns of the cycle yield 1 net G3P molecule exported for glucose synthesis, requiring 9 ATP and 6 NADPH total.',
+          'Every 3 turns of the cycle produce 1 net exported G3P molecule, requiring 9 ATP and 6 NADPH. RuBisCO oxygenase side-activity causes photorespiration losses of up to 25%.',
         interactiveSimType: 'photosynthesis',
-        actionPrompt: 'What makes RuBisCO the rate-limiting enzyme in carbon fixation, and what is photorespiration?',
+        actionPrompt: 'Examine RuBisCO kinetics, the rate-limiting steps, and evolutionary adaptations against photorespiration.',
       },
     ];
   }
 
-  // 2. Nuclear Fusion, Atomic Collisions, Plasma, Stellar Physics
+  // 2. Nuclear Fusion, Plasma Physics, Quantum Tunneling
   if (
     normalized.includes('fusion') ||
     normalized.includes('nuclear') ||
     normalized.includes('deuterium') ||
     normalized.includes('tritium') ||
     normalized.includes('coulomb') ||
-    normalized.includes('atom') ||
-    normalized.includes('collision') ||
-    normalized.includes('plasma')
+    normalized.includes('plasma') ||
+    normalized.includes('tokamak')
   ) {
     return [
       {
         id: 'branch-coulomb-tunneling',
-        title: 'Coulomb Barrier & Tunneling',
-        badge: 'QUANTUM PHYSICS',
-        icon: '⚛️',
+        title: 'Coulomb Barrier & Gamow Tunneling',
+        badge: 'QUANTUM MECHANICS',
+        iconType: 'atom',
         summary:
-          'Positively charged nuclei strongly repel each other electrostatically. At ~100M °C, thermal velocities allow wavefunctions to overlap via quantum mechanical tunneling.',
-        formula: 'V_Coulomb = (1 / 4πε₀) · (q₁ · q₂ / r)',
+          'Positively charged nuclei experience strong electrostatic repulsion. High thermal velocity brings wavefunctions close enough to permit quantum tunneling through the Gamow peak.',
+        formula: 'P_tunnel ≈ exp(-2π · α · Z₁Z₂ · c / v)',
         deepDive:
-          'Once nuclei penetrate within ~1 femtometer (10⁻¹⁵ m), the attractive Strong Nuclear Force overcomes Coulomb repulsion and snaps them together.',
+          'At distances r < 1 fm (10⁻¹⁵ m), the attractive Strong Nuclear Force overcomes electromagnetic repulsion, causing nucleons to bind tightly into helium.',
         interactiveSimType: 'nuclear-fusion',
-        actionPrompt: 'How does quantum tunneling enable nuclear fusion at lower temperatures than classical mechanics predicts?',
+        actionPrompt: 'Explain how quantum tunneling enables thermonuclear fusion at temperatures below classical electrostatic barrier heights.',
       },
       {
         id: 'branch-mass-defect',
-        title: 'Mass Defect & E = mc²',
-        badge: 'RELATIVITY',
-        icon: '💥',
+        title: 'Mass Defect & Energy Release',
+        badge: 'RELATIVISTIC PHYSICS',
+        iconType: 'formula',
         summary:
-          'The fused helium-4 nucleus plus neutron weighs strictly less than the initial deuterium + tritium rest mass. This lost mass (Δm) converts directly to kinetic energy.',
-        formula: 'Q = Δm · c² = (m_D + m_T - m_He - m_n) · c² = 17.6 MeV',
+          'The fused ⁴He nucleus plus free neutron has strictly lower rest mass than initial deuterium and tritium nucleons. This mass deficit Δm transforms into kinetic energy.',
+        formula: 'Q = Δm · c² = (m_D + m_T - m_He - m_n)c² = 17.59 MeV',
         deepDive:
-          '80% of released energy (14.1 MeV) is carried by the neutral neutron (heats reactor blankets), and 20% (3.5 MeV) stays with the alpha particle (plasma self-heating).',
+          '80% of energy (14.1 MeV) is carried by the neutron to heat the tritium-breeding lithium blanket, while 20% (3.5 MeV) remains with the alpha particle to maintain plasma self-heating.',
         interactiveSimType: 'nuclear-fusion',
-        actionPrompt: 'Calculate the exact mass defect and energy release per gram of Deuterium-Tritium fusion fuel.',
+        actionPrompt: 'Calculate the mass deficit and specific energy density of Deuterium-Tritium fusion compared to coal and fission.',
       },
       {
-        id: 'branch-dt-ignition',
-        title: 'D-T Reaction & Ignition',
+        id: 'branch-lawson-criterion',
+        title: 'Lawson Criterion & Confinement',
         badge: 'REACTOR PHYSICS',
-        icon: '🔥',
+        iconType: 'compass',
         summary:
-          'Deuterium-Tritium has the highest reaction cross-section at achievable temperatures, making it the primary fuel for magnetic tokamaks and inertial confinement.',
-        formula: '²H + ³H ⟶ ⁴He (3.5 MeV) + ¹n (14.1 MeV)',
+          'Net fusion energy production requires the triple product of plasma density, ion temperature, and energy confinement time to exceed the Lawson ignition threshold.',
+        formula: 'n · T · τ_E ≥ 3 × 10²¹ keV · s / m³ (Q ≥ 1)',
         deepDive:
-          'The Lawson Criterion defines the triple product (density · temperature · confinement time > 3 × 10²¹ keV·s/m³) needed for net energy ignition (Q > 1).',
+          'Tokamaks utilize helical magnetic fields generated by toroidal and poloidal coils to suppress magnetohydrodynamic (MHD) instabilities and heat loss.',
         interactiveSimType: 'nuclear-fusion',
-        actionPrompt: 'Compare magnetic confinement (ITER tokamak) vs inertial confinement (NIF laser) for D-T fusion ignition.',
+        actionPrompt: 'Compare magnetic confinement (ITER tokamak) vs inertial confinement (NIF laser) for achieving Lawson ignition.',
       },
     ];
   }
 
-  // 3. Binary Search Tree, Algorithms, Sorting, Data Structures
+  // 3. Machine Learning, Neural Networks, Transformers, Attention
   if (
-    normalized.includes('binary tree') ||
-    normalized.includes('bst') ||
-    normalized.includes('tree') ||
-    normalized.includes('traversal') ||
-    normalized.includes('search') ||
-    normalized.includes('sorting') ||
-    normalized.includes('node')
+    normalized.includes('attention') ||
+    normalized.includes('transformer') ||
+    normalized.includes('neural') ||
+    normalized.includes('backprop') ||
+    normalized.includes('gradient') ||
+    normalized.includes('deep learning') ||
+    normalized.includes('llm')
   ) {
     return [
       {
-        id: 'branch-bst-partition',
-        title: 'Binary Partition Invariant',
-        badge: 'DATA STRUCTURES',
-        icon: '🌲',
+        id: 'branch-scaled-dot-product',
+        title: 'Scaled Dot-Product Attention',
+        badge: 'ARCHITECTURE',
+        iconType: 'layers',
         summary:
-          'For every node: all keys in the left subtree are strictly smaller, and all keys in the right subtree are larger. This halves the search space at each descent step.',
-        formula: 'T(n) = T(n/2) + O(1) ⟹ O(log n) Search',
+          'Queries and Keys compute pairwise semantic relevance affinities, which are scaled by 1/√d_k to prevent softmax gradient vanishing, then applied as weights over Values.',
+        formula: 'Attention(Q, K, V) = softmax(Q · Kᵀ / √d_k) · V',
         deepDive:
-          'When balanced (AVL or Red-Black trees), tree height is h = ⌊log₂ n⌋. Unbalanced trees degrade into an O(n) linked list under sorted insertion.',
-        interactiveSimType: 'binary-tree',
-        actionPrompt: 'Show step-by-step how AVL tree self-balancing rotations prevent O(n) degradation in Binary Search Trees.',
+          'Multi-head attention projects representations into h distinct subspaces, enabling simultaneous focus on syntax, long-range dependencies, and semantic relations.',
+        actionPrompt: 'Walk through scaled dot-product attention step-by-step with matrix dimension transformations.',
       },
       {
-        id: 'branch-traversal',
-        title: 'In-Order Traversal Walkthrough',
-        badge: 'ALGORITHMS',
-        icon: '🔍',
+        id: 'branch-backprop-autodiff',
+        title: 'Reverse-Mode Automatic Differentiation',
+        badge: 'OPTIMIZATION',
+        iconType: 'formula',
         summary:
-          'Depth-First In-Order traversal (Left Subtree ⟶ Current Node ⟶ Right Subtree) visits and outputs keys in strictly ascending sorted order in O(n) time.',
-        formula: 'Order: inOrder(node.left) → emit(node.key) → inOrder(node.right)',
+          'Gradients of the loss function with respect to weights are propagated backward through the computational graph using the multivariate chain rule.',
+        formula: '∂L / ∂w_ij = (∂L / ∂y_j) · (∂y_j / ∂z_j) · x_i',
         deepDive:
-          'Pre-order traversal is used for serialization and copying; Post-order is used for bottom-up node deallocation and math expression evaluation.',
-        interactiveSimType: 'binary-tree',
-        actionPrompt: 'Walk through In-Order, Pre-Order, and Post-Order traversals with stack trace visualizations.',
+          'Modern optimizers (AdamW) combine running first moments (momentum) with second moments (adaptive learning rates) and decoupled L2 weight decay.',
+        actionPrompt: 'Derive backpropagation through a self-attention layer and explain gradient checkpointing.',
       },
       {
-        id: 'branch-complexity',
-        title: 'Time & Space Complexity',
+        id: 'branch-inference-kv-cache',
+        title: 'KV-Caching & Autoregressive Decoding',
+        badge: 'SYSTEMS ML',
+        iconType: 'cpu',
+        summary:
+          'During autoregressive token generation, Key and Value tensors for previously generated tokens are cached in GPU SRAM/HBM to avoid O(n²) redundant recomputations.',
+        formula: 'KV Cache Size = 2 · b · s · n_layers · n_heads · d_head',
+        deepDive:
+          'PagedAttention and FlashAttention optimize GPU memory bandwidth by tiling matrix multiplications and eliminating intermediate materialization.',
+        actionPrompt: 'Analyze memory bandwidth bottlenecks during LLM decoding and how FlashAttention tiles attention computation.',
+      },
+    ];
+  }
+
+  // 4. Graphs, Dijkstra, A*, Shortest Paths, Trees
+  if (
+    normalized.includes('graph') ||
+    normalized.includes('dijkstra') ||
+    normalized.includes('shortest path') ||
+    normalized.includes('bfs') ||
+    normalized.includes('dfs') ||
+    normalized.includes('a*') ||
+    normalized.includes('traversal')
+  ) {
+    return [
+      {
+        id: 'branch-dijkstra-relaxation',
+        title: 'Greedy Edge Relaxation & Invariant',
+        badge: 'GRAPH THEORY',
+        iconType: 'compass',
+        summary:
+          'Dijkstra maintains tentative shortest distances from the source. At each step, it extracts the minimum tentative distance node and relaxes all outgoing edges.',
+        formula: 'if dist[u] + w(u, v) < dist[v] then dist[v] = dist[u] + w(u, v)',
+        deepDive:
+          'Using a min-priority queue (min-heap), the overall asymptotic time complexity is O((V + E) log V). With Fibonacci heaps, it achieves theoretical O(E + V log V).',
+        interactiveSimType: 'graph-traversal',
+        actionPrompt: 'Explain why Dijkstra fails with negative edge weights and how Bellman-Ford resolves negative cycles.',
+      },
+      {
+        id: 'branch-a-star-heuristic',
+        title: 'A* Search & Admissible Heuristics',
+        badge: 'SEARCH ALGORITHMS',
+        iconType: 'formula',
+        summary:
+          'A* prioritizes nodes by evaluation function f(n) = g(n) + h(n), where g(n) is the exact cost from start and h(n) is an admissible heuristic estimate to the goal.',
+        formula: 'f(n) = g(n) + h(n), where h(n) ≤ h*(n) (Admissibility)',
+        deepDive:
+          'An admissible heuristic never overestimates the true cost to the goal, ensuring optimal shortest path discovery while pruning unpromising branches.',
+        interactiveSimType: 'graph-traversal',
+        actionPrompt: 'Demonstrate Euclidean vs Manhattan heuristic distances in 2D grid pathfinding.',
+      },
+      {
+        id: 'branch-complexity-tradeoffs',
+        title: 'Asymptotic Bounds & Space Profile',
         badge: 'COMPLEXITY',
-        icon: '📊',
+        iconType: 'code',
         summary:
-          'Search, insert, and delete run in O(h) time where h is tree height. In balanced trees, this is O(log n); worst-case degenerate trees are O(n).',
-        formula: 'Average Time: O(log n) | Auxiliary Call Stack: O(h)',
+          'BFS explores level-by-level using O(V) queue space for unweighted graphs. Dijkstra adds priority ordering for non-negative weighted graphs.',
+        formula: 'BFS: O(V + E) | Dijkstra: O((V + E) log V) | Space: O(V)',
         deepDive:
-          'With 1,000,000 elements, a balanced BST finds any record in just ~20 comparisons (log₂ 1,000,000 ≈ 20).',
-        interactiveSimType: 'binary-tree',
-        actionPrompt: 'Explain how B-Trees generalize BSTs for disk and database indexing with high fan-out factors.',
+          'In dense graphs (E ≈ V²), matrix representations yield O(V²) which matches adjacency lists with binary heaps.',
+        interactiveSimType: 'graph-traversal',
+        actionPrompt: 'Compare memory constraints of bidirectional search vs unidirectional Dijkstra on large road networks.',
       },
     ];
   }
 
-  // 4. Systems Programming, Concurrency, POSIX, Mutex, Raft
+  // 5. Hash Tables, Dictionaries, Collisions
   if (
-    normalized.includes('concurrency') ||
-    normalized.includes('thread') ||
-    normalized.includes('mutex') ||
-    normalized.includes('posix') ||
-    normalized.includes('raft') ||
-    normalized.includes('distributed') ||
-    normalized.includes('cache')
+    normalized.includes('hash') ||
+    normalized.includes('bucket') ||
+    normalized.includes('collision') ||
+    normalized.includes('load factor') ||
+    normalized.includes('probing')
   ) {
     return [
       {
-        id: 'branch-posix-threads',
-        title: 'POSIX Threads & Mutex Locks',
-        badge: 'SYSTEMS',
-        icon: '🔒',
+        id: 'branch-hash-function',
+        title: 'Polynomial Hash & Uniform Distribution',
+        badge: 'HASHING',
+        iconType: 'database',
         summary:
-          'POSIX mutexes prevent race conditions across concurrent threads. Atomic hardware primitives (CMPXCHG) ensure mutually exclusive critical section access.',
-        formula: 'pthread_mutex_lock(&mtx) ⟶ [Critical Section] ⟶ pthread_mutex_unlock(&mtx)',
+          'A cryptographic or polynomial rolling hash function maps variable-length keys to uniform pseudo-random 32/64-bit integers modulo table capacity M.',
+        formula: 'h(s) = (∑ s[i] · pⁱ) mod M, where p is prime (e.g., 31)',
         deepDive:
-          'Condition variables allow worker threads to sleep without consuming CPU cycles, atomically waking up when data arrives.',
-        actionPrompt: 'Explain mutex vs spinlock trade-offs and condition variable signaling patterns.',
+          'Uniform hashing ensures each key is equally likely to hash to any of the M slots, independent of where other keys have hashed.',
+        interactiveSimType: 'hash-table',
+        actionPrompt: 'Compare separate chaining vs open addressing (linear, quadratic, double hashing) under high load factors.',
       },
       {
-        id: 'branch-raft-consensus',
-        title: 'Raft Consensus & Quorums',
-        badge: 'DISTRIBUTED',
-        icon: '🌐',
+        id: 'branch-load-factor-amortization',
+        title: 'Load Factor (λ) & Amortized O(1)',
+        badge: 'COMPLEXITY',
+        iconType: 'formula',
         summary:
-          'Raft breaks consensus into Leader Election, Log Replication, and Safety. A strict majority quorum (N/2 + 1) is required to commit any state change.',
-        formula: 'Quorum = ⌊N / 2⌋ + 1 Nodes',
+          'The load factor λ = N / M dictates collision frequency. When λ exceeds threshold (typically 0.75), resizing doubles capacity to preserve O(1) expected operations.',
+        formula: 'E[Search Time] = 1 + λ / 2 (Successful Search in Chaining)',
         deepDive:
-          'Randomized election timeouts (150ms-300ms) prevent split-vote deadlocks during leader failure failover.',
-        actionPrompt: 'How does Raft maintain strong consistency during network partitions and split-brain scenarios?',
+          'Table doubling takes O(N) work, but since it occurs exponentially infrequently, aggregate insertion cost is amortized O(1) per element.',
+        interactiveSimType: 'hash-table',
+        actionPrompt: 'Prove mathematically why hash table resizing yields O(1) amortized insertion cost.',
       },
       {
-        id: 'branch-memory-ordering',
-        title: 'Memory Models & MESI Caches',
-        badge: 'HARDWARE ARCH',
-        icon: '⚡',
+        id: 'branch-collision-resolution',
+        title: 'Chaining vs Robin Hood Hashing',
+        badge: 'SYSTEMS DESIGN',
+        iconType: 'code',
         summary:
-          'Multicore CPUs cache memory lines in Modified, Exclusive, Shared, or Invalid states. Memory barriers enforce read/write order across cores.',
-        formula: 'Acquire-Release Semantics & Memory Fences',
+          'Separate chaining links nodes on heap memory addresses. Robin Hood hashing reallocates items in contiguous arrays to minimize variance in probe sequence lengths.',
+        formula: 'Variance(PSL) ⟶ 0 in Robin Hood Hashing',
         deepDive:
-          'Out-of-order execution and compiler reordering make memory fences mandatory for lock-free multi-threaded queues.',
-        actionPrompt: 'Explain cache coherence protocols (MESI) and false sharing prevention in high-performance C++.',
+          'Contiguous open addressing benefits from CPU L1/L2 cache locality, whereas linked list nodes cause pointer chasing cache misses.',
+        interactiveSimType: 'hash-table',
+        actionPrompt: 'Explain how CPU cache line architecture influences modern hash table implementations like Swiss Tables.',
       },
     ];
   }
 
-  // 5. Default Fallback Concept Branches
+  // 6. Sorting & Divide-and-Conquer (Merge Sort, Quick Sort)
+  if (
+    normalized.includes('merge sort') ||
+    normalized.includes('quick sort') ||
+    normalized.includes('divide and conquer') ||
+    normalized.includes('sorting') ||
+    normalized.includes('quicksort') ||
+    normalized.includes('mergesort')
+  ) {
+    return [
+      {
+        id: 'branch-divide-conquer',
+        title: 'Divide-and-Conquer Recurrence',
+        badge: 'RECURSION',
+        iconType: 'tree',
+        summary:
+          'The problem is split into independent subproblems of size n/2, solved recursively, and combined in linear O(n) auxiliary time.',
+        formula: 'T(n) = 2T(n/2) + O(n) ⟹ O(n log n) by Master Theorem',
+        deepDive:
+          'Recursion depth is exactly ⌈log₂ n⌉ levels. At each level, merging elements takes O(n) total comparisons across all partitions.',
+        interactiveSimType: 'sorting',
+        actionPrompt: 'Solve the recurrence relation T(n) = 2T(n/2) + O(n) using the recursion tree method.',
+      },
+      {
+        id: 'branch-stability-space',
+        title: 'Stability & Auxiliary Space Trade-offs',
+        badge: 'COMPLEXITY',
+        iconType: 'code',
+        summary:
+          'Standard Merge Sort guarantees stable sorting but requires O(n) auxiliary buffer space. Quick Sort sorts in-place O(log n) call stack space but is unstable.',
+        formula: 'Merge Sort: Space O(n) | Quick Sort: Space O(log n)',
+        deepDive:
+          'Stability is critical when sorting records with multiple keys (e.g., sorting by date then by transaction amount).',
+        interactiveSimType: 'sorting',
+        actionPrompt: 'Why does standard merge sort require O(n) extra space, and can in-place merge sort run in O(n log n) time?',
+      },
+      {
+        id: 'branch-pivot-partitioning',
+        title: 'Lomuto vs Hoare Partitioning',
+        badge: 'ALGORITHMS',
+        iconType: 'compass',
+        summary:
+          'Hoare partitioning uses two pointers starting at ends moving inward, performing on average three times fewer element swaps than Lomuto partitioning.',
+        formula: 'Expected Comparisons: ~1.386 n ln n in Randomized Quick Sort',
+        deepDive:
+          'Selecting median-of-three or randomized pivots prevents O(n²) degradation on already sorted or reverse-sorted input arrays.',
+        interactiveSimType: 'sorting',
+        actionPrompt: 'Compare Lomuto vs Hoare partitioning schemes with pointer trace diagrams.',
+      },
+    ];
+  }
+
+  // 7. Dynamic Topic-Aware Synthesis Fallback
+  // Extracts subject from text to avoid generic strings like F(x, t) = Governing Relation
+  const cleanSubject = text
+    .replace(/[?.,!]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !['what', 'when', 'which', 'where', 'how', 'explain', 'tell', 'show'].includes(w.toLowerCase()))
+    .slice(0, 4)
+    .join(' ') || 'Underlying Subject';
+
   return [
     {
-      id: 'branch-core-mechanism',
-      title: 'Core Fundamental Mechanism',
+      id: 'branch-core-principles',
+      title: 'First-Principles Analytical Model',
       badge: 'FOUNDATION',
-      icon: '💡',
-      summary:
-        'The foundational operational principles, state transitions, and step-by-step logic that govern this concept.',
-      formula: 'Input State ⟶ Transformation Function ⟶ Verified Output',
-      deepDive:
-        'Understanding the first principles enables reasoning through edge cases, boundary conditions, and performance constraints.',
-      actionPrompt: `Explain the core fundamental mechanism of: ${text.slice(0, 80)}`,
+      iconType: 'compass',
+      summary: `The formal mechanisms, governing axioms, and state transformations defining ${cleanSubject}.`,
+      formula: `System(S₀) ⟶ [Invariant Transformation] ⟶ Validated State(S₁)`,
+      deepDive: `Deconstructing ${cleanSubject} to its primary invariants isolates root dependencies and reveals performance and correctness constraints.`,
+      actionPrompt: `Explain the foundational first principles, state invariants, and step-by-step logic of: ${cleanSubject}.`,
     },
     {
-      id: 'branch-governing-laws',
-      title: 'Underlying Scientific Laws & Math',
-      badge: 'FORMULA & LAWS',
-      icon: '📐',
-      summary:
-        'The mathematical models, formal equations, conservation laws, or algorithmic proof principles that guarantee correctness.',
-      formula: 'F(x, t) = Governing Analytical Relation',
-      deepDive:
-        'Rigorous mathematical guarantees prevent silent runtime errors and optimize resource utilization.',
-      actionPrompt: `What are the governing equations and mathematical formulations for: ${text.slice(0, 80)}`,
+      id: 'branch-formal-relationships',
+      title: 'Formal Bounds & Governing Relations',
+      badge: 'FORMULATION',
+      iconType: 'formula',
+      summary: `Mathematical formulations, asymptotic bounds, and quantitative conservation relations governing ${cleanSubject}.`,
+      formula: `Complexity / Balance: T(n) ∈ O(f(n)) ⟵ Bound Invariants`,
+      deepDive: `Formal proofs and rigorous mathematical modeling protect against degenerate edge conditions and define scaling limits under load.`,
+      actionPrompt: `What are the governing mathematical relations, equations, or formal asymptotic bounds for: ${cleanSubject}?`,
     },
     {
-      id: 'branch-real-world-impact',
-      title: 'Real-World Applications & Impact',
+      id: 'branch-applied-systems',
+      title: 'Production Architecture & Implementation',
       badge: 'APPLICATION',
-      icon: '🚀',
-      summary:
-        'How modern engineers, scientists, and software architects apply this knowledge in production systems and experimental labs.',
-      formula: 'Theoretical Model ⟶ Industrial Engineering Implementation',
-      deepDive:
-        'Case studies and production battle-testing highlight practical trade-offs between speed, cost, and complexity.',
-      actionPrompt: `Give real-world engineering case studies and applications of: ${text.slice(0, 80)}`,
+      iconType: 'application',
+      summary: `How modern software engineers, scientists, and researchers implement ${cleanSubject} in real-world production environments.`,
+      formula: `Specification ⟶ Architectural Pipeline ⟶ Production Deployment`,
+      deepDive: `Industrial case studies demonstrate practical engineering trade-offs between latency, maintainability, and resource utilization.`,
+      actionPrompt: `Give concrete real-world engineering case studies, architectures, and implementation patterns for: ${cleanSubject}.`,
     },
   ];
 }

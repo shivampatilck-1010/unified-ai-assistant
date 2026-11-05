@@ -9,23 +9,23 @@
 .composer__inner {
   display: flex;
   flex-direction: column;
-  background: #070709;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 8px 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  background: var(--surface-card, #201f1d);
+  border: 1px solid var(--border, rgba(240, 237, 230, 0.09));
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
 .composer--dragging .composer__inner {
-  border-color: #e2a03f;
-  background: #0e0e14;
-  box-shadow: 0 0 0 2px rgba(226, 160, 63, 0.4);
+  border-color: var(--accent);
+  background: #252422;
+  box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
 .composer__inner:focus-within {
-  border-color: var(--accent-muted);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent-muted);
+  border-color: rgba(217, 119, 87, 0.45);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(217, 119, 87, 0.3);
 }
 
 .composer__attachments-strip {
@@ -143,7 +143,18 @@
   cursor: default;
 }
 
-.composer__send-btn:not(:disabled):hover,
+.composer__send-btn:not(:disabled) {
+  background: var(--accent);
+  color: #191817;
+  border-radius: 8px;
+}
+
+.composer__send-btn:not(:disabled):hover {
+  background: var(--accent-hover, #c96442);
+  color: #ffffff;
+  transform: scale(1.04);
+}
+
 .composer__stop-btn:hover {
   background: var(--surface-hover);
   color: var(--text-primary);

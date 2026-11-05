@@ -11,30 +11,103 @@ export interface InteractiveChoiceCardProps {
   onSelectChoice?: (choice: string) => void;
 }
 
+function renderBranchIcon(iconType?: string) {
+  switch (iconType) {
+    case 'compass':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+        </svg>
+      );
+    case 'formula':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M4 19h16M4 5h16M9 9l6 6M15 9l-6 6" />
+        </svg>
+      );
+    case 'atom':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="2" />
+          <path d="M12 2a10 5 0 0 1 0 20 10 5 0 0 1 0-20z" transform="rotate(30 12 12)" />
+          <path d="M12 2a10 5 0 0 1 0 20 10 5 0 0 1 0-20z" transform="rotate(-30 12 12)" />
+        </svg>
+      );
+    case 'database':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <ellipse cx="12" cy="5" rx="9" ry="3" />
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+        </svg>
+      );
+    case 'code':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <polyline points="16 18 22 12 16 6" />
+          <polyline points="8 6 2 12 8 18" />
+        </svg>
+      );
+    case 'layers':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
+        </svg>
+      );
+    case 'tree':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="5" r="3" />
+          <circle cx="6" cy="17" r="3" />
+          <circle cx="18" cy="17" r="3" />
+          <path d="M12 8v4M12 12l-4 3M12 12l4 3" />
+        </svg>
+      );
+    case 'cpu':
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
+        </svg>
+      );
+    default:
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      );
+  }
+}
+
 export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
   question,
   options = [],
-  category = 'Clarification & Choice',
-  typeBadge = 'MCQ',
+  category = 'Inquiry & Reasoning',
+  typeBadge = 'Inquiry',
   summary,
   onSelectChoice,
 }) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState<boolean>(false);
 
-  // Cybernetic Branching Reference Modules
-  const [branches, setBranches] = useState<ExplanationBranch[]>(() =>
+  // Conceptual reference branches
+  const [branches] = useState<ExplanationBranch[]>(() =>
     inferExplanationBranches(question, options, category)
   );
   const [expandedBranchId, setExpandedBranchId] = useState<string | null>(null);
-  const [showBranches, setShowBranches] = useState<boolean>(false);
+  const [showBranches, setShowBranches] = useState<boolean>(true);
   const [downloadFeedback, setDownloadFeedback] = useState<string | null>(null);
 
   const handleSelectOption = (idx: number, opt: string) => {
     if (submitted) return;
     setSelectedIndex(idx);
     setSubmitted(true);
-    setShowBranches(true);
 
     if (onSelectChoice) {
       onSelectChoice(opt);
@@ -47,11 +120,12 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
 
   const handleDownloadBranch = (branch: ExplanationBranch) => {
     try {
-      const content = `# Study Sheet: ${branch.title}\n\n` +
-        `**Domain**: ${branch.badge || 'STEM'}\n\n` +
-        `## Concept Summary\n${branch.summary}\n\n` +
-        (branch.formula ? `## Mathematical / Chemical Formula\n\`\`\`\n${branch.formula}\n\`\`\`\n\n` : '') +
-        (branch.deepDive ? `## In-Depth Analysis\n${branch.deepDive}\n\n` : '') +
+      const content =
+        `# Conceptual Study Reference: ${branch.title}\n\n` +
+        `**Domain Area**: ${branch.badge || 'Cognitive Sciences'}\n\n` +
+        `## Overview & Summary\n${branch.summary}\n\n` +
+        (branch.formula ? `## Mathematical / Formal Relation\n\`\`\`\n${branch.formula}\n\`\`\`\n\n` : '') +
+        (branch.deepDive ? `## Analytical Deep-Dive\n${branch.deepDive}\n\n` : '') +
         `---\n*Exported from Unified AI Cognitive Workspace on ${new Date().toLocaleString()}*`;
 
       const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
@@ -71,19 +145,18 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
     }
   };
 
-  const handleDeleteBranch = (branchId: string) => {
-    setBranches((prev) => prev.filter((b) => b.id !== branchId));
-  };
-
   const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
   return (
     <div className="cortex-card-wrapper">
-      {/* Centered Card with Colored Boundary */}
+      {/* Claude Editorial Styled Container */}
       <div className="cortex-card-main">
         <div className="cortex-card-header">
-          <span className="cortex-badge">{typeBadge.toUpperCase()}</span>
-          <span className="cortex-category">{category}</span>
+          <div className="cortex-header-meta">
+            <span className="cortex-badge">{typeBadge.toUpperCase()}</span>
+            <span className="cortex-category">{category}</span>
+          </div>
+          <span className="cortex-brand-hint">Claude Editorial Model</span>
         </div>
 
         <h4 className="cortex-card-title">{question}</h4>
@@ -125,45 +198,36 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
         {/* Selection Feedback Banner */}
         {submitted && selectedIndex !== null && (
           <div className="cortex-submitted-banner">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <span>
-              Selected <strong>Option {optionLetters[selectedIndex]}:</strong> &ldquo;{options[selectedIndex]}&rdquo;
+              Recorded response: <strong>Option {optionLetters[selectedIndex]}:</strong> &ldquo;{options[selectedIndex]}&rdquo;
             </span>
           </div>
         )}
 
-        {/* Branching Reference Modules Section */}
+        {/* Conceptual Foundations & Reference Branches */}
         {branches.length > 0 && (
-          <div className="cortex-branches-section" style={{ marginTop: '20px' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#00e5ff' }}>
-                  CYBERNETIC PEDAGOGICAL MODULES
-                </span>
-                <span style={{ fontSize: '10px', color: '#64748b' }}>({branches.length})</span>
+          <div className="cortex-branches-section">
+            <div className="cortex-branches-header-row">
+              <div className="cortex-branches-title-group">
+                <span className="cortex-branches-title">Key Principles & Deeper Exploration</span>
+                <span className="cortex-branches-count">({branches.length})</span>
               </div>
               <button
                 type="button"
                 className="cortex-branch-action-btn"
-                style={{ fontSize: '11px', padding: '3px 8px' }}
                 onClick={() => setShowBranches((s) => !s)}
+                aria-label={showBranches ? 'Collapse exploration paths' : 'Expand exploration paths'}
               >
-                {showBranches ? '▲ Collapse Paths' : '▼ Expand Paths'}
+                {showBranches ? 'Collapse ▴' : 'Explore ▾'}
               </button>
             </div>
 
             {showBranches && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="cortex-branches-list">
                 {branches.map((b) => {
                   const isExpanded = expandedBranchId === b.id;
                   const isDownloaded = downloadFeedback === b.id;
@@ -171,52 +235,44 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
                   return (
                     <div key={b.id} className="cortex-branch-card">
                       <div className="cortex-branch-header">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className="cortex-branch-icon">{b.icon || '🧬'}</span>
+                        <div className="cortex-branch-title-wrap">
+                          <span className="cortex-branch-icon" aria-hidden="true">
+                            {renderBranchIcon(b.iconType)}
+                          </span>
                           <span className="cortex-branch-title">{b.title}</span>
                           {b.badge && <span className="cortex-branch-badge">{b.badge}</span>}
                         </div>
 
-                        {/* Action Nodes: View, Download, Delete */}
+                        {/* Action Nodes: Inspect, Export */}
                         <div className="cortex-branch-actions">
                           <button
                             type="button"
-                            className="cortex-branch-action-btn"
+                            className={`cortex-branch-action-btn ${isExpanded ? 'cortex-branch-action-btn--active' : ''}`}
                             onClick={() => handleToggleDeepDive(b.id)}
-                            title={isExpanded ? 'Hide Deep Dive' : 'View Deep Dive'}
+                            title={isExpanded ? 'Hide deep dive' : 'Inspect deep dive'}
                           >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                              <circle cx="12" cy="12" r="3" />
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                              {isExpanded ? (
+                                <path d="M18 15l-6-6-6 6" />
+                              ) : (
+                                <path d="M6 9l6 6 6-6" />
+                              )}
                             </svg>
-                            <span>{isExpanded ? 'Hide' : 'View'}</span>
+                            <span>{isExpanded ? 'Hide' : 'Inspect'}</span>
                           </button>
 
                           <button
                             type="button"
                             className="cortex-branch-action-btn"
                             onClick={() => handleDownloadBranch(b)}
-                            title="Download study reference note"
+                            title="Export study reference note"
                           >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                               <polyline points="7 10 12 15 17 10" />
                               <line x1="12" y1="15" x2="12" y2="3" />
                             </svg>
-                            <span>{isDownloaded ? 'Saved!' : 'Download'}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            className="cortex-branch-action-btn cortex-branch-action-btn--delete"
-                            onClick={() => handleDeleteBranch(b.id)}
-                            title="Dismiss / Delete reference module"
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                            <span>Delete</span>
+                            <span>{isDownloaded ? 'Exported!' : 'Export'}</span>
                           </button>
                         </div>
                       </div>
@@ -232,20 +288,23 @@ export const InteractiveChoiceCard: React.FC<InteractiveChoiceCardProps> = ({
                       {/* Deep Dive Panel */}
                       {isExpanded && b.deepDive && (
                         <div className="cortex-branch-deepdive">
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#38bdf8', marginBottom: '4px' }}>
-                            MECHANISM DEEP-DIVE:
+                          <div className="cortex-deepdive-label">
+                            Analytical Mechanics & Invariant:
                           </div>
-                          <div style={{ fontSize: '12px', color: '#e2e8f0', lineHeight: 1.5 }}>
+                          <div className="cortex-deepdive-text">
                             {b.deepDive}
                           </div>
                           {b.actionPrompt && onSelectChoice && (
                             <button
                               type="button"
-                              className="sim-btn sim-btn--primary"
-                              style={{ marginTop: '8px', fontSize: '11px', padding: '4px 10px' }}
+                              className="cortex-explore-btn"
                               onClick={() => onSelectChoice(b.actionPrompt!)}
                             >
-                              Explore Further in Chat ➔
+                              <span>Explore Further in Chat</span>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                              </svg>
                             </button>
                           )}
                         </div>
