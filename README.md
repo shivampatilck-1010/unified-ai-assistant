@@ -45,32 +45,32 @@ Understand ➔ Plan ➔ Observe ➔ Act ➔ Verify ➔ Recover ➔ Complete
 
 ---
 
-## ✨ Highlights & Capabilities
+##  Highlights & Capabilities
 
-### 1. 🪐 Executive 3D Metallic Identity & Micro-Animations
+### 1.  Executive 3D Metallic Identity & Micro-Animations
 * **Sculpted 3D Metallic 'U'**: Pure titanium gunmetal and polished platinum-chrome gradients with authentic specular bevels.
 * **Planetary Orbital Plasma Ring**: Perspective-tilted orbital ring with 3D depth layering (passes behind the left arm and loops across the front bowl).
 * **Fluid Specular Sheen Sweep**: Animated directional beam of light sweeping smoothly across the metallic creases of the letter.
 * **Traveling Photon Particle**: Celestial star particle dynamically tracing the elliptical planetary orbit.
 * **Zero Compression Artifacts**: High-resolution 1024x1024 native alpha-transparent PNG and scalable vector SVG (`/logo.svg`).
 
-### 2. 🌐 Universal Computer-Use & Autonomous Browser Intelligence (Phase 3)
+### 2.  Universal Computer-Use & Autonomous Browser Intelligence (Phase 3)
 * **Playwright-Powered Web Execution**: Operates unfamiliar web interfaces, fills forms, authenticates, and completes complex adaptive educational lessons end-to-end.
 * **Visual DOM Observation**: Real-time perception of interactive elements, input fields, modals, and dynamic overlays.
 * **Live Viewport Card**: Interactive in-chat preview card with live screenshot feed, observed action progress, and fullscreen view.
 * **Self-Correction & Recovery**: Automatically detects validation failures, overlays, or navigation timeouts, recovers state, and verifies task completion.
 
-### 3. 💻 Autonomous Coding Sandbox (Phase 4)
+### 3.  Autonomous Coding Sandbox (Phase 4)
 * **Codebase Tree Inspection**: Direct workspace filesystem inspection with structure mapping and file metadata (`/api/intelligence/coding/inspect`).
 * **Source Code Inspection & Editing**: In-browser code editor and viewer with line formatting and safe modification writes (`/api/intelligence/coding/modify`).
 * **Subprocess Test Runner**: Runs isolated `pytest` test suites with real-time telemetry, exit code capture, test counts, execution duration, and terminal stdout/stderr streaming.
 * **Dedicated Workspace UI**: Integrated directly into the **Projects & Workspaces** view under the *Coding Sandbox* tab.
 
-### 4. 📐 Mathematical Notation & Visual Diagrams
+### 4.  Mathematical Notation & Visual Diagrams
 * **KaTeX 0.19 Rendering**: Full rendering of inline equations (`$E = mc^2$`, `\(...\)`) and standalone display equation blocks (`$$...$$`, `\[...\]`).
 * **Mermaid 12.2 Interactive Diagrams**: Live generation of flowcharts, sequence diagrams, class models, state machines, and Gantt charts with one-click **SVG Download** and code copying.
 
-### 5. 🌌 Interactive Canvas Animation
+### 5.  Interactive Canvas Animation
 * **Image Generating Particle Canvas**: Pitch-black canvas (`#050507`) with 75 floating gray ambient particles.
 * **Interactive Physics**: Particles actively respond to cursor movement with dynamic gravitational attraction and connecting velocity tracer filaments.
 
@@ -79,32 +79,32 @@ Understand ➔ Plan ➔ Observe ➔ Act ➔ Verify ➔ Recover ➔ Complete
 * **Semantic Vector Embeddings**: Cosine similarity retrieval with lexical fallback.
 * **Grounded Citation Badges**: Verifiable source tags (`[Doc: filename, Page X]`) with snippet previews.
 
-### 7. 🔎 Autonomous Web Research Engine (Phase 6)
+### 7.  Autonomous Web Research Engine (Phase 6)
 * **Multi-Query Synthesis**: Formulates deep search plans across independent sources.
 * **SSRF-Protected Content Extraction**: Blocks private IP addresses and cloud metadata endpoints (`169.254.169.254`).
 * **Structured Markdown Reports**: Automated synthesis with numbered web citations (`[Web N: Title]`).
 
-### 8. 🤖 Multi-Agent Orchestration Engine (Phase 7)
+### 8.  Multi-Agent Orchestration Engine (Phase 7)
 * **Directed Acyclic Graph (DAG)**: Orchestrates specialized sub-agents (Planner, Web Researcher, Browser Automator, Coding Agent, Verifier).
 * **Human-in-the-Loop Review**: Mandatory confirmation gates for consequential actions.
 * **Topological Dependency Execution**: Safe concurrent execution of independent tasks via `asyncio.gather`.
 
-### 9. ⏰ Scheduled Automations & 72-Hour Data Retention (Phase 8)
+### 9.  Scheduled Automations & 72-Hour Data Retention (Phase 8)
 * **Recurring Background Automations**: Built-in cron scheduler for recurring research briefs, browser workflows, and code audits.
 * **Automations Manager UI**: Dedicated management tab inside **Calendar & Tasks** to register and monitor active schedules.
 * **72-Hour Data Retention**: Automated rolling cleanup worker purging expired conversations, files, and sensing events, with one-click manual purge in **Settings**.
 
-### 10. 🔐 Google Authentication & Follow-Up Email Recaps
+### 10.  Google Authentication & Follow-Up Email Recaps
 * **Official Google One-Tap & Sign-In**: Multi-colored Google "G" branding with HMAC-SHA256 JWT sessions and user profile synchronization.
 * **Follow-Up Email Dispatch**: In-chat modal enabling users to receive concise task summaries, action items, and attachments sent directly to their Google email account.
 
-### 11. 📡 Physical Wi-Fi Sensing Workspace
+### 11.  Physical Wi-Fi Sensing Workspace
 * **ESP32 CSI Hardware Bridge**: Real serial interface (`COM7` @ 921600 baud) for channel state information (CSI) vital sensing and presence detection.
 * **Interactive 3D Room Canvas**: Three.js/Cytoscape room visualization tracking indoor position, respiration rate, and motion vectors.
 
 ---
 
-## 🏛 System Architecture
+##  System Architecture
 
 ```mermaid
 graph TD
@@ -135,7 +135,7 @@ graph TD
 
 ---
 
-## 🚀 Cloudflare Deployment Guide
+##  Cloudflare Deployment Guide
 
 Deploying the Unified AI Assistant online via Cloudflare gives you high availability, global CDN edge delivery, automatic SSL certificates, and zero-trust tunneling for your backend API without exposing open ports to the public internet.
 
