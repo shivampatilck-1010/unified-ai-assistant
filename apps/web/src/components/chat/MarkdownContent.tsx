@@ -322,10 +322,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       lowerLang === 'linked-list' ||
       lowerLang === 'photosynthesis' ||
       lowerLang === 'sorting' ||
+      lowerLang === 'merge-sort' ||
+      lowerLang === 'quick-sort' ||
       lowerLang === 'generative-ui' ||
       (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script') || code.includes('<!DOCTYPE')))
     ) {
-      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'linked-list' | 'sorting' | 'photosynthesis' | 'custom-html' = 'custom-html';
+      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'linked-list' | 'sorting' | 'merge-sort' | 'quick-sort' | 'photosynthesis' | 'custom-html' = 'custom-html';
       const lowerCode = code.toLowerCase().trim();
       const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
       const declaredType = typeMatch ? typeMatch[1].toLowerCase() : '';
@@ -382,12 +384,42 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       } else if (
         declaredType === 'sorting' ||
         declaredType === 'sort' ||
+        declaredType === 'merge-sort' ||
+        declaredType === 'mergesort' ||
+        declaredType === 'quick-sort' ||
+        declaredType === 'quicksort' ||
         lowerLang.includes('sort') ||
+        lowerLang.includes('merge') ||
+        lowerLang.includes('quick') ||
         lowerCode.includes('bubblesort') ||
         lowerCode.includes('quicksort') ||
-        lowerCode.includes('mergesort')
+        lowerCode.includes('mergesort') ||
+        lowerCode.includes('merge sort') ||
+        lowerCode.includes('quick sort') ||
+        lowerCode.includes('merge') ||
+        lowerCode.includes('sort')
       ) {
-        simType = 'sorting';
+        if (
+          declaredType === 'merge-sort' ||
+          declaredType === 'mergesort' ||
+          lowerLang.includes('merge') ||
+          lowerCode.includes('mergesort') ||
+          lowerCode.includes('merge sort') ||
+          lowerCode.includes('merge')
+        ) {
+          simType = 'merge-sort';
+        } else if (
+          declaredType === 'quick-sort' ||
+          declaredType === 'quicksort' ||
+          lowerLang.includes('quick') ||
+          lowerCode.includes('quicksort') ||
+          lowerCode.includes('quick sort') ||
+          lowerCode.includes('quick')
+        ) {
+          simType = 'quick-sort';
+        } else {
+          simType = 'sorting';
+        }
       } else {
         // Universal dynamic Generative UI / HTML5 Canvas / SVG simulation for ANY other topic!
         simType = 'custom-html';

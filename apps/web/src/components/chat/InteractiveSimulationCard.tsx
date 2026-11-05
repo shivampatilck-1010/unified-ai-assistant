@@ -3,7 +3,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './InteractiveSimulationCard.css';
 
 export interface InteractiveSimulationCardProps {
-  type?: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'linked-list' | 'sorting' | 'photosynthesis' | 'custom-html';
+  type?:
+    | 'atomic-collision'
+    | 'nuclear-fusion'
+    | 'binary-tree'
+    | 'linked-list'
+    | 'sorting'
+    | 'merge-sort'
+    | 'quick-sort'
+    | 'photosynthesis'
+    | 'custom-html';
   title?: string;
   code?: string;
 }
@@ -122,6 +131,24 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
       return 'photosynthesis';
     }
     if (
+      declaredType === 'merge-sort' ||
+      declaredType === 'mergesort' ||
+      lowerCode.includes('mergesort') ||
+      lowerCode.includes('merge sort') ||
+      lowerCode.includes('merge')
+    ) {
+      return 'merge-sort';
+    }
+    if (
+      declaredType === 'quick-sort' ||
+      declaredType === 'quicksort' ||
+      lowerCode.includes('quicksort') ||
+      lowerCode.includes('quick sort') ||
+      lowerCode.includes('quick')
+    ) {
+      return 'quick-sort';
+    }
+    if (
       declaredType === 'sorting' ||
       declaredType === 'sort' ||
       lowerCode.includes('sort') ||
@@ -150,6 +177,8 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     if (resolvedType === 'binary-tree') return 'Binary Search Tree Visualizer';
     if (resolvedType === 'linked-list') return 'Singly Linked List Interactive Visualizer';
     if (resolvedType === 'photosynthesis') return 'Photosynthesis & Solar Photolysis Simulation';
+    if (resolvedType === 'merge-sort') return 'Merge Sort (Divide & Conquer O(n log n)) Visualizer';
+    if (resolvedType === 'quick-sort') return 'Quick Sort (Partition O(n log n)) Visualizer';
     if (resolvedType === 'sorting') return 'Sorting Algorithm Visualizer';
     return 'Interactive Visual Simulation';
   }, [title, resolvedType]);
@@ -216,26 +245,233 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   const [comparisons, setComparisons] = useState<number>(0);
   const [swaps, setSwaps] = useState<number>(0);
   const [isSorting, setIsSorting] = useState<boolean>(false);
+  const [sortAlgo, setSortAlgo] = useState<'merge' | 'quick' | 'bubble'>('merge');
+  const [mergeRange, setMergeRange] = useState<{ left: number; mid: number; right: number } | null>(null);
+  const [pivotIdx, setPivotIdx] = useState<number | null>(null);
+  const [sortStatusText, setSortStatusText] = useState<string>('Ready to sort');
   const sortCancelRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (resolvedType === 'merge-sort' || code.toLowerCase().includes('merge')) {
+      setSortAlgo('merge');
+      setSortStatusText('Merge Sort (Divide & Conquer O(N log N)) ready');
+    } else if (resolvedType === 'quick-sort' || code.toLowerCase().includes('quick')) {
+      setSortAlgo('quick');
+      setSortStatusText('Quick Sort (Partition O(N log N)) ready');
+    } else if (code.toLowerCase().includes('bubble')) {
+      setSortAlgo('bubble');
+      setSortStatusText('Bubble Sort (Adjacent Swaps O(N²)) ready');
+    }
+  }, [resolvedType, code]);
 
   const handleShuffleSort = () => {
     sortCancelRef.current = true;
     setIsSorting(false);
     setComparingIdx(null);
+    setMergeRange(null);
+    setPivotIdx(null);
     setSortedIndices([]);
     setComparisons(0);
     setSwaps(0);
+    setSortStatusText('Array randomized. Choose an algorithm and press Start.');
     setSortArray((prev) => [...prev].sort(() => Math.random() - 0.5));
   };
 
-  const handleStartSort = async () => {
+  // --- MERGE SORT (Divide & Conquer O(n log n)) ---
+  const handleStartMergeSort = async () => {
     if (isSorting) return;
     setIsSorting(true);
     sortCancelRef.current = false;
+    setSortedIndices([]);
+    setComparingIdx(null);
+    setPivotIdx(null);
+    let compCount = 0;
+    let auxWrites = 0;
+    setComparisons(0);
+    setSwaps(0);
+    setSortStatusText('Starting Merge Sort (Divide & Conquer)...');
+
+    const arr = [...sortArray];
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const merge = async (left: number, mid: number, right: number) => {
+      if (sortCancelRef.current) return;
+      setMergeRange({ left, mid, right });
+      setSortStatusText(`Divide: Merging sub-arrays [${left}..${mid}] and [${mid + 1}..${right}]`);
+      await sleep(180);
+
+      const leftPart = arr.slice(left, mid + 1);
+      const rightPart = arr.slice(mid + 1, right + 1);
+
+      let i = 0;
+      let j = 0;
+      let k = left;
+
+      while (i < leftPart.length && j < rightPart.length) {
+        if (sortCancelRef.current) return;
+        setComparingIdx([left + i, mid + 1 + j]);
+        compCount++;
+        setComparisons(compCount);
+        setSortStatusText(`Comparing left: ${leftPart[i]} with right: ${rightPart[j]}`);
+        await sleep(140);
+
+        if (leftPart[i] <= rightPart[j]) {
+          arr[k] = leftPart[i];
+          i++;
+        } else {
+          arr[k] = rightPart[j];
+          j++;
+        }
+        auxWrites++;
+        setSwaps(auxWrites);
+        setSortArray([...arr]);
+        k++;
+        await sleep(90);
+      }
+
+      while (i < leftPart.length) {
+        if (sortCancelRef.current) return;
+        arr[k] = leftPart[i];
+        i++;
+        k++;
+        auxWrites++;
+        setSwaps(auxWrites);
+        setSortArray([...arr]);
+        await sleep(60);
+      }
+
+      while (j < rightPart.length) {
+        if (sortCancelRef.current) return;
+        arr[k] = rightPart[j];
+        j++;
+        k++;
+        auxWrites++;
+        setSwaps(auxWrites);
+        setSortArray([...arr]);
+        await sleep(60);
+      }
+
+      const mergedSoFar: number[] = [];
+      for (let m = left; m <= right; m++) mergedSoFar.push(m);
+      setSortedIndices((prev) => Array.from(new Set([...prev, ...mergedSoFar])));
+    };
+
+    const mergeSortHelper = async (left: number, right: number) => {
+      if (left >= right || sortCancelRef.current) return;
+      const mid = Math.floor((left + right) / 2);
+      setSortStatusText(`Divide: Splitting at mid [${mid}] into [${left}..${mid}] & [${mid + 1}..${right}]`);
+      await sleep(120);
+
+      await mergeSortHelper(left, mid);
+      await mergeSortHelper(mid + 1, right);
+      await merge(left, mid, right);
+    };
+
+    await mergeSortHelper(0, arr.length - 1);
+
+    if (!sortCancelRef.current) {
+      setComparingIdx(null);
+      setMergeRange(null);
+      setSortedIndices(arr.map((_, i) => i));
+      setSortStatusText(`✅ Merge Sort Complete! Comparisons: ${compCount} | Auxiliary Writes: ${auxWrites}`);
+    }
+    setIsSorting(false);
+  };
+
+  // --- QUICK SORT (Pivot & Partition O(n log n)) ---
+  const handleStartQuickSort = async () => {
+    if (isSorting) return;
+    setIsSorting(true);
+    sortCancelRef.current = false;
+    setSortedIndices([]);
+    setComparingIdx(null);
+    setMergeRange(null);
+    let compCount = 0;
+    let swapCount = 0;
+    setComparisons(0);
+    setSwaps(0);
+    setSortStatusText('Starting Quick Sort (Pivot & Partition)...');
+
+    const arr = [...sortArray];
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const partition = async (low: number, high: number): Promise<number> => {
+      const pivot = arr[high];
+      setPivotIdx(high);
+      setSortStatusText(`Selected Pivot = ${pivot} at index [${high}]`);
+      await sleep(200);
+
+      let i = low - 1;
+      for (let j = low; j < high; j++) {
+        if (sortCancelRef.current) return -1;
+        setComparingIdx([j, high]);
+        compCount++;
+        setComparisons(compCount);
+        await sleep(120);
+
+        if (arr[j] < pivot) {
+          i++;
+          const temp = arr[i];
+          arr[i] = arr[j];
+          arr[j] = temp;
+          swapCount++;
+          setSwaps(swapCount);
+          setSortArray([...arr]);
+          await sleep(80);
+        }
+      }
+
+      const temp = arr[i + 1];
+      arr[i + 1] = arr[high];
+      arr[high] = temp;
+      swapCount++;
+      setSwaps(swapCount);
+      setSortArray([...arr]);
+      setPivotIdx(i + 1);
+      setSortedIndices((prev) => Array.from(new Set([...prev, i + 1])));
+      setSortStatusText(`Pivot ${pivot} placed in sorted position [${i + 1}]`);
+      await sleep(150);
+
+      return i + 1;
+    };
+
+    const quickSortHelper = async (low: number, high: number) => {
+      if (low < high && !sortCancelRef.current) {
+        const pi = await partition(low, high);
+        if (pi === -1) return;
+        await quickSortHelper(low, pi - 1);
+        await quickSortHelper(pi + 1, high);
+      } else if (low === high) {
+        setSortedIndices((prev) => Array.from(new Set([...prev, low])));
+      }
+    };
+
+    await quickSortHelper(0, arr.length - 1);
+
+    if (!sortCancelRef.current) {
+      setComparingIdx(null);
+      setPivotIdx(null);
+      setSortedIndices(arr.map((_, i) => i));
+      setSortStatusText(`✅ Quick Sort Complete! Comparisons: ${compCount} | Swaps: ${swapCount}`);
+    }
+    setIsSorting(false);
+  };
+
+  // --- BUBBLE SORT (Adjacent Swaps O(n²)) ---
+  const handleStartBubbleSort = async () => {
+    if (isSorting) return;
+    setIsSorting(true);
+    sortCancelRef.current = false;
+    setSortedIndices([]);
+    setMergeRange(null);
+    setPivotIdx(null);
     const arr = [...sortArray];
     const n = arr.length;
     let compCount = 0;
     let swapCount = 0;
+    setComparisons(0);
+    setSwaps(0);
+    setSortStatusText('Starting Bubble Sort (Adjacent Comparisons)...');
 
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n - i - 1; j++) {
@@ -243,6 +479,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         setComparingIdx([j, j + 1]);
         compCount++;
         setComparisons(compCount);
+        setSortStatusText(`Comparing arr[${j}] (${arr[j]}) with arr[${j + 1}] (${arr[j + 1]})`);
         await new Promise((r) => setTimeout(r, 120));
 
         if (arr[j] > arr[j + 1]) {
@@ -259,7 +496,18 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     }
     setComparingIdx(null);
     setSortedIndices(arr.map((_, idx) => idx));
+    setSortStatusText(`✅ Bubble Sort Complete! Comparisons: ${compCount} | Swaps: ${swapCount}`);
     setIsSorting(false);
+  };
+
+  const handleStartSort = () => {
+    if (sortAlgo === 'merge') {
+      void handleStartMergeSort();
+    } else if (sortAlgo === 'quick') {
+      void handleStartQuickSort();
+    } else {
+      void handleStartBubbleSort();
+    }
   };
 
   // =========================================================================
@@ -1411,7 +1659,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   };
 
   // =========================================================================
-  // SORTING ALGORITHM ENGINE
+  // SORTING ALGORITHM ENGINE (Merge Sort, Quick Sort, Bubble Sort)
   // =========================================================================
   const renderSortingSvg = () => {
     const maxVal = Math.max(...sortArray, 100);
@@ -1419,26 +1667,98 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     const gap = 10;
     const startX = 26;
 
-    return (
-      <svg width="100%" height="280" viewBox="0 0 540 280">
-        <rect x="10" y="10" width="520" height="260" rx="12" fill="#06090d" stroke="rgba(255,255,255,0.08)" />
+    const algoLabel =
+      sortAlgo === 'merge'
+        ? 'Merge Sort (Divide & Conquer)'
+        : sortAlgo === 'quick'
+        ? 'Quick Sort (Partitioning)'
+        : 'Bubble Sort (Adjacent Swaps)';
 
+    const algoComplexity =
+      sortAlgo === 'merge'
+        ? 'Time: O(N log N) Guaranteed | Space: O(N) Auxiliary'
+        : sortAlgo === 'quick'
+        ? 'Time: O(N log N) Average | Space: O(log N)'
+        : 'Time: O(N²) Quadratic | Space: O(1)';
+
+    return (
+      <svg width="100%" height="300" viewBox="0 0 540 300">
+        <rect x="10" y="10" width="520" height="280" rx="12" fill="#06090d" stroke="rgba(255,255,255,0.08)" />
+
+        {/* Algorithm Header Banner */}
+        <g transform="translate(24, 28)">
+          <text x="0" y="0" fill="#f8fafc" fontSize="13" fontWeight="bold">
+            {algoLabel}
+          </text>
+          <text x="0" y="15" fill="#64748b" fontSize="10.5" fontFamily="monospace">
+            {algoComplexity}
+          </text>
+        </g>
+
+        {/* Live Status Bar */}
+        <g transform="translate(24, 62)">
+          <rect x="0" y="0" width="492" height="22" rx="4" fill="rgba(56, 189, 248, 0.08)" stroke="rgba(56, 189, 248, 0.2)" strokeWidth="1" />
+          <circle cx="10" cy="11" r="3" fill="#38bdf8" />
+          <text x="20" y="14.5" fill="#38bdf8" fontSize="11" fontWeight="500">
+            {sortStatusText}
+          </text>
+        </g>
+
+        {/* Merge Partition Guide Indicator */}
+        {sortAlgo === 'merge' && mergeRange && (
+          <g>
+            {/* Left Sub-array highlight box */}
+            {(() => {
+              const x1 = startX + mergeRange.left * (barWidth + gap) - 4;
+              const w1 = (mergeRange.mid - mergeRange.left + 1) * (barWidth + gap) - gap + 8;
+              const x2 = startX + (mergeRange.mid + 1) * (barWidth + gap) - 4;
+              const w2 = (mergeRange.right - (mergeRange.mid + 1) + 1) * (barWidth + gap) - gap + 8;
+              return (
+                <>
+                  <rect x={x1} y="90" width={w1} height="15" rx="3" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" strokeWidth="1" />
+                  <text x={x1 + w1 / 2} y="101" fill="#38bdf8" fontSize="9" fontWeight="bold" textAnchor="middle">
+                    LEFT [{mergeRange.left}..{mergeRange.mid}]
+                  </text>
+                  <rect x={x2} y="90" width={w2} height="15" rx="3" fill="rgba(244, 63, 94, 0.15)" stroke="#f43f5e" strokeWidth="1" />
+                  <text x={x2 + w2 / 2} y="101" fill="#f43f5e" fontSize="9" fontWeight="bold" textAnchor="middle">
+                    RIGHT [{mergeRange.mid + 1}..{mergeRange.right}]
+                  </text>
+                </>
+              );
+            })()}
+          </g>
+        )}
+
+        {/* Array Bars */}
         {sortArray.map((val, idx) => {
           const x = startX + idx * (barWidth + gap);
-          const barHeight = (val / maxVal) * 180;
-          const y = 230 - barHeight;
+          const barHeight = (val / maxVal) * 140;
+          const y = 255 - barHeight;
 
+          const isPivot = sortAlgo === 'quick' && pivotIdx === idx;
           const isComparing = comparingIdx && (comparingIdx[0] === idx || comparingIdx[1] === idx);
           const isSorted = sortedIndices.includes(idx);
+          const isLeftSubArray = sortAlgo === 'merge' && mergeRange && idx >= mergeRange.left && idx <= mergeRange.mid;
+          const isRightSubArray = sortAlgo === 'merge' && mergeRange && idx > mergeRange.mid && idx <= mergeRange.right;
 
           let fill = '#3b82f6';
           let stroke = '#60a5fa';
-          if (isComparing) {
+
+          if (isPivot) {
+            fill = '#a855f7';
+            stroke = '#c084fc';
+          } else if (isComparing) {
             fill = '#f59e0b';
             stroke = '#fbbf24';
           } else if (isSorted) {
             fill = '#10b981';
             stroke = '#34d399';
+          } else if (isLeftSubArray) {
+            fill = '#0284c7';
+            stroke = '#38bdf8';
+          } else if (isRightSubArray) {
+            fill = '#e11d48';
+            stroke = '#f43f5e';
           }
 
           return (
@@ -1451,14 +1771,29 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                   x: rect ? e.clientX - rect.left : x,
                   y: rect ? e.clientY - rect.top : y,
                   title: `Array Element [${idx}] = ${val}`,
-                  category: isSorted ? 'Sorted In Position' : isComparing ? 'Active Comparison' : 'Unsorted Element',
-                  color: isComparing ? '#f59e0b' : isSorted ? '#10b981' : '#3b82f6',
-                  description: `Represents integer ${val} at index ${idx}. Bubble Sort repeatedly compares adjacent elements and swaps them if they are in the wrong order.`,
+                  category: isPivot
+                    ? 'Selected Pivot'
+                    : isSorted
+                    ? 'Sorted In Position'
+                    : isComparing
+                    ? 'Active Comparison'
+                    : isLeftSubArray
+                    ? 'Left Sub-Array (Divide)'
+                    : isRightSubArray
+                    ? 'Right Sub-Array (Divide)'
+                    : 'Array Element',
+                  color: stroke,
+                  description:
+                    sortAlgo === 'merge'
+                      ? `Represents integer ${val} at index ${idx}. Merge Sort divides the array into sub-arrays and merges them in sorted order with guaranteed O(n log n) efficiency.`
+                      : sortAlgo === 'quick'
+                      ? `Represents integer ${val} at index ${idx}. Quick Sort chooses a pivot and partitions elements smaller and larger around it.`
+                      : `Represents integer ${val} at index ${idx}. Bubble Sort repeatedly compares adjacent elements and swaps them if out of order.`,
                   stats: [
                     { label: 'Value', value: String(val) },
                     { label: 'Array Index', value: `[${idx}]` },
-                    { label: 'Status', value: isSorted ? 'Sorted' : isComparing ? 'Comparing' : 'Pending' },
-                    { label: 'Complexity', value: 'O(N²) Bubble Sort' },
+                    { label: 'Algorithm', value: algoLabel },
+                    { label: 'Status', value: isSorted ? 'Sorted' : isComparing ? 'Comparing' : isLeftSubArray ? 'Left Sub-list' : isRightSubArray ? 'Right Sub-list' : 'Pending' },
                   ],
                 });
               }}
@@ -1472,7 +1807,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
                 rx="4"
                 fill={fill}
                 stroke={stroke}
-                strokeWidth="1.5"
+                strokeWidth={isComparing || isPivot ? '2' : '1.5'}
                 style={{ transition: 'all 0.12s ease' }}
               />
               <text
@@ -1488,7 +1823,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               </text>
               <text
                 x={x + barWidth / 2}
-                y={248}
+                y={272}
                 fill="#64748b"
                 fontSize="9.5"
                 textAnchor="middle"
@@ -1819,25 +2154,58 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
           )}
 
           {/* Controls Bar for Sorting */}
-          {resolvedType === 'sorting' && (
-            <div className="tree-controls-bar">
+          {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && (
+            <div className="tree-controls-bar" style={{ flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.06)', padding: '2px', borderRadius: '6px' }}>
+                <button
+                  type="button"
+                  className={`sim-btn ${sortAlgo === 'merge' ? 'sim-btn--primary' : ''}`}
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  onClick={() => { if (!isSorting) setSortAlgo('merge'); }}
+                  disabled={isSorting}
+                >
+                  Merge Sort O(N log N)
+                </button>
+                <button
+                  type="button"
+                  className={`sim-btn ${sortAlgo === 'quick' ? 'sim-btn--primary' : ''}`}
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  onClick={() => { if (!isSorting) setSortAlgo('quick'); }}
+                  disabled={isSorting}
+                >
+                  Quick Sort
+                </button>
+                <button
+                  type="button"
+                  className={`sim-btn ${sortAlgo === 'bubble' ? 'sim-btn--primary' : ''}`}
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  onClick={() => { if (!isSorting) setSortAlgo('bubble'); }}
+                  disabled={isSorting}
+                >
+                  Bubble Sort O(N²)
+                </button>
+              </div>
+
               <button
                 type="button"
                 className="sim-btn sim-btn--primary"
                 onClick={handleStartSort}
                 disabled={isSorting}
               >
-                Start Bubble Sort
+                {isSorting
+                  ? '⏳ Sorting...'
+                  : `Start ${sortAlgo === 'merge' ? 'Merge Sort' : sortAlgo === 'quick' ? 'Quick Sort' : 'Bubble Sort'}`}
               </button>
               <button
                 type="button"
                 className="sim-btn"
                 onClick={handleShuffleSort}
+                disabled={isSorting}
               >
-                Shuffle Array
+                🔀 Shuffle Array
               </button>
               <span style={{ fontSize: '11.5px', color: '#94a3b8', marginLeft: 'auto' }}>
-                Comparisons: <strong style={{ color: '#fbbf24' }}>{comparisons}</strong> | Swaps: <strong style={{ color: '#38bdf8' }}>{swaps}</strong>
+                Comparisons: <strong style={{ color: '#fbbf24' }}>{comparisons}</strong> | {sortAlgo === 'merge' ? 'Aux Writes' : 'Swaps'}: <strong style={{ color: '#38bdf8' }}>{swaps}</strong>
               </span>
             </div>
           )}
@@ -1916,7 +2284,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             {resolvedType === 'binary-tree' && renderTreeSvg()}
             {resolvedType === 'linked-list' && renderLinkedListSvg()}
             {resolvedType === 'photosynthesis' && renderPhotosynthesisSvg()}
-            {resolvedType === 'sorting' && renderSortingSvg()}
+            {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && renderSortingSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}
             {/* Floating Sci-Fi HUD Tooltip Overlay */}
             {hoveredInfo && (
