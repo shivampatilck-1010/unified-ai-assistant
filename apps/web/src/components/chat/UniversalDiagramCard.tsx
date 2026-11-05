@@ -1068,24 +1068,26 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
         </div>
       )}
 
-      {/* Footer Legend */}
-      <div className="universal-diagram-legend-row">
-        <div className="universal-diagram-legend-item">
-          <div className="universal-diagram-legend-dot" style={{ background: '#ef4444' }} />
-          <span>Proton (p⁺)</span>
+      {/* Footer Legend - STRICTLY ONLY for Bohr Atomic Models */}
+      {normalizedType === 'atom' && (
+        <div className="universal-diagram-legend-row">
+          <div className="universal-diagram-legend-item">
+            <div className="universal-diagram-legend-dot" style={{ background: '#ef4444' }} />
+            <span>Proton (p⁺)</span>
+          </div>
+          <div className="universal-diagram-legend-item">
+            <div className="universal-diagram-legend-dot" style={{ background: '#64748b' }} />
+            <span>Neutron (n⁰)</span>
+          </div>
+          <div className="universal-diagram-legend-item">
+            <div className="universal-diagram-legend-dot" style={{ background: '#38bdf8' }} />
+            <span>Electron (e⁻)</span>
+          </div>
+          <div className="universal-diagram-legend-item" style={{ marginLeft: 'auto' }}>
+            <span>Radial Guide: Quantized Bohr Orbits (n = 1, 2, 3...)</span>
+          </div>
         </div>
-        <div className="universal-diagram-legend-item">
-          <div className="universal-diagram-legend-dot" style={{ background: '#64748b' }} />
-          <span>Neutron (n⁰)</span>
-        </div>
-        <div className="universal-diagram-legend-item">
-          <div className="universal-diagram-legend-dot" style={{ background: '#38bdf8' }} />
-          <span>Electron (e⁻)</span>
-        </div>
-        <div className="universal-diagram-legend-item" style={{ marginLeft: 'auto' }}>
-          <span>Radial Guide: Quantized Bohr Orbits (n = 1, 2, 3...)</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

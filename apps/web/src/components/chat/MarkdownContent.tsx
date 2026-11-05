@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import mermaid from 'mermaid';
@@ -130,6 +130,110 @@ const MermaidDiagram: React.FC<{ code: string }> = ({ code }) => {
         dangerouslySetInnerHTML={{ __html: svgHtml }}
       />
     </div>
+  );
+};
+
+// Seamless Embedded Figure for SVG diagrams & scientific illustrations without bulky flashcard borders
+const EmbeddedFigure: React.FC<{ svgCode: string; title?: string }> = ({ svgCode, title }) => {
+  const [copied, setCopied] = useState<boolean>(false);
+  const figureRef = useRef<HTMLDivElement | null>(null);
+
+  // Clean and prepare SVG
+  const cleanSvg = useMemo(() => {
+    let clean = svgCode.trim();
+    if (!clean.startsWith('<svg')) {
+      const match = clean.match(/<svg[\s\S]*<\/svg>/i);
+      if (match) clean = match[0];
+    }
+    // Ensure responsive width & auto height
+    clean = clean.replace(/<svg\b([^>]*)/i, (_all, attrs) => {
+      let mod = attrs;
+      if (!/width=/i.test(mod)) mod += ' width="100%"';
+      if (!/height=/i.test(mod) && /viewBox=/i.test(mod)) mod += ' height="auto"';
+      return `<svg ${mod}`;
+    });
+    return clean;
+  }, [svgCode]);
+
+  // Extract title if not provided
+  const displayTitle = useMemo(() => {
+    if (title && title.trim().length > 0) return title.trim();
+    const titleMatch = svgCode.match(/<title>([^<]+)<\/title>/i);
+    if (titleMatch) return titleMatch[1].trim();
+    const commentMatch = svgCode.match(/<!--\s*([^-]+)\s*-->/);
+    if (commentMatch) return commentMatch[1].trim();
+    return null;
+  }, [title, svgCode]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(cleanSvg);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadSvg = () => {
+    const blob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(displayTitle || 'scientific_diagram').toLowerCase().replace(/\s+/g, '_')}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadPng = () => {
+    const svgEl = figureRef.current?.querySelector('svg');
+    if (!svgEl) return;
+    const bbox = svgEl.viewBox?.baseVal;
+    const w = bbox?.width || svgEl.clientWidth || 740;
+    const h = bbox?.height || svgEl.clientHeight || 420;
+    const canvas = document.createElement('canvas');
+    canvas.width = w * 2;
+    canvas.height = h * 2;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(2, 2);
+    ctx.fillStyle = '#141312';
+    ctx.fillRect(0, 0, w, h);
+    const img = new Image();
+    const svgBlob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const pngUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = pngUrl;
+      a.download = `${(displayTitle || 'scientific_diagram').toLowerCase().replace(/\s+/g, '_')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+    img.src = url;
+  };
+
+  return (
+    <figure className="embedded-chat-figure" ref={figureRef}>
+      <div className="embedded-figure-viewport" dangerouslySetInnerHTML={{ __html: cleanSvg }} />
+      <div className="embedded-figure-toolbar">
+        <button type="button" className="embedded-figure-btn" onClick={handleDownloadSvg} title="Download SVG">
+          SVG
+        </button>
+        <button type="button" className="embedded-figure-btn" onClick={handleDownloadPng} title="Download 2x Retina PNG">
+          PNG
+        </button>
+        <button type="button" className="embedded-figure-btn" onClick={handleCopy} title="Copy SVG Code">
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      {displayTitle && (
+        <figcaption className="embedded-figure-caption">
+          <span className="embedded-figure-caption-prefix">Figure:</span> {displayTitle}
+        </figcaption>
+      )}
+    </figure>
   );
 };
 
@@ -356,6 +460,22 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
 
       if (/esp32|pro_cpu|app_cpu|xtensa|microcontroller|ulp\s*coprocessor|system\s*memory|soc/i.test(code)) {
         diagType = 'architecture';
+      }
+
+      // Direct seamless routing for SVG schematics & illustrations: render borderless EmbeddedFigure!
+      if (
+        (lowerLang === 'svg' || code.trim().startsWith('<svg')) &&
+        !code.includes('type: atom') &&
+        !code.includes('type: molecule') &&
+        !code.includes('type: architecture') &&
+        !code.includes('type: microcontroller')
+      ) {
+        return (
+          <EmbeddedFigure
+            svgCode={code}
+            title={diagTitle}
+          />
+        );
       }
 
       return (
@@ -1061,15 +1181,26 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         continue;
       }
 
-      // 8. Headers & Typography
-      if (line.startsWith('#### ')) {
-        nodes.push(<h5 key={`h5-${nodes.length}`} className="md-h5">{formatInline(line.slice(5))}</h5>);
-      } else if (line.startsWith('### ')) {
-        nodes.push(<h4 key={`h4-${nodes.length}`} className="md-h4">{formatInline(line.slice(4))}</h4>);
-      } else if (line.startsWith('## ')) {
-        nodes.push(<h3 key={`h3-${nodes.length}`} className="md-h3">{formatInline(line.slice(3))}</h3>);
-      } else if (line.startsWith('# ')) {
-        nodes.push(<h2 key={`h2-${nodes.length}`} className="md-h2">{formatInline(line.slice(2))}</h2>);
+      // 8. Headers & Typography (Supports # through ######, leading spaces, and clean formatting)
+      const headingMatch = line.trimStart().match(/^(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        flushList();
+        const level = headingMatch[1].length;
+        const headingText = headingMatch[2].trim();
+        if (level === 1) {
+          nodes.push(<h2 key={`h2-${nodes.length}`} className="md-h2">{formatInline(headingText)}</h2>);
+        } else if (level === 2) {
+          nodes.push(<h3 key={`h3-${nodes.length}`} className="md-h3">{formatInline(headingText)}</h3>);
+        } else if (level === 3) {
+          nodes.push(<h4 key={`h4-${nodes.length}`} className="md-h4">{formatInline(headingText)}</h4>);
+        } else if (level === 4) {
+          nodes.push(<h5 key={`h5-${nodes.length}`} className="md-h5">{formatInline(headingText)}</h5>);
+        } else if (level === 5) {
+          nodes.push(<h6 key={`h5-${nodes.length}`} className="md-h5 md-subheading-lead">{formatInline(headingText)}</h6>);
+        } else {
+          nodes.push(<h6 key={`h6-${nodes.length}`} className="md-h6 md-microheading">{formatInline(headingText)}</h6>);
+        }
+        continue;
       } else if (line.startsWith('> ')) {
         const bqContent = line.slice(2).trim();
         const isPromptLike =
