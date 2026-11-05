@@ -1,52 +1,56 @@
 /* ==========================================================================
-   UniversalDiagramCard.css — Claude Editorial Vector Diagram & Schematic Card
+   UniversalDiagramCard.css — Claude Editorial Scientific Diagram Architecture
+   - Zero text collapsing: generous SVG geometry & HTML KaTeX data cards
+   - Publication-grade typography: Inter, Newsreader, JetBrains Mono
+   - Warm charcoal canvas (#191817 / #1f1e1c) with terracotta (#d97757) accents
    ========================================================================== */
 
 .universal-diagram-card {
   width: 100%;
-  max-width: 780px;
-  margin: 18px auto;
+  max-width: 800px;
+  margin: 22px auto;
   background: var(--surface-card, #1f1e1c);
   border: 1px solid var(--border, rgba(240, 237, 230, 0.09));
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-  font-family: var(--font-sans, 'Inter', sans-serif);
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-sans, 'Inter', -apple-system, sans-serif);
   box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
 .universal-diagram-card:hover {
   border-color: rgba(217, 119, 87, 0.35);
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* Header */
+/* --- Top Header Row 1: Title & Action Tools --- */
 .universal-diagram-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 12px 18px;
   background: #181715;
-  border-bottom: 1px solid rgba(240, 237, 230, 0.07);
+  border-bottom: 1px solid rgba(240, 237, 230, 0.08);
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
 .universal-diagram-title-wrap {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 220px;
 }
 
 .universal-diagram-badge {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  padding: 2.5px 7px;
+  padding: 3px 8px;
   border-radius: 4px;
   background: rgba(217, 119, 87, 0.12);
-  border: 1px solid rgba(217, 119, 87, 0.3);
+  border: 1px solid rgba(217, 119, 87, 0.35);
   color: #d97757;
   font-family: var(--font-mono, monospace);
   text-transform: uppercase;
@@ -54,13 +58,13 @@
 
 .universal-diagram-title {
   font-family: var(--font-serif, 'Newsreader', 'Lora', Georgia, serif);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   color: #faf9f5;
   letter-spacing: -0.01em;
 }
 
-/* Actions Toolbar */
+/* Action Tools */
 .universal-diagram-actions {
   display: flex;
   align-items: center;
@@ -71,15 +75,17 @@
 .universal-diagram-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   background: rgba(240, 237, 230, 0.04);
   border: 1px solid rgba(240, 237, 230, 0.09);
   color: #b0aca2;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  font-family: var(--font-sans, 'Inter', sans-serif);
 }
 
 .universal-diagram-btn:hover {
@@ -89,19 +95,19 @@
 }
 
 .universal-diagram-btn--active {
-  background: rgba(217, 119, 87, 0.2);
+  background: rgba(217, 119, 87, 0.18);
   border-color: #d97757;
   color: #faf9f5;
 }
 
-/* Presets Bar */
+/* --- Row 2: Elements Preset Selector --- */
 .universal-diagram-presets-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #151412;
-  border-bottom: 1px solid rgba(240, 237, 230, 0.05);
+  gap: 8px;
+  padding: 9px 18px;
+  background: #141311;
+  border-bottom: 1px solid rgba(240, 237, 230, 0.06);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -110,12 +116,17 @@
   height: 4px;
 }
 
+.universal-diagram-presets-bar::-webkit-scrollbar-thumb {
+  background: rgba(240, 237, 230, 0.15);
+  border-radius: 2px;
+}
+
 .universal-diagram-presets-label {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: #7d7971;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   margin-right: 4px;
 }
@@ -124,9 +135,9 @@
   background: rgba(240, 237, 230, 0.04);
   border: 1px solid rgba(240, 237, 230, 0.08);
   color: #b0aca2;
-  font-size: 11px;
-  padding: 2.5px 8px;
-  border-radius: 12px;
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 14px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -139,22 +150,22 @@
 }
 
 .universal-diagram-preset-pill--active {
-  background: rgba(217, 119, 87, 0.15);
+  background: rgba(217, 119, 87, 0.16);
   border-color: #d97757;
   color: #d97757;
   font-weight: 600;
 }
 
-/* Viewport Canvas */
+/* --- Viewport Canvas: Generous & Uncluttered --- */
 .universal-diagram-viewport {
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 380px;
-  max-height: 520px;
-  padding: 16px;
-  background: #141311;
+  min-height: 420px;
+  max-height: 540px;
+  padding: 20px 16px;
+  background: #121110;
   overflow: hidden;
   user-select: none;
 }
@@ -170,82 +181,106 @@
 
 .universal-diagram-svg-wrap svg {
   max-width: 100%;
-  max-height: 460px;
+  max-height: 480px;
   height: auto;
-  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+  filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.5));
 }
 
-/* Telemetry & Key Legend Footer */
-.universal-diagram-footer {
-  padding: 12px 16px;
+/* --- Editorial Scientific Data Panel (HTML + KaTeX) --- */
+.universal-diagram-editorial-panel {
+  padding: 16px 20px;
   background: #181715;
-  border-top: 1px solid rgba(240, 237, 230, 0.07);
+  border-top: 1px solid rgba(240, 237, 230, 0.08);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.universal-diagram-card-column {
+  background: #131210;
+  border: 1px solid rgba(240, 237, 230, 0.06);
+  border-radius: 8px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.universal-diagram-metrics-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 12px;
-}
-
-.universal-diagram-metric-item {
-  display: flex;
-  align-items: center;
   gap: 6px;
 }
 
-.universal-diagram-metric-label {
-  color: #7d7971;
-  font-size: 11px;
+.universal-diagram-col-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #d97757;
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
-.universal-diagram-metric-value {
+.universal-diagram-col-headline {
+  font-size: 14px;
+  font-weight: 600;
+  color: #faf9f5;
+  font-family: var(--font-serif, 'Newsreader', Georgia, serif);
+}
+
+.universal-diagram-col-metric {
+  font-size: 12px;
+  color: #b0aca2;
+  line-height: 1.5;
+}
+
+.universal-diagram-col-metric strong {
   color: #ede8df;
-  font-family: var(--font-mono, monospace);
   font-weight: 500;
 }
 
-.universal-diagram-legend {
+.universal-diagram-math-box {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  border-left: 2px solid #d97757;
+  font-size: 12px;
+  color: #faf9f5;
+}
+
+/* Footer Legend */
+.universal-diagram-legend-row {
+  padding: 10px 20px;
+  background: #151412;
+  border-top: 1px solid rgba(240, 237, 230, 0.05);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
-  font-size: 11px;
+  font-size: 11.5px;
   color: #b0aca2;
-  padding-top: 6px;
-  border-top: 1px dashed rgba(240, 237, 230, 0.06);
 }
 
 .universal-diagram-legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .universal-diagram-legend-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
   .universal-diagram-viewport {
-    min-height: 300px;
-    padding: 10px;
+    min-height: 320px;
+    padding: 12px;
   }
 
   .universal-diagram-header {
-    padding: 8px 12px;
+    padding: 10px 14px;
   }
 
-  .universal-diagram-footer {
-    padding: 10px 12px;
+  .universal-diagram-editorial-panel {
+    grid-template-columns: 1fr;
+    padding: 12px 14px;
   }
 }

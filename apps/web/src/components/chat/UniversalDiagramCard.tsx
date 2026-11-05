@@ -1,4 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import './UniversalDiagramCard.css';
 
 export interface UniversalDiagramProps {
@@ -15,19 +17,33 @@ interface AtomPreset {
   a: number;
   shells: number[];
   config: string;
+  group: string;
+  period: number;
 }
 
 const ATOM_PRESETS: AtomPreset[] = [
-  { name: 'Hydrogen', symbol: 'H', z: 1, a: 1, shells: [1], config: '1s¹' },
-  { name: 'Helium', symbol: 'He', z: 2, a: 4, shells: [2], config: '1s²' },
-  { name: 'Carbon', symbol: 'C', z: 6, a: 12, shells: [2, 4], config: '[He] 2s² 2p²' },
-  { name: 'Nitrogen', symbol: 'N', z: 7, a: 14, shells: [2, 5], config: '[He] 2s² 2p³' },
-  { name: 'Oxygen', symbol: 'O', z: 8, a: 16, shells: [2, 6], config: '[He] 2s² 2p⁴' },
-  { name: 'Sodium', symbol: 'Na', z: 11, a: 23, shells: [2, 8, 1], config: '[Ne] 3s¹' },
-  { name: 'Silicon', symbol: 'Si', z: 14, a: 28, shells: [2, 8, 4], config: '[Ne] 3s² 3p²' },
-  { name: 'Chlorine', symbol: 'Cl', z: 17, a: 35, shells: [2, 8, 7], config: '[Ne] 3s² 3p⁵' },
-  { name: 'Calcium', symbol: 'Ca', z: 20, a: 40, shells: [2, 8, 8, 2], config: '[Ar] 4s²' },
+  { name: 'Hydrogen', symbol: 'H', z: 1, a: 1, shells: [1], config: '1s^1', group: 'Nonmetal (Group 1)', period: 1 },
+  { name: 'Helium', symbol: 'He', z: 2, a: 4, shells: [2], config: '1s^2', group: 'Noble Gas (Group 18)', period: 1 },
+  { name: 'Lithium', symbol: 'Li', z: 3, a: 7, shells: [2, 1], config: '[\\text{He}]\\,2s^1', group: 'Alkali Metal (Group 1)', period: 2 },
+  { name: 'Carbon', symbol: 'C', z: 6, a: 12, shells: [2, 4], config: '[\\text{He}]\\,2s^2\\,2p^2', group: 'Reactive Nonmetal (Group 14)', period: 2 },
+  { name: 'Nitrogen', symbol: 'N', z: 7, a: 14, shells: [2, 5], config: '[\\text{He}]\\,2s^2\\,2p^3', group: 'Pnictogen (Group 15)', period: 2 },
+  { name: 'Oxygen', symbol: 'O', z: 8, a: 16, shells: [2, 6], config: '[\\text{He}]\\,2s^2\\,2p^4', group: 'Chalcogen (Group 16)', period: 2 },
+  { name: 'Sodium', symbol: 'Na', z: 11, a: 23, shells: [2, 8, 1], config: '[\\text{Ne}]\\,3s^1', group: 'Alkali Metal (Group 1)', period: 3 },
+  { name: 'Silicon', symbol: 'Si', z: 14, a: 28, shells: [2, 8, 4], config: '[\\text{Ne}]\\,3s^2\\,3p^2', group: 'Metalloid (Group 14)', period: 3 },
+  { name: 'Chlorine', symbol: 'Cl', z: 17, a: 35, shells: [2, 8, 7], config: '[\\text{Ne}]\\,3s^2\\,3p^5', group: 'Halogen (Group 17)', period: 3 },
+  { name: 'Calcium', symbol: 'Ca', z: 20, a: 40, shells: [2, 8, 8, 2], config: '[\\text{Ar}]\\,4s^2', group: 'Alkaline Earth (Group 2)', period: 4 },
 ];
+
+function renderMathHtml(math: string, displayMode = false): string {
+  try {
+    return katex.renderToString(math, {
+      displayMode,
+      throwOnError: false,
+    });
+  } catch {
+    return math;
+  }
+}
 
 export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
   type = 'atom',
@@ -45,11 +61,11 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     const idx = ATOM_PRESETS.findIndex(
       (a) => a.name.toLowerCase() === element.toLowerCase() || a.symbol.toLowerCase() === element.toLowerCase()
     );
-    return idx >= 0 ? idx : 2; // Default to Carbon
+    return idx >= 0 ? idx : 3; // Default to Carbon (index 3)
   });
 
   // Selected molecule preset
-  const [moleculePreset, setMoleculePreset] = useState<'water' | 'benzene' | 'methane'>('water');
+  const [moleculePreset, setMoleculePreset] = useState<'water' | 'benzene'>('water');
 
   const svgContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,14 +75,12 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     const lowerCode = (code || '').toLowerCase();
     if (lower.includes('atom') || lowerCode.includes('type: atom') || lowerCode.includes('bohr')) return 'atom';
     if (lower.includes('molecule') || lowerCode.includes('type: molecule') || lowerCode.includes('benzene') || lowerCode.includes('water')) return 'molecule';
-    if (lower.includes('cell') || lowerCode.includes('type: cell') || lowerCode.includes('chloroplast')) return 'cell';
-    if (lower.includes('circuit') || lowerCode.includes('type: circuit')) return 'circuit';
     if (lower.includes('neural') || lowerCode.includes('type: neural')) return 'neural-net';
     if (code && code.trim().startsWith('<svg')) return 'custom-svg';
     return 'atom';
   }, [type, code]);
 
-  const currentAtom = ATOM_PRESETS[atomIndex];
+  const currentAtom = ATOM_PRESETS[atomIndex] || ATOM_PRESETS[3];
 
   // Export as vector SVG
   const handleExportSvg = () => {
@@ -97,12 +111,12 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
 
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const scale = 2; // Retina 2x
-      canvas.width = (svgElem.clientWidth || 600) * scale;
-      canvas.height = (svgElem.clientHeight || 450) * scale;
+      const scale = 2; // 2x Retina
+      canvas.width = (svgElem.clientWidth || 660) * scale;
+      canvas.height = (svgElem.clientHeight || 480) * scale;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = '#141311';
+        ctx.fillStyle = '#121110';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const pngUrl = canvas.toDataURL('image/png');
@@ -128,78 +142,103 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Render Bohr Atom Diagram
+  // Render Bohr Atom Diagram (Clean, Large, Zero Text Collisions)
   const renderAtomSvg = () => {
-    const cx = 300;
-    const cy = 230;
-    const baseRadius = 55;
-    const shellGap = 38;
+    const cx = 330;
+    const cy = 240;
+    // Generous radial spacing so orbital shells and electrons NEVER collide
+    const shellRadii = [75, 135, 195, 245];
+    const shellNames = ['K (n=1)', 'L (n=2)', 'M (n=3)', 'N (n=4)'];
 
     return (
-      <svg viewBox="0 0 600 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label={`Bohr model of ${currentAtom.name}`}>
+      <svg
+        viewBox="0 0 660 480"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label={`Bohr model of ${currentAtom.name}`}
+        style={{ textRendering: 'geometricPrecision', shapeRendering: 'geometricPrecision' }}
+      >
         <defs>
-          {/* Radial gradient for nucleus */}
-          <radialGradient id="nucleusGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#d97757" stopOpacity="0.9" />
-            <stop offset="70%" stopColor="#c96442" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#1f1e1c" stopOpacity="0.1" />
+          {/* Radial gradient for nucleus ambient glow */}
+          <radialGradient id="nucleusAura" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#d97757" stopOpacity="0.85" />
+            <stop offset="65%" stopColor="#c96442" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#121110" stopOpacity="0" />
           </radialGradient>
-          {/* Radial gradient for electrons */}
-          <radialGradient id="electronGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="40%" stopColor="#38bdf8" />
+          {/* Electron radial gradient */}
+          <radialGradient id="electronParticle" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#e0f2fe" />
+            <stop offset="35%" stopColor="#38bdf8" />
             <stop offset="100%" stopColor="#0284c7" />
           </radialGradient>
-          {/* Proton gradient */}
-          <radialGradient id="protonGrad" cx="35%" cy="35%" r="65%">
-            <stop offset="0%" stopColor="#f87171" />
-            <stop offset="100%" stopColor="#dc2626" />
+          {/* Proton sphere gradient */}
+          <radialGradient id="protonSphere" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#fca5a5" />
+            <stop offset="60%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#991b1b" />
           </radialGradient>
-          {/* Neutron gradient */}
-          <radialGradient id="neutronGrad" cx="35%" cy="35%" r="65%">
-            <stop offset="0%" stopColor="#94a3b8" />
-            <stop offset="100%" stopColor="#475569" />
+          {/* Neutron sphere gradient */}
+          <radialGradient id="neutronSphere" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#cbd5e1" />
+            <stop offset="60%" stopColor="#64748b" />
+            <stop offset="100%" stopColor="#334155" />
           </radialGradient>
         </defs>
 
-        {/* Background Grid Pattern */}
-        <g opacity="0.08" stroke="#faf9f5" strokeWidth="0.5">
-          <line x1="0" y1="230" x2="600" y2="230" strokeDasharray="3 3" />
-          <line x1="300" y1="0" x2="300" y2="460" strokeDasharray="3 3" />
-          <circle cx="300" cy="230" r="180" fill="none" strokeDasharray="2 4" />
+        {/* Subtle Background Coordinate Crosshair & Guide Rings */}
+        <g opacity="0.08" stroke="#faf9f5" strokeWidth="0.8">
+          <line x1="0" y1={cy} x2="660" y2={cy} strokeDasharray="4 4" />
+          <line x1={cx} y1="0" x2={cx} y2="480" strokeDasharray="4 4" />
         </g>
 
         {/* Concentric Electron Orbital Shells */}
         {currentAtom.shells.map((count, sIdx) => {
-          const r = baseRadius + sIdx * shellGap;
-          const shellNames = ['K (n=1)', 'L (n=2)', 'M (n=3)', 'N (n=4)'];
-          const duration = 12 + sIdx * 6; // Inner shells rotate faster by Kepler's harmonic law
+          const r = shellRadii[sIdx] || 75 + sIdx * 55;
+          // Angular speed: inner shells rotate faster by Kepler's law T ~ r^(3/2)
+          const duration = 12 + sIdx * 7;
+          // Radial indicator angle at -40 degrees (top-right quadrant) so labels NEVER hit electrons
+          const labelAngle = -Math.PI * 0.22;
+          const lx = cx + r * Math.cos(labelAngle);
+          const ly = cy + r * Math.sin(labelAngle);
 
           return (
             <g key={`shell-${sIdx}`}>
-              {/* Shell Orbit Guide Line */}
+              {/* Orbital Guide Circle */}
               <circle
                 cx={cx}
                 cy={cy}
                 r={r}
                 fill="none"
-                stroke="rgba(240, 237, 230, 0.22)"
+                stroke="rgba(240, 237, 230, 0.2)"
                 strokeWidth="1.2"
-                strokeDasharray="4 4"
+                strokeDasharray="5 5"
               />
 
-              {/* Quantum Shell Label */}
+              {/* Quantum Shell Callout Pill Badge at -40° */}
               {showLabels && (
-                <text
-                  x={cx + r + 4}
-                  y={cy - 4}
-                  fill="#b0aca2"
-                  fontSize="10"
-                  fontFamily="monospace"
-                  opacity="0.85"
-                >
-                  {shellNames[sIdx] || `n=${sIdx + 1}`}
-                </text>
+                <g transform={`translate(${lx}, ${ly})`}>
+                  <rect
+                    x="-26"
+                    y="-9"
+                    width="52"
+                    height="18"
+                    rx="9"
+                    fill="#181715"
+                    stroke="rgba(217, 119, 87, 0.4)"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x="0"
+                    y="3.5"
+                    textAnchor="middle"
+                    fill="#ede8df"
+                    fontSize="9.5"
+                    fontWeight="600"
+                    fontFamily="system-ui, -apple-system, sans-serif"
+                  >
+                    {shellNames[sIdx]}
+                  </text>
+                </g>
               )}
 
               {/* Orbiting Group of Electrons */}
@@ -220,19 +259,19 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
 
                   return (
                     <g key={`electron-${sIdx}-${eIdx}`}>
-                      {/* Electron Outer Glow Halo */}
-                      <circle cx={ex} cy={ey} r="8" fill="rgba(56, 189, 248, 0.25)" />
-                      {/* Electron Particle Sphere */}
-                      <circle cx={ex} cy={ey} r="4.5" fill="url(#electronGlow)" />
-                      {/* Negative Charge Minus Sign */}
+                      {/* Cyan Glow Aura */}
+                      <circle cx={ex} cy={ey} r="9" fill="rgba(56, 189, 248, 0.22)" />
+                      {/* Particle Sphere */}
+                      <circle cx={ex} cy={ey} r="5" fill="url(#electronParticle)" stroke="#38bdf8" strokeWidth="0.8" />
+                      {/* Negative Sign */}
                       <text
                         x={ex}
                         y={ey + 2.5}
                         textAnchor="middle"
-                        fill="#0c4a6e"
+                        fill="#082f49"
                         fontSize="7"
                         fontWeight="bold"
-                        fontFamily="monospace"
+                        fontFamily="system-ui, -apple-system, sans-serif"
                       >
                         -
                       </text>
@@ -244,65 +283,59 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
           );
         })}
 
-        {/* Central Dense Nucleus */}
+        {/* Central Atomic Nucleus */}
         <g>
-          {/* Nucleus Glow Ambient Aura */}
-          <circle cx={cx} cy={cy} r="34" fill="url(#nucleusGlow)" />
+          {/* Ambient Glow Aura */}
+          <circle cx={cx} cy={cy} r="46" fill="url(#nucleusAura)" />
 
-          {/* Densely Clustered Nucleons (Protons & Neutrons) */}
-          {Array.from({ length: Math.min(currentAtom.z, 7) }).map((_, i) => {
-            const angle = (i * 2 * Math.PI) / 7;
-            const dist = i === 0 ? 0 : 12;
+          {/* Densely Packed Protons & Neutrons */}
+          {Array.from({ length: Math.min(currentAtom.z, 8) }).map((_, i) => {
+            const angle = (i * 2 * Math.PI) / 8;
+            const dist = i === 0 ? 0 : 15;
             const px = cx + dist * Math.cos(angle);
             const py = cy + dist * Math.sin(angle);
             return (
-              <circle
-                key={`p-${i}`}
-                cx={px}
-                cy={py}
-                r="6.5"
-                fill="url(#protonGrad)"
-                stroke="#7f1d1d"
-                strokeWidth="0.8"
-              />
+              <g key={`p-${i}`}>
+                <circle cx={px} cy={py} r="8" fill="url(#protonSphere)" stroke="#7f1d1d" strokeWidth="0.8" />
+                <text x={px} y={py + 3} textAnchor="middle" fill="#ffffff" fontSize="8" fontWeight="bold" fontFamily="sans-serif">
+                  +
+                </text>
+              </g>
             );
           })}
 
-          {Array.from({ length: Math.min(currentAtom.a - currentAtom.z, 7) }).map((_, i) => {
-            const angle = (i * 2 * Math.PI) / 7 + 0.45;
-            const dist = 14;
+          {Array.from({ length: Math.min(currentAtom.a - currentAtom.z, 8) }).map((_, i) => {
+            const angle = (i * 2 * Math.PI) / 8 + 0.4;
+            const dist = 17;
             const nx = cx + dist * Math.cos(angle);
             const ny = cy + dist * Math.sin(angle);
             return (
-              <circle
-                key={`n-${i}`}
-                cx={nx}
-                cy={ny}
-                r="6"
-                fill="url(#neutronGrad)"
-                stroke="#1e293b"
-                strokeWidth="0.8"
-              />
+              <g key={`n-${i}`}>
+                <circle cx={nx} cy={ny} r="7.5" fill="url(#neutronSphere)" stroke="#1e293b" strokeWidth="0.8" />
+                <text x={nx} y={ny + 2.5} textAnchor="middle" fill="#ffffff" fontSize="7" fontWeight="bold" fontFamily="sans-serif">
+                  n
+                </text>
+              </g>
             );
           })}
 
-          {/* Central Chemical Symbol Badge */}
+          {/* Chemical Symbol Center Badge */}
           <rect
-            x={cx - 16}
-            y={cy - 12}
-            width="32"
-            height="24"
-            rx="5"
-            fill="rgba(19, 18, 17, 0.85)"
+            x={cx - 18}
+            y={cy - 14}
+            width="36"
+            height="28"
+            rx="6"
+            fill="rgba(18, 17, 16, 0.92)"
             stroke="#d97757"
-            strokeWidth="1.2"
+            strokeWidth="1.5"
           />
           <text
             x={cx}
-            y={cy + 4}
+            y={cy + 5}
             textAnchor="middle"
             fill="#faf9f5"
-            fontSize="14"
+            fontSize="16"
             fontWeight="bold"
             fontFamily="'Newsreader', Georgia, serif"
           >
@@ -310,55 +343,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
           </text>
         </g>
 
-        {/* Top-Left Element Profile Callout */}
-        {showLabels && (
-          <g transform="translate(24, 28)">
-            <rect width="180" height="74" rx="8" fill="#181715" stroke="rgba(240, 237, 230, 0.12)" strokeWidth="1" />
-            <text x="14" y="22" fill="#faf9f5" fontSize="13" fontWeight="600" fontFamily="'Newsreader', Georgia, serif">
-              {currentAtom.name} ({currentAtom.symbol})
-            </text>
-            <text x="14" y="40" fill="#b0aca2" fontSize="10.5" fontFamily="monospace">
-              Atomic No (Z): {currentAtom.z} | Mass (A): {currentAtom.a}
-            </text>
-            <text x="14" y="58" fill="#d97757" fontSize="10.5" fontFamily="monospace">
-              Config: {currentAtom.config}
-            </text>
-          </g>
-        )}
-
-        {/* Top-Right Energy Transitions Callout */}
-        {showLabels && (
-          <g transform="translate(390, 28)">
-            <rect width="186" height="74" rx="8" fill="#181715" stroke="rgba(240, 237, 230, 0.12)" strokeWidth="1" />
-            <text x="14" y="22" fill="#faf9f5" fontSize="11" fontWeight="600" fontFamily="'Newsreader', Georgia, serif">
-              Bohr Energy Levels:
-            </text>
-            <text x="14" y="40" fill="#b0aca2" fontSize="10" fontFamily="monospace">
-              E_n = -13.6 eV / n²
-            </text>
-            <text x="14" y="58" fill="#38bdf8" fontSize="10" fontFamily="monospace">
-              ΔE = h·ν = h·c / λ (Photon emission)
-            </text>
-          </g>
-        )}
-
-        {/* Bottom Legend */}
-        {showLabels && (
-          <g transform="translate(24, 420)">
-            <circle cx="10" cy="0" r="4.5" fill="#ef4444" />
-            <text x="22" y="3" fill="#b0aca2" fontSize="10.5">Proton (p⁺)</text>
-
-            <circle cx="105" cy="0" r="4.5" fill="#64748b" />
-            <text x="117" y="3" fill="#b0aca2" fontSize="10.5">Neutron (n⁰)</text>
-
-            <circle cx="205" cy="0" r="4.5" fill="#38bdf8" />
-            <text x="217" y="3" fill="#b0aca2" fontSize="10.5">Electron (e⁻)</text>
-
-            <line x1="310" y1="0" x2="330" y2="0" stroke="rgba(240, 237, 230, 0.4)" strokeDasharray="3 3" />
-            <text x="338" y="3" fill="#b0aca2" fontSize="10.5">Quantized Shells (n=1,2,3...)</text>
-          </g>
-        )}
-
+        {/* Global Keyframes for Smooth Orbital Physics */}
         <style>{`
           @keyframes rotateOrbit {
             from { transform: rotate(0deg); }
@@ -369,11 +354,11 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     );
   };
 
-  // Render Molecular Structure Diagram (Water, Benzene, Methane)
+  // Render Molecular Geometry (Water H2O Dipole or Benzene C6H6)
   const renderMoleculeSvg = () => {
     if (moleculePreset === 'benzene') {
       return (
-        <svg viewBox="0 0 600 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Benzene Molecular Structure">
+        <svg viewBox="0 0 660 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Benzene C6H6 Resonance Structure">
           <defs>
             <radialGradient id="carbonGlow" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#94a3b8" />
@@ -385,132 +370,102 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
             </radialGradient>
           </defs>
 
-          {/* Hexagonal Carbon-Carbon Bonds */}
+          {/* Hexagonal Planar Carbon Ring */}
           <polygon
-            points="300,110 395,165 395,275 300,330 205,275 205,165"
+            points="330,110 435,170 435,290 330,350 225,290 225,170"
             fill="none"
             stroke="#d97757"
-            strokeWidth="3.5"
+            strokeWidth="4"
           />
-          {/* Inner Resonant Aromatic Pi-Electron Ring */}
-          <circle cx="300" cy="220" r="62" fill="none" stroke="rgba(217, 119, 87, 0.6)" strokeWidth="2.5" strokeDasharray="6 4" />
+          {/* Resonant Delocalized Pi-Electron Circular Orbit */}
+          <circle cx="330" cy="230" r="72" fill="none" stroke="rgba(217, 119, 87, 0.65)" strokeWidth="3" strokeDasharray="8 5" />
 
-          {/* C-H Bonds */}
-          <line x1="300" y1="110" x2="300" y2="45" stroke="#b0aca2" strokeWidth="2.5" />
-          <line x1="395" y1="165" x2="452" y2="132" stroke="#b0aca2" strokeWidth="2.5" />
-          <line x1="395" y1="275" x2="452" y2="308" stroke="#b0aca2" strokeWidth="2.5" />
-          <line x1="300" y1="330" x2="300" y2="395" stroke="#b0aca2" strokeWidth="2.5" />
-          <line x1="205" y1="275" x2="148" y2="308" stroke="#b0aca2" strokeWidth="2.5" />
-          <line x1="205" y1="165" x2="148" y2="132" stroke="#b0aca2" strokeWidth="2.5" />
+          {/* C-H Outer Bonds */}
+          <line x1="330" y1="110" x2="330" y2="40" stroke="#b0aca2" strokeWidth="2.5" />
+          <line x1="435" y1="170" x2="496" y2="135" stroke="#b0aca2" strokeWidth="2.5" />
+          <line x1="435" y1="290" x2="496" y2="325" stroke="#b0aca2" strokeWidth="2.5" />
+          <line x1="330" y1="350" x2="330" y2="420" stroke="#b0aca2" strokeWidth="2.5" />
+          <line x1="225" y1="290" x2="164" y2="325" stroke="#b0aca2" strokeWidth="2.5" />
+          <line x1="225" y1="170" x2="164" y2="135" stroke="#b0aca2" strokeWidth="2.5" />
 
           {/* 6 Carbon Atoms */}
           {[
-            [300, 110], [395, 165], [395, 275],
-            [300, 330], [205, 275], [205, 165],
+            [330, 110], [435, 170], [435, 290],
+            [330, 350], [225, 290], [225, 170],
           ].map(([x, y], idx) => (
             <g key={`c-${idx}`}>
-              <circle cx={x} cy={y} r="14" fill="url(#carbonGlow)" stroke="#1e293b" strokeWidth="1.5" />
-              <text x={x} y={y + 4.5} textAnchor="middle" fill="#faf9f5" fontSize="12" fontWeight="bold" fontFamily="monospace">C</text>
+              <circle cx={x} cy={y} r="16" fill="url(#carbonGlow)" stroke="#1e293b" strokeWidth="1.5" />
+              <text x={x} y={y + 5} textAnchor="middle" fill="#faf9f5" fontSize="13" fontWeight="bold" fontFamily="monospace">C</text>
             </g>
           ))}
 
           {/* 6 Hydrogen Atoms */}
           {[
-            [300, 45], [452, 132], [452, 308],
-            [300, 395], [148, 308], [148, 132],
+            [330, 40], [496, 135], [496, 325],
+            [330, 420], [164, 325], [164, 135],
           ].map(([x, y], idx) => (
             <g key={`h-${idx}`}>
-              <circle cx={x} cy={y} r="11" fill="url(#hydrogenGlow)" stroke="#64748b" strokeWidth="1" />
-              <text x={x} y={y + 4} textAnchor="middle" fill="#0f172a" fontSize="11" fontWeight="bold" fontFamily="monospace">H</text>
+              <circle cx={x} cy={y} r="12" fill="url(#hydrogenGlow)" stroke="#64748b" strokeWidth="1" />
+              <text x={x} y={y + 4.5} textAnchor="middle" fill="#0f172a" fontSize="11" fontWeight="bold" fontFamily="monospace">H</text>
             </g>
           ))}
-
-          {/* Annotation Card */}
-          {showLabels && (
-            <g transform="translate(24, 24)">
-              <rect width="190" height="64" rx="6" fill="#181715" stroke="rgba(240, 237, 230, 0.12)" />
-              <text x="12" y="20" fill="#faf9f5" fontSize="12.5" fontWeight="600" fontFamily="'Newsreader', Georgia, serif">
-                Benzene (C₆H₆) Resonance
-              </text>
-              <text x="12" y="38" fill="#b0aca2" fontSize="10.5" fontFamily="monospace">
-                Planar sp² Hybridization (120°)
-              </text>
-              <text x="12" y="54" fill="#d97757" fontSize="10" fontFamily="monospace">
-                6 Delocalized π-Electrons Ring
-              </text>
-            </g>
-          )}
         </svg>
       );
     }
 
-    // Default: Water Molecule Dipole (H2O)
+    // Default: Water Molecule (H2O Dipole)
     return (
-      <svg viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Water Molecule (H2O) Dipole Structure">
+      <svg viewBox="0 0 660 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Water Molecule (H2O) Dipole Structure">
         <defs>
-          <radialGradient id="oxygenGlow" cx="40%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="#f87171" />
-            <stop offset="100%" stopColor="#b91c1c" />
+          <radialGradient id="oxygenGrad" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#fca5a5" />
+            <stop offset="50%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#991b1b" />
           </radialGradient>
-          <radialGradient id="hydrogenOrb" cx="35%" cy="35%" r="65%">
-            <stop offset="0%" stopColor="#e2e8f0" />
-            <stop offset="100%" stopColor="#94a3b8" />
+          <radialGradient id="hydrogenGrad" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="50%" stopColor="#cbd5e1" />
+            <stop offset="100%" stopColor="#64748b" />
           </radialGradient>
         </defs>
 
-        {/* Covalent Bond Lines */}
-        <line x1="300" y1="190" x2="190" y2="280" stroke="rgba(240, 237, 230, 0.4)" strokeWidth="6" strokeLinecap="round" />
-        <line x1="300" y1="190" x2="410" y2="280" stroke="rgba(240, 237, 230, 0.4)" strokeWidth="6" strokeLinecap="round" />
+        {/* Covalent Single Bonds */}
+        <line x1="330" y1="190" x2="210" y2="290" stroke="rgba(240, 237, 230, 0.4)" strokeWidth="8" strokeLinecap="round" />
+        <line x1="330" y1="190" x2="450" y2="290" stroke="rgba(240, 237, 230, 0.4)" strokeWidth="8" strokeLinecap="round" />
 
         {/* Bond Angle Arc (104.5°) */}
-        <path d="M 260 225 A 50 50 0 0 0 340 225" fill="none" stroke="#d97757" strokeWidth="2" strokeDasharray="3 3" />
-        <text x="300" y="248" textAnchor="middle" fill="#d97757" fontSize="12" fontWeight="600" fontFamily="monospace">104.5°</text>
+        <path d="M 285 230 A 60 60 0 0 0 375 230" fill="none" stroke="#d97757" strokeWidth="2.5" strokeDasharray="4 4" />
+        <text x="330" y="255" textAnchor="middle" fill="#d97757" fontSize="14" fontWeight="600" fontFamily="monospace">104.5°</text>
 
         {/* Central Oxygen Atom */}
-        <circle cx="300" cy="190" r="44" fill="url(#oxygenGlow)" stroke="#7f1d1d" strokeWidth="2" />
-        <text x="300" y="196" textAnchor="middle" fill="#ffffff" fontSize="22" fontWeight="bold" fontFamily="monospace">O</text>
-        <text x="300" y="132" textAnchor="middle" fill="#f87171" fontSize="14" fontWeight="bold" fontFamily="monospace">δ²⁻ (Partial Negative)</text>
+        <circle cx="330" cy="190" r="48" fill="url(#oxygenGrad)" stroke="#7f1d1d" strokeWidth="2" />
+        <text x="330" y="197" textAnchor="middle" fill="#ffffff" fontSize="24" fontWeight="bold" fontFamily="monospace">O</text>
+        <text x="330" y="125" textAnchor="middle" fill="#f87171" fontSize="15" fontWeight="bold" fontFamily="monospace">δ²⁻ (Partial Negative)</text>
 
         {/* Left Hydrogen Atom */}
-        <circle cx="190" cy="280" r="28" fill="url(#hydrogenOrb)" stroke="#475569" strokeWidth="1.5" />
-        <text x="190" y="286" textAnchor="middle" fill="#0f172a" fontSize="16" fontWeight="bold" fontFamily="monospace">H</text>
-        <text x="160" y="328" textAnchor="middle" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace">δ⁺</text>
+        <circle cx="210" cy="290" r="30" fill="url(#hydrogenGrad)" stroke="#334155" strokeWidth="1.5" />
+        <text x="210" y="297" textAnchor="middle" fill="#0f172a" fontSize="17" fontWeight="bold" fontFamily="monospace">H</text>
+        <text x="175" y="340" textAnchor="middle" fill="#38bdf8" fontSize="14" fontWeight="bold" fontFamily="monospace">δ⁺</text>
 
         {/* Right Hydrogen Atom */}
-        <circle cx="410" cy="280" r="28" fill="url(#hydrogenOrb)" stroke="#475569" strokeWidth="1.5" />
-        <text x="410" y="286" textAnchor="middle" fill="#0f172a" fontSize="16" fontWeight="bold" fontFamily="monospace">H</text>
-        <text x="440" y="328" textAnchor="middle" fill="#38bdf8" fontSize="13" fontWeight="bold" fontFamily="monospace">δ⁺</text>
+        <circle cx="450" cy="290" r="30" fill="url(#hydrogenGrad)" stroke="#334155" strokeWidth="1.5" />
+        <text x="450" y="297" textAnchor="middle" fill="#0f172a" fontSize="17" fontWeight="bold" fontFamily="monospace">H</text>
+        <text x="485" y="340" textAnchor="middle" fill="#38bdf8" fontSize="14" fontWeight="bold" fontFamily="monospace">δ⁺</text>
 
-        {/* Dipole Moment Arrow */}
-        {showLabels && (
-          <g transform="translate(300, 360)">
-            <line x1="0" y1="0" x2="0" y2="-50" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="5 3" />
-            <polygon points="0,-56 -5,-46 5,-46" fill="#fbbf24" />
-            <line x1="-8" y1="0" x2="8" y2="0" stroke="#fbbf24" strokeWidth="2" />
-            <text x="14" y="-24" fill="#fbbf24" fontSize="11" fontFamily="monospace">Net Dipole Vector (μ = 1.85 D)</text>
-          </g>
-        )}
-
-        {/* Annotation Box */}
-        {showLabels && (
-          <g transform="translate(24, 24)">
-            <rect width="200" height="64" rx="6" fill="#181715" stroke="rgba(240, 237, 230, 0.12)" />
-            <text x="12" y="22" fill="#faf9f5" fontSize="13" fontWeight="600" fontFamily="'Newsreader', Georgia, serif">
-              Water Molecule (H₂O) Dipole
-            </text>
-            <text x="12" y="40" fill="#b0aca2" fontSize="10.5" fontFamily="monospace">
-              Polar Covalent Single Bonds
-            </text>
-            <text x="12" y="56" fill="#d97757" fontSize="10" fontFamily="monospace">
-              O-H Bond Length: 95.84 pm
-            </text>
-          </g>
-        )}
+        {/* Net Dipole Vector Arrow */}
+        <g transform="translate(330, 370)">
+          <line x1="0" y1="0" x2="0" y2="-55" stroke="#fbbf24" strokeWidth="3" strokeDasharray="6 3" />
+          <polygon points="0,-62 -6,-50 6,-50" fill="#fbbf24" />
+          <line x1="-10" y1="0" x2="10" y2="0" stroke="#fbbf24" strokeWidth="2.5" />
+          <text x="18" y="-28" fill="#fbbf24" fontSize="12" fontWeight="600" fontFamily="monospace">
+            Net Dipole (μ = 1.85 D)
+          </text>
+        </g>
       </svg>
     );
   };
 
-  // Render Neural Network Architecture
+  // Render Neural Network Topology
   const renderNeuralNetSvg = () => {
     const layers = [
       { name: 'Input Layer', count: 3, label: 'x' },
@@ -518,22 +473,22 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
       { name: 'Hidden Layer 2', count: 4, label: 'h²' },
       { name: 'Output Layer', count: 2, label: 'ŷ' },
     ];
-    const layerX = [80, 230, 380, 520];
+    const layerX = [90, 250, 410, 560];
 
     return (
-      <svg viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deep Neural Network Schematic">
-        {/* Synaptic Inter-Layer Connection Lines */}
+      <svg viewBox="0 0 660 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deep Neural Network Schematic">
+        {/* Synaptic Weights */}
         {layers.slice(0, -1).map((l, lIdx) => {
           const nextLayer = layers[lIdx + 1];
           const x1 = layerX[lIdx];
           const x2 = layerX[lIdx + 1];
 
-          return l.count > 0 && (
+          return (
             <g key={`conn-${lIdx}`}>
               {Array.from({ length: l.count }).map((_, i) => {
-                const y1 = 90 + (240 / (l.count + 1)) * (i + 1);
+                const y1 = 90 + (250 / (l.count + 1)) * (i + 1);
                 return Array.from({ length: nextLayer.count }).map((_, j) => {
-                  const y2 = 90 + (240 / (nextLayer.count + 1)) * (j + 1);
+                  const y2 = 90 + (250 / (nextLayer.count + 1)) * (j + 1);
                   return (
                     <line
                       key={`syn-${i}-${j}`}
@@ -541,7 +496,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
                       y1={y1}
                       x2={x2}
                       y2={y2}
-                      stroke="rgba(217, 119, 87, 0.25)"
+                      stroke="rgba(217, 119, 87, 0.28)"
                       strokeWidth="1.2"
                     />
                   );
@@ -551,20 +506,17 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
           );
         })}
 
-        {/* Neurons */}
+        {/* Layer Nodes */}
         {layers.map((l, lIdx) => {
           const x = layerX[lIdx];
           return (
             <g key={`layer-${lIdx}`}>
-              {/* Layer Header Label */}
-              {showLabels && (
-                <text x={x} y="55" textAnchor="middle" fill="#b0aca2" fontSize="11" fontWeight="600" fontFamily="monospace">
-                  {l.name}
-                </text>
-              )}
+              <text x={x} y="55" textAnchor="middle" fill="#b0aca2" fontSize="11" fontWeight="600" fontFamily="monospace">
+                {l.name}
+              </text>
 
               {Array.from({ length: l.count }).map((_, i) => {
-                const y = 90 + (240 / (l.count + 1)) * (i + 1);
+                const y = 90 + (250 / (l.count + 1)) * (i + 1);
                 const isOutput = lIdx === layers.length - 1;
                 const isInput = lIdx === 0;
 
@@ -595,20 +547,11 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
             </g>
           );
         })}
-
-        {/* Math Legend */}
-        {showLabels && (
-          <g transform="translate(140, 390)">
-            <text fill="#b0aca2" fontSize="11" fontFamily="monospace">
-              Forward Propagation: z = W·x + b | Activation: a = σ(z) = ReLU / Softmax
-            </text>
-          </g>
-        )}
       </svg>
     );
   };
 
-  // Render Raw/Custom SVG string provided by LLM
+  // Render Raw/Custom SVG string
   const renderCustomSvg = () => {
     if (!code) return <div style={{ color: '#b0aca2', padding: '20px' }}>No SVG code provided</div>;
     return (
@@ -621,7 +564,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
 
   return (
     <div className="universal-diagram-card">
-      {/* Top Header */}
+      {/* Top Header Row 1: Title & Toolbar */}
       <div className="universal-diagram-header">
         <div className="universal-diagram-title-wrap">
           <span className="universal-diagram-badge">
@@ -636,7 +579,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
           <span className="universal-diagram-title">
             {title ||
               (normalizedType === 'atom'
-                ? `Bohr Atomic Model: ${currentAtom.name} (Z=${currentAtom.z})`
+                ? `Bohr Model: ${currentAtom.name} (${currentAtom.symbol}, Z=${currentAtom.z})`
                 : normalizedType === 'molecule'
                 ? `Molecular Geometry: ${moleculePreset.toUpperCase()}`
                 : normalizedType === 'neural-net'
@@ -652,7 +595,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
               type="button"
               className={`universal-diagram-btn ${animate ? 'universal-diagram-btn--active' : ''}`}
               onClick={() => setAnimate((a) => !a)}
-              title={animate ? 'Pause orbital animation' : 'Start orbital animation'}
+              title={animate ? 'Pause orbital motion' : 'Start orbital motion'}
             >
               {animate ? '⏸ Pause' : '▶ Animate'}
             </button>
@@ -680,7 +623,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
             type="button"
             className="universal-diagram-btn"
             onClick={() => setZoomLevel(1)}
-            title="Reset zoom"
+            title="Reset zoom to 100%"
           >
             {Math.round(zoomLevel * 100)}%
           </button>
@@ -694,23 +637,23 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
           </button>
 
           {/* Export PNG */}
-          <button type="button" className="universal-diagram-btn" onClick={handleExportPng} title="Export 2x Retina PNG">
+          <button type="button" className="universal-diagram-btn" onClick={handleExportPng} title="Download 2x Retina PNG">
             📷 PNG
           </button>
 
           {/* Export SVG */}
-          <button type="button" className="universal-diagram-btn" onClick={handleExportSvg} title="Export Lossless Vector SVG">
+          <button type="button" className="universal-diagram-btn" onClick={handleExportSvg} title="Download Scalable Vector SVG">
             📐 SVG
           </button>
 
-          {/* Copy SVG code */}
-          <button type="button" className="universal-diagram-btn" onClick={handleCopy} title="Copy SVG code">
+          {/* Copy SVG Code */}
+          <button type="button" className="universal-diagram-btn" onClick={handleCopy} title="Copy SVG Code">
             {copied ? '✓ Copied' : '📋 Copy'}
           </button>
         </div>
       </div>
 
-      {/* Interactive Element Preset Bar for Atoms */}
+      {/* Row 2: Elements Switcher Pills for Atoms */}
       {normalizedType === 'atom' && (
         <div className="universal-diagram-presets-bar">
           <span className="universal-diagram-presets-label">Elements:</span>
@@ -727,7 +670,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
         </div>
       )}
 
-      {/* Preset Bar for Molecules */}
+      {/* Row 2: Molecule Selector */}
       {normalizedType === 'molecule' && (
         <div className="universal-diagram-presets-bar">
           <span className="universal-diagram-presets-label">Molecules:</span>
@@ -748,7 +691,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
         </div>
       )}
 
-      {/* Viewport Canvas with Scalable Transform */}
+      {/* Visual Canvas Stage (Scalable Transform) */}
       <div className="universal-diagram-viewport" ref={svgContainerRef}>
         <div
           className="universal-diagram-svg-wrap"
@@ -761,29 +704,116 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
         </div>
       </div>
 
-      {/* Telemetry / Scientific Info Footer */}
+      {/* Editorial Scientific Data Cards (HTML + KaTeX: ZERO TEXT COLLAPSING) */}
       {normalizedType === 'atom' && (
-        <div className="universal-diagram-footer">
-          <div className="universal-diagram-metrics-row">
-            <div className="universal-diagram-metric-item">
-              <span className="universal-diagram-metric-label">Nucleus:</span>
-              <span className="universal-diagram-metric-value">
-                {currentAtom.z} p⁺ + {currentAtom.a - currentAtom.z} n⁰ (Mass A={currentAtom.a})
-              </span>
+        <div className="universal-diagram-editorial-panel">
+          {/* Card 1: Nuclear Composition */}
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Nuclear Composition</span>
+            <span className="universal-diagram-col-headline">
+              {currentAtom.name} ({currentAtom.symbol})
+            </span>
+            <div className="universal-diagram-col-metric">
+              Atomic Number (<strong>Z</strong>): {currentAtom.z} Protons (p⁺)
             </div>
-            <div className="universal-diagram-metric-item">
-              <span className="universal-diagram-metric-label">Configuration:</span>
-              <span className="universal-diagram-metric-value">{currentAtom.config}</span>
+            <div className="universal-diagram-col-metric">
+              Neutrons (<strong>N</strong>): {currentAtom.a - currentAtom.z} n⁰ (Mass A={currentAtom.a})
             </div>
-            <div className="universal-diagram-metric-item">
-              <span className="universal-diagram-metric-label">Shell Occupancy:</span>
-              <span className="universal-diagram-metric-value">
-                {currentAtom.shells.map((count, i) => `n=${i + 1}: ${count}e⁻`).join(' | ')}
-              </span>
+            <div className="universal-diagram-col-metric">
+              Classification: {currentAtom.group}
+            </div>
+          </div>
+
+          {/* Card 2: Quantum Shell Configuration */}
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Electron Configuration</span>
+            <div
+              className="universal-diagram-math-box"
+              dangerouslySetInnerHTML={{ __html: renderMathHtml(currentAtom.config, true) }}
+            />
+            <div className="universal-diagram-col-metric" style={{ marginTop: '4px' }}>
+              Occupancy: {currentAtom.shells.map((count, i) => `n=${i + 1} (${['K', 'L', 'M', 'N'][i]}): ${count}e⁻`).join(' | ')}
+            </div>
+            <div className="universal-diagram-col-metric">
+              Valence Electrons: {currentAtom.shells[currentAtom.shells.length - 1]}e⁻
+            </div>
+          </div>
+
+          {/* Card 3: Bohr Energy Levels */}
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Quantized Energy Levels</span>
+            <div
+              className="universal-diagram-math-box"
+              dangerouslySetInnerHTML={{ __html: renderMathHtml('E_n = -\\frac{13.6\\,\\text{eV}}{n^2}', true) }}
+            />
+            <div className="universal-diagram-col-metric" style={{ marginTop: '4px' }}>
+              Ground State (<strong>n=1</strong>): -13.60 eV
+            </div>
+            <div className="universal-diagram-col-metric">
+              Photon Transition: <span dangerouslySetInnerHTML={{ __html: renderMathHtml('\\Delta E = h\\nu = \\frac{hc}{\\lambda}') }} />
             </div>
           </div>
         </div>
       )}
+
+      {/* Molecular Data Card */}
+      {normalizedType === 'molecule' && (
+        <div className="universal-diagram-editorial-panel">
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Chemical Bonding</span>
+            <span className="universal-diagram-col-headline">
+              {moleculePreset === 'water' ? 'Water Dipole (H₂O)' : 'Benzene (C₆H₆)'}
+            </span>
+            <div className="universal-diagram-col-metric">
+              {moleculePreset === 'water'
+                ? 'Polar Covalent Single O-H Bonds'
+                : 'Aromatic Planar sp² Ring (120°)'}
+            </div>
+          </div>
+
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Geometric Properties</span>
+            <div className="universal-diagram-col-metric">
+              {moleculePreset === 'water' ? 'Bond Angle: 104.5° Bent' : 'Bond Angle: 120.0° Planar'}
+            </div>
+            <div className="universal-diagram-col-metric">
+              {moleculePreset === 'water' ? 'Dipole Moment: μ = 1.85 D' : 'Dipole Moment: μ = 0 D (Nonpolar)'}
+            </div>
+          </div>
+
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Analytical Energy</span>
+            <div
+              className="universal-diagram-math-box"
+              dangerouslySetInnerHTML={{
+                __html: renderMathHtml(
+                  moleculePreset === 'water' ? '\\Delta E_{\\text{bond}} = 459\\,\\text{kJ/mol}' : 'E_{\\text{resonance}} = 152\\,\\text{kJ/mol}',
+                  true
+                ),
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Footer Legend */}
+      <div className="universal-diagram-legend-row">
+        <div className="universal-diagram-legend-item">
+          <div className="universal-diagram-legend-dot" style={{ background: '#ef4444' }} />
+          <span>Proton (p⁺)</span>
+        </div>
+        <div className="universal-diagram-legend-item">
+          <div className="universal-diagram-legend-dot" style={{ background: '#64748b' }} />
+          <span>Neutron (n⁰)</span>
+        </div>
+        <div className="universal-diagram-legend-item">
+          <div className="universal-diagram-legend-dot" style={{ background: '#38bdf8' }} />
+          <span>Electron (e⁻)</span>
+        </div>
+        <div className="universal-diagram-legend-item" style={{ marginLeft: 'auto' }}>
+          <span>Radial Guide: Quantized Bohr Orbits (n = 1, 2, 3...)</span>
+        </div>
+      </div>
     </div>
   );
 };
