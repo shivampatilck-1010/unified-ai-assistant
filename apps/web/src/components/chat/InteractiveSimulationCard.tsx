@@ -19,6 +19,10 @@ export interface InteractiveSimulationCardProps {
     | 'photochemical'
     | 'photochemical-reaction'
     | 'photolysis'
+    | 'rocket-engine'
+    | 'nozzle'
+    | 'gas-dynamics'
+    | 'propulsion'
     | 'graph'
     | 'dijkstra'
     | 'bfs-dfs'
@@ -187,6 +191,25 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
       return 'photochemical';
     }
     if (
+      declaredType === 'rocket-engine' ||
+      declaredType === 'nozzle' ||
+      declaredType === 'gas-dynamics' ||
+      declaredType === 'propulsion' ||
+      declaredType === 'rocket' ||
+      declaredType === 'de-laval' ||
+      declaredType === 'delaval' ||
+      lowerCode.includes('rocket-engine') ||
+      lowerCode.includes('de laval') ||
+      lowerCode.includes('delaval') ||
+      lowerCode.includes('nozzle') ||
+      lowerCode.includes('supersonic exhaust') ||
+      lowerCode.includes('thrust') ||
+      lowerCode.includes('throttle') ||
+      lowerCode.includes('o/f ratio')
+    ) {
+      return 'rocket-engine';
+    }
+    if (
       declaredType === 'photosynthesis' ||
       declaredType === 'photo' ||
       lowerCode.includes('photosynthesis') ||
@@ -246,6 +269,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     if (resolvedType === 'stack-queue') return 'LIFO Stack & FIFO Buffer Memory Visualizer';
     if (resolvedType === 'photosynthesis') return 'Photosynthesis & Solar Photolysis Simulation';
     if (resolvedType === 'photochemical') return 'Photochemical Reaction & UV Photolysis Simulator';
+    if (resolvedType === 'rocket-engine') return 'Rocket Engine & De Laval Nozzle Supersonic Gas Dynamics';
     if (resolvedType === 'merge-sort') return 'Merge Sort (Divide & Conquer O(n log n)) Visualizer';
     if (resolvedType === 'quick-sort') return 'Quick Sort (Partition O(n log n)) Visualizer';
     if (resolvedType === 'sorting') return 'Sorting Algorithm Visualizer';
@@ -408,6 +432,37 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     }, 850);
     return () => clearInterval(interval);
   }, [resolvedType, isPaused, uvWavelengthNm, uvFluxPct, reactantCount]);
+
+  // --- Rocket Engine & Supersonic Gas Dynamics State ---
+  const [isEngineIgnited, setIsEngineIgnited] = useState<boolean>(true);
+  const [rocketThrottlePct, setRocketThrottlePct] = useState<number>(85);
+  const [rocketAltitudeKm, setRocketAltitudeKm] = useState<number>(0);
+  const [rocketOfRatio, setRocketOfRatio] = useState<number>(2.6);
+  const [rocketGasFilter, setRocketGasFilter] = useState<'all' | 'H2O' | 'CO2' | 'CO' | 'H2'>('all');
+  const [propellantMassKg, setPropellantMassKg] = useState<number>(1420);
+  const [totalThrustKn, setTotalThrustKn] = useState<number>(845);
+  const [totalMoleculesEjected, setTotalMoleculesEjected] = useState<number>(342000);
+
+  // Live dynamic telemetry calculations
+  const chamberPressureMpa = +( (rocketThrottlePct / 100) * (isEngineIgnited ? 7.2 : 0.1) ).toFixed(2);
+  const chamberTempK = isEngineIgnited ? Math.round(3150 + (rocketOfRatio - 2.0) * 320) : 295;
+  const exitMach = isEngineIgnited ? +(3.2 + (rocketThrottlePct / 100) * 0.4).toFixed(2) : 0;
+  const ispSeconds = isEngineIgnited ? Math.round(311 + (rocketAltitudeKm / 100) * 37) : 0;
+  const ambientPressureKpa = +(101.3 * Math.exp(-rocketAltitudeKm / 7.2)).toFixed(1);
+
+  // Rocket Engine animation loop
+  useEffect(() => {
+    if (resolvedType !== 'rocket-engine' || isPaused || !isEngineIgnited) return;
+    const interval = setInterval(() => {
+      const massRate = +(18.5 * (rocketThrottlePct / 100)).toFixed(1);
+      setPropellantMassKg((prev) => Math.max(0, +(prev - massRate * 0.05).toFixed(1)));
+      setTotalMoleculesEjected((prev) => prev + Math.round(18000 * (rocketThrottlePct / 100)));
+      const baseThrust = 760 * (rocketThrottlePct / 100);
+      const vacuumBonus = (rocketAltitudeKm / 100) * 95;
+      setTotalThrustKn(Math.round(baseThrust + vacuumBonus));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [resolvedType, isPaused, isEngineIgnited, rocketThrottlePct, rocketAltitudeKm]);
 
   // --- Sorting Algorithm Visualizer State ---
   const [sortArray, setSortArray] = useState<number[]>([45, 12, 85, 32, 64, 21, 93, 54, 76, 18, 41, 60]);
@@ -1310,8 +1365,8 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     setSearchingPath(path);
     setSearchStatus(
       found
-        ? `Found ${val}! Path: ${path.join(' âž” ')}`
-        : `${val} not found. Path: ${path.join(' âž” ')}`
+        ? `Found ${val}! Path: ${path.join(' ⟶ ')}`
+        : `${val} not found. Path: ${path.join(' ⟶ ')}`
     );
   };
 
@@ -2134,6 +2189,486 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   };
 
   // =========================================================================
+  // ROCKET ENGINE & DE LAVAL NOZZLE SUPERSONIC GAS DYNAMICS ENGINE
+  // =========================================================================
+  const renderRocketEngineSvg = () => {
+    const isOverexpanded = rocketAltitudeKm < 20; // Sea level atmospheric pinching
+    const isUnderexpanded = rocketAltitudeKm > 40; // Deep vacuum flare
+    const altRatio = Math.min(1, Math.max(0, rocketAltitudeKm / 100));
+
+    // Gas molecules inside chamber, throat, and supersonic plume
+    const chamberMolecules = [
+      { id: 'c1', x: 52, y: 105, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'c2', x: 74, y: 135, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 'c3', x: 62, y: 172, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'c4', x: 96, y: 112, species: 'CO', formula: 'CO', name: 'Carbon Monoxide', color: '#f87171', pct: '9%' },
+      { id: 'c5', x: 114, y: 154, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'c6', x: 86, y: 190, species: 'H2', formula: 'H₂', name: 'Molecular Hydrogen', color: '#c084fc', pct: '5%' },
+      { id: 'c7', x: 132, y: 124, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 'c8', x: 104, y: 138, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'c9', x: 146, y: 162, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'c10', x: 122, y: 94, species: 'OH', formula: 'OH•', name: 'Hydroxyl Radical', color: '#f43f5e', pct: '<1%' },
+    ];
+
+    const throatMolecules = [
+      { id: 't1', x: 166, y: 132, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 't2', x: 176, y: 146, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 't3', x: 186, y: 136, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 't4', x: 194, y: 152, species: 'CO', formula: 'CO', name: 'Carbon Monoxide', color: '#f87171', pct: '9%' },
+    ];
+
+    const plumeMolecules = [
+      { id: 'p1', x: 220, ySpread: -0.25, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p2', x: 236, ySpread: 0.3, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 'p3', x: 258, ySpread: -0.45, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p4', x: 274, ySpread: 0.52, species: 'CO', formula: 'CO', name: 'Carbon Monoxide', color: '#f87171', pct: '9%' },
+      { id: 'p5', x: 292, ySpread: 0.05, species: 'H2', formula: 'H₂', name: 'Molecular Hydrogen', color: '#c084fc', pct: '5%' },
+      { id: 'p6', x: 312, ySpread: -0.65, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p7', x: 326, ySpread: 0.72, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 'p8', x: 346, ySpread: -0.15, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p9', x: 362, ySpread: 0.22, species: 'CO', formula: 'CO', name: 'Carbon Monoxide', color: '#f87171', pct: '9%' },
+      { id: 'p10', x: 382, ySpread: -0.85, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p11', x: 398, ySpread: 0.9, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p12', x: 418, ySpread: -0.05, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 'p13', x: 432, ySpread: -0.42, species: 'H2', formula: 'H₂', name: 'Molecular Hydrogen', color: '#c084fc', pct: '5%' },
+      { id: 'p14', x: 448, ySpread: 0.48, species: 'CO', formula: 'CO', name: 'Carbon Monoxide', color: '#f87171', pct: '9%' },
+      { id: 'p15', x: 472, ySpread: -1.15, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p16', x: 486, ySpread: 1.2, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+      { id: 'p17', x: 508, ySpread: 0.02, species: 'CO2', formula: 'CO₂', name: 'Carbon Dioxide', color: '#fb923c', pct: '20%' },
+      { id: 'p18', x: 524, ySpread: -0.6, species: 'H2', formula: 'H₂', name: 'Molecular Hydrogen', color: '#c084fc', pct: '5%' },
+      { id: 'p19', x: 536, ySpread: 0.75, species: 'H2O', formula: 'H₂O', name: 'Superheated Steam', color: '#38bdf8', pct: '66%' },
+    ];
+
+    // Compute dynamic plume boundary paths based on altitude
+    const upperPlumeY = isOverexpanded
+      ? 'M 295 52 C 340 85, 410 108, 545 116'
+      : isUnderexpanded
+      ? 'M 295 52 C 345 24, 420 10, 545 6'
+      : 'M 295 52 C 345 52, 420 54, 545 56';
+
+    const lowerPlumeY = isOverexpanded
+      ? 'M 295 228 C 340 195, 410 172, 545 164'
+      : isUnderexpanded
+      ? 'M 295 228 C 345 256, 420 270, 545 274'
+      : 'M 295 228 C 345 228, 420 226, 545 224';
+
+    const plumePolygonPoints = isOverexpanded
+      ? '295,52 340,85 410,108 545,116 545,164 410,172 340,195 295,228'
+      : isUnderexpanded
+      ? '295,52 345,24 420,10 545,6 545,274 420,270 345,256 295,228'
+      : '295,52 345,52 420,54 545,56 545,224 420,226 345,228 295,228';
+
+    return (
+      <svg width="100%" height="280" viewBox="0 0 560 280">
+        <defs>
+          {/* Combustion Plasma Gradient */}
+          <linearGradient id="rocketChamberFlame" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ef4444" stopOpacity={isEngineIgnited ? 0.85 : 0.05} />
+            <stop offset="40%" stopColor="#f97316" stopOpacity={isEngineIgnited ? 0.92 : 0.05} />
+            <stop offset="85%" stopColor="#fbbf24" stopOpacity={isEngineIgnited ? 0.95 : 0.05} />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity={isEngineIgnited ? 0.98 : 0.05} />
+          </linearGradient>
+
+          {/* Supersonic Plume Body Gradient */}
+          <linearGradient id="supersonicPlumeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity={isEngineIgnited ? 0.95 : 0.02} />
+            <stop offset="15%" stopColor="#fef08a" stopOpacity={isEngineIgnited ? 0.8 : 0.02} />
+            <stop offset="45%" stopColor="#f97316" stopOpacity={isEngineIgnited ? 0.55 : 0.02} />
+            <stop offset="80%" stopColor="#dc2626" stopOpacity={isEngineIgnited ? 0.35 : 0.01} />
+            <stop offset="100%" stopColor="#7f1d1d" stopOpacity={isEngineIgnited ? 0.1 : 0} />
+          </linearGradient>
+
+          {/* Shock Diamond Glowing Radial */}
+          <radialGradient id="shockDiamondGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+            <stop offset="35%" stopColor="#fef08a" stopOpacity="0.85" />
+            <stop offset="70%" stopColor="#f59e0b" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+          </radialGradient>
+
+          {/* Regenerative Cooling Jacket Gradient */}
+          <linearGradient id="coolingJacketGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#d97757" />
+            <stop offset="50%" stopColor="#9a3412" />
+            <stop offset="100%" stopColor="#431407" />
+          </linearGradient>
+        </defs>
+
+        <rect x="6" y="6" width="548" height="268" rx="10" fill="#141312" stroke="rgba(255,255,255,0.06)" />
+
+        {/* 1. Supersonic Plume Exhaust Stream (Active When Engine Ignited) */}
+        {isEngineIgnited && (
+          <g>
+            <polygon points={plumePolygonPoints} fill="url(#supersonicPlumeGrad)" />
+
+            <path d={upperPlumeY} fill="none" stroke="rgba(254, 240, 138, 0.45)" strokeWidth="1.5" />
+            <path d={lowerPlumeY} fill="none" stroke="rgba(254, 240, 138, 0.45)" strokeWidth="1.5" />
+
+            {/* Supersonic Core Streamlines with High-Speed Animation */}
+            <path
+              d="M 295 140 L 545 140"
+              stroke="#ffffff"
+              strokeWidth="2.2"
+              strokeDasharray="14 8"
+              opacity="0.9"
+            >
+              <animate attributeName="stroke-dashoffset" from="44" to="0" dur="0.25s" repeatCount="indefinite" />
+            </path>
+            <path
+              d="M 295 125 C 340 128, 410 132, 545 135"
+              stroke="#fef08a"
+              strokeWidth="1.5"
+              strokeDasharray="12 6"
+              opacity="0.75"
+            >
+              <animate attributeName="stroke-dashoffset" from="36" to="0" dur="0.28s" repeatCount="indefinite" />
+            </path>
+            <path
+              d="M 295 155 C 340 152, 410 148, 545 145"
+              stroke="#fef08a"
+              strokeWidth="1.5"
+              strokeDasharray="12 6"
+              opacity="0.75"
+            >
+              <animate attributeName="stroke-dashoffset" from="36" to="0" dur="0.28s" repeatCount="indefinite" />
+            </path>
+          </g>
+        )}
+
+        {/* 2. Oblique Shock Diamonds (Mach Disks Active at Sea Level / Overexpansion) */}
+        {isEngineIgnited && isOverexpanded && (
+          <g
+            className="sim-svg-interactive"
+            opacity={Math.max(0.15, 1 - altRatio * 1.6)}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+              setHoveredInfo({
+                x: rect ? e.clientX - rect.left : 360,
+                y: rect ? e.clientY - rect.top : 140,
+                title: 'Oblique Shock Diamond (Mach Disk Reflection)',
+                category: 'Overexpanded Aerodynamics (Sea Level)',
+                color: '#fde047',
+                description: 'At sea level, atmospheric pressure (Pa = 101.3 kPa) is higher than nozzle exit pressure (Pe ≈ 52 kPa). Oblique shock waves reflect inward from the supersonic shear layer, compressing and re-igniting exhaust gases into luminous periodic diamonds.',
+                stats: [
+                  { label: 'Ambient Pressure (P_a)', value: '101.3 kPa (1.0 atm)' },
+                  { label: 'Exit Pressure (P_e)', value: '52.4 kPa (Overexpanded)' },
+                  { label: 'Shock Compression Temp', value: '1,840 K (Luminous Reheat)' },
+                  { label: 'Diamond Formation', value: 'Prandtl-Meyer Shock Reflection' },
+                ],
+              });
+            }}
+            onMouseLeave={() => setHoveredInfo(null)}
+          >
+            {/* Diamond 1 */}
+            <polygon points="325,140 338,127 351,140 338,153" fill="url(#shockDiamondGlow)" stroke="#fde047" strokeWidth="1.4" />
+            {/* Diamond 2 */}
+            <polygon points="370,140 382,129 394,140 382,151" fill="url(#shockDiamondGlow)" stroke="#f59e0b" strokeWidth="1.2" />
+            {/* Diamond 3 */}
+            <polygon points="414,140 424,131 434,140 424,149" fill="url(#shockDiamondGlow)" stroke="#f59e0b" strokeWidth="1.0" />
+            {/* Diamond 4 */}
+            <polygon points="455,140 463,133 471,140 463,147" fill="url(#shockDiamondGlow)" stroke="#f97316" strokeWidth="0.8" />
+            {/* Diamond 5 */}
+            <polygon points="492,140 498,135 504,140 498,145" fill="url(#shockDiamondGlow)" stroke="#f97316" strokeWidth="0.8" />
+          </g>
+        )}
+
+        {/* 3. Deep Space Vacuum Flare Indicator */}
+        {isEngineIgnited && isUnderexpanded && (
+          <g transform="translate(360, 24)">
+            <rect x="0" y="0" width="180" height="26" rx="4" fill="rgba(20, 19, 18, 0.88)" stroke="rgba(217, 119, 87, 0.4)" />
+            <text x="90" y="17" fill="#faf9f5" fontSize="9.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+              🌌 VACUUM BELL PLUME (I_sp = {ispSeconds}s)
+            </text>
+          </g>
+        )}
+
+        {/* 4. Combustion Chamber Hot Gas Core */}
+        <polygon
+          points="36,75 130,75 180,115 180,165 130,205 36,205"
+          fill="url(#rocketChamberFlame)"
+        />
+
+        {/* 5. De Laval Nozzle Wall Contours & Regenerative Cooling Tubes */}
+        <g>
+          {/* Upper Chamber & Nozzle Wall */}
+          <path
+            d="M 24 64 L 130 64 Q 160 64 180 106 Q 215 106 295 40 L 295 52 Q 220 115 180 115 Q 155 75 130 75 L 36 75 L 24 64 Z"
+            fill="url(#coolingJacketGrad)"
+            stroke="rgba(255, 255, 255, 0.15)"
+            strokeWidth="1"
+          />
+          {/* Lower Chamber & Nozzle Wall */}
+          <path
+            d="M 24 216 L 130 216 Q 160 216 180 174 Q 215 174 295 240 L 295 228 Q 220 165 180 165 Q 155 205 130 205 L 36 205 L 24 216 Z"
+            fill="url(#coolingJacketGrad)"
+            stroke="rgba(255, 255, 255, 0.15)"
+            strokeWidth="1"
+          />
+
+          {/* Regenerative Cooling Ribs */}
+          {[50, 75, 100, 125, 150, 175, 205, 235, 265].map((rx) => (
+            <line
+              key={`rib-top-${rx}`}
+              x1={rx}
+              y1="56"
+              x2={rx}
+              y2="70"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="1"
+            />
+          ))}
+          {[50, 75, 100, 125, 150, 175, 205, 235, 265].map((rx) => (
+            <line
+              key={`rib-bot-${rx}`}
+              x1={rx}
+              y1="210"
+              x2={rx}
+              y2="224"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="1"
+            />
+          ))}
+        </g>
+
+        {/* 6. Coaxial Injector Face (Left Dock) */}
+        <g
+          transform="translate(14, 60)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 70,
+              y: rect ? e.clientY - rect.top : 140,
+              title: 'Coaxial Injector Dome & Propellant Manifold',
+              category: 'Cryogenic Injection System',
+              color: '#38bdf8',
+              description: 'Atomizes liquid oxygen (LOX at 90 K) and methane/kerosene fuel (RP-1) at high differential injection pressure (ΔP = 1.4 MPa), generating fine aerosol mist that combusts stoichiometrically.',
+              stats: [
+                { label: 'Oxidizer', value: 'Liquid Oxygen (LOX, O₂)' },
+                { label: 'Fuel', value: 'Hydrocarbon (CH₄ / RP-1 Kerosene)' },
+                { label: 'O/F Mixture Ratio', value: `${rocketOfRatio} : 1` },
+                { label: 'Injection ΔP', value: '1.42 MPa' },
+                { label: 'Combustion Eq', value: 'CH₄ + 2 O₂ ⟶ CO₂ + 2 H₂O + ΔH' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
+          <rect x="0" y="8" width="18" height="144" rx="3" fill="#1f1e1c" stroke="#38bdf8" strokeWidth="1.2" />
+          {/* LOX Injector Ports (Cyan) */}
+          {[22, 58, 94, 130].map((iy) => (
+            <g key={`lox-${iy}`}>
+              <rect x="14" y={iy} width="10" height="5" fill="#38bdf8" />
+              <line x1="24" y1={iy + 2.5} x2="36" y2={iy + 2.5} stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="3 2" />
+            </g>
+          ))}
+          {/* Fuel Injector Ports (Terracotta) */}
+          {[40, 76, 112].map((iy) => (
+            <g key={`fuel-${iy}`}>
+              <rect x="14" y={iy} width="10" height="5" fill="#ea580c" />
+              <line x1="24" y1={iy + 2.5} x2="36" y2={iy + 2.5} stroke="#ea580c" strokeWidth="1.5" strokeDasharray="3 2" />
+            </g>
+          ))}
+          <text x="8" y="80" fill="#faf9f5" fontSize="7.5" fontWeight="bold" textAnchor="middle" transform="rotate(-90 8 80)" fontFamily="sans-serif">
+            INJECTOR
+          </text>
+        </g>
+
+        {/* 7. Choked Sonic Throat Marker (Mach 1.0) */}
+        <g
+          transform="translate(180, 112)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 180,
+              y: rect ? e.clientY - rect.top : 140,
+              title: 'De Laval Nozzle Throat (Choked Sonic Flow)',
+              category: 'Transonic Sonic Barrier (Mach 1.0)',
+              color: '#fbbf24',
+              description: 'The narrowest cross-sectional area (A*) of the nozzle where compressible gas flow reaches acoustic speed (Mach 1.0). Downstream of this geometric boundary, the divergent bell accelerates the gas into supersonic velocities (Mach > 3.4).',
+              stats: [
+                { label: 'Flow Regime', value: 'Choked Sonic Flow (M = 1.00)' },
+                { label: 'Acoustic Speed (a*)', value: '1,120 m/s' },
+                { label: 'Critical Pressure (P*)', value: `${(0.564 * +chamberPressureMpa).toFixed(2)} MPa (0.564 Pc)` },
+                { label: 'Critical Temp (T*)', value: `${Math.round(chamberTempK * 0.833)} K` },
+                { label: 'Mass Flow (ṁ)', value: `${(18.5 * (rocketThrottlePct / 100)).toFixed(1)} kg/s` },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
+          <line x1="0" y1="3" x2="0" y2="53" stroke="#fbbf24" strokeWidth="1.8" strokeDasharray="3 3" />
+          <rect x="-18" y="20" width="36" height="16" rx="3" fill="#141312" stroke="#fbbf24" strokeWidth="0.9" />
+          <text x="0" y="31.5" fill="#fbbf24" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            M = 1.0
+          </text>
+        </g>
+
+        {/* 8. Exit Plane Bell Skirt Marker */}
+        <g
+          transform="translate(295, 45)"
+          className="sim-svg-interactive"
+          onMouseEnter={(e) => {
+            const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+            setHoveredInfo({
+              x: rect ? e.clientX - rect.left : 295,
+              y: rect ? e.clientY - rect.top : 140,
+              title: 'Nozzle Exit Plane (Ae / A* Expansion Ratio)',
+              category: 'Supersonic Expansion Boundary',
+              color: '#d97757',
+              description: 'Divergent bell nozzle contour designed to isentropically expand gas pressure from throat stagnation down to exit pressure Pe. Area expansion ratio ε = Ae / A* ≈ 16.5.',
+              stats: [
+                { label: 'Expansion Ratio (ε)', value: '16.5 : 1 (Ae / A*)' },
+                { label: 'Exit Mach Number', value: `Mach ${exitMach}` },
+                { label: 'Exit Velocity (v_e)', value: '3,150 m/s' },
+                { label: 'Static Temp (T_e)', value: '1,420 K (Adiabatically Cooled)' },
+                { label: 'Reactive Thrust Eq', value: 'F = ṁ · v_e + (P_e - P_a) · A_e' },
+              ],
+            });
+          }}
+          onMouseLeave={() => setHoveredInfo(null)}
+        >
+          <line x1="0" y1="7" x2="0" y2="183" stroke="#d97757" strokeWidth="1.2" strokeDasharray="4 3" opacity="0.6" />
+          <text x="0" y="0" fill="#faf9f5" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            Ae EXIT
+          </text>
+        </g>
+
+        {/* 9. Interactive Gas Molecules (Chamber, Throat, Plume) */}
+        {/* Chamber Molecules */}
+        {chamberMolecules.map((mol) => {
+          const isHighlighted = rocketGasFilter === 'all' || rocketGasFilter === mol.species;
+          const molOpacity = isEngineIgnited ? (isHighlighted ? 0.95 : 0.18) : 0.05;
+
+          return (
+            <g
+              key={mol.id}
+              transform={`translate(${mol.x}, ${mol.y})`}
+              className="sim-svg-interactive"
+              opacity={molOpacity}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+                setHoveredInfo({
+                  x: rect ? e.clientX - rect.left : mol.x,
+                  y: rect ? e.clientY - rect.top : mol.y,
+                  title: `${mol.name} (${mol.formula})`,
+                  category: 'Combustion Chamber Product',
+                  color: mol.color,
+                  description: `Subsonic combustion gas molecule formed in the chamber under extreme pressure (${chamberPressureMpa} MPa) and temperature (${chamberTempK} K). Bounces rapidly, colliding with fellow molecules to maintain stagnation pressure.`,
+                  stats: [
+                    { label: 'Chemical Species', value: `${mol.formula} (${mol.name})` },
+                    { label: 'Flow Velocity', value: 'Subsonic (v ≈ 240 m/s, M ≈ 0.22)' },
+                    { label: 'Local Temperature', value: `${chamberTempK} K (${chamberTempK - 273} °C)` },
+                    { label: 'Local Pressure', value: `${chamberPressureMpa} MPa (${(+chamberPressureMpa * 9.87).toFixed(0)} atm)` },
+                    { label: 'Exhaust Fraction', value: mol.pct },
+                  ],
+                });
+              }}
+              onMouseLeave={() => setHoveredInfo(null)}
+            >
+              <circle cx="0" cy="0" r="4.2" fill={mol.color} stroke="#ffffff" strokeWidth="0.8" />
+              {isHighlighted && (
+                <text x="0" y="2.8" fill="#141312" fontSize="5.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+                  {mol.formula.slice(0, 3)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Throat Molecules */}
+        {throatMolecules.map((mol) => {
+          const isHighlighted = rocketGasFilter === 'all' || rocketGasFilter === mol.species;
+          const molOpacity = isEngineIgnited ? (isHighlighted ? 0.95 : 0.18) : 0.05;
+
+          return (
+            <g
+              key={mol.id}
+              transform={`translate(${mol.x}, ${mol.y})`}
+              className="sim-svg-interactive"
+              opacity={molOpacity}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+                setHoveredInfo({
+                  x: rect ? e.clientX - rect.left : mol.x,
+                  y: rect ? e.clientY - rect.top : mol.y,
+                  title: `${mol.name} (${mol.formula}) — Choked Flow`,
+                  category: 'Transonic Sonic Molecule (Mach 1.0)',
+                  color: mol.color,
+                  description: `Gas molecule passing through the minimum constriction area (A*). Reaches exactly local speed of sound (acoustic Mach 1.0). All stagnation pressure is converted into directional axial momentum.`,
+                  stats: [
+                    { label: 'Chemical Formula', value: mol.formula },
+                    { label: 'Acoustic Speed (a*)', value: '1,120 m/s (Mach 1.00)' },
+                    { label: 'Local Temperature', value: `${Math.round(chamberTempK * 0.833)} K` },
+                    { label: 'Exhaust Fraction', value: mol.pct },
+                  ],
+                });
+              }}
+              onMouseLeave={() => setHoveredInfo(null)}
+            >
+              <circle cx="0" cy="0" r="4.2" fill={mol.color} stroke="#fbbf24" strokeWidth="1" />
+            </g>
+          );
+        })}
+
+        {/* Plume Molecules */}
+        {plumeMolecules.map((mol) => {
+          const spreadFactor = isOverexpanded ? 28 : isUnderexpanded ? 115 : 65;
+          const curY = 140 + mol.ySpread * spreadFactor;
+          const isHighlighted = rocketGasFilter === 'all' || rocketGasFilter === mol.species;
+          const molOpacity = isEngineIgnited ? (isHighlighted ? 0.95 : 0.18) : 0.05;
+
+          return (
+            <g
+              key={mol.id}
+              transform={`translate(${mol.x}, ${curY})`}
+              className="sim-svg-interactive"
+              opacity={molOpacity}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.closest('.sim-viewport')?.getBoundingClientRect();
+                setHoveredInfo({
+                  x: rect ? e.clientX - rect.left : mol.x,
+                  y: rect ? e.clientY - rect.top : curY,
+                  title: `Supersonic Exhaust: ${mol.name} (${mol.formula})`,
+                  category: 'Supersonic Reaction Plume',
+                  color: mol.color,
+                  description: `Accelerated supersonic exhaust molecule ejected into ambient atmosphere or vacuum at Mach ${exitMach}. Carrying immense reactive momentum (p = m · v_e), this substance directly generates vehicle upward thrust via Newton's 3rd Law.`,
+                  stats: [
+                    { label: 'Chemical Species', value: `${mol.formula} (${mol.name})` },
+                    { label: 'Exhaust Velocity (v_e)', value: '3,150 m/s (Mach 3.42)' },
+                    { label: 'Static Temp (T_e)', value: '1,420 K (Adiabatically Cooled)' },
+                    { label: 'Net Thrust (F)', value: `${totalThrustKn} kN` },
+                    { label: 'Exhaust Fraction', value: mol.pct },
+                  ],
+                });
+              }}
+              onMouseLeave={() => setHoveredInfo(null)}
+            >
+              <circle cx="0" cy="0" r="3.8" fill={mol.color} stroke="#ffffff" strokeWidth="0.7" />
+              {/* Supersonic Mach Cone Trail */}
+              <line x1="-8" y1="0" x2="-2" y2="0" stroke={mol.color} strokeWidth="1.2" opacity="0.6" />
+            </g>
+          );
+        })}
+
+        {/* 10. Engine State Banner (When Shutdown) */}
+        {!isEngineIgnited && (
+          <g transform="translate(160, 115)">
+            <rect x="0" y="0" width="240" height="50" rx="8" fill="rgba(18, 17, 16, 0.94)" stroke="#ef4444" strokeWidth="1.5" />
+            <text x="120" y="22" fill="#ef4444" fontSize="12" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+              🛑 ENGINE SHUTDOWN (COLD)
+            </text>
+            <text x="120" y="38" fill="#ede8df" fontSize="9.5" textAnchor="middle" fontFamily="monospace">
+              Combustion halted. Click [🔥 IGNITE ENGINE] to restart flow.
+            </text>
+          </g>
+        )}
+      </svg>
+    );
+  };
+
+  // =========================================================================
   // SORTING ALGORITHM ENGINE (Merge Sort, Quick Sort, Bubble Sort)
   // =========================================================================
   const renderSortingSvg = () => {
@@ -2615,10 +3150,10 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
 
               <div className="sim-legend">
                 <span className="sim-legend__item">
-                  <span className="sim-legend__dot" style={{ background: '#38bdf8' }} /> D (Â²H)
+                  <span className="sim-legend__dot" style={{ background: '#38bdf8' }} /> D (²H)
                 </span>
                 <span className="sim-legend__item">
-                  <span className="sim-legend__dot" style={{ background: '#22d3ee' }} /> T (Â³H)
+                  <span className="sim-legend__dot" style={{ background: '#22d3ee' }} /> T (³H)
                 </span>
                 <span className="sim-legend__item">
                   <span className="sim-legend__dot" style={{ background: '#c084fc' }} /> â´He (Alpha)
@@ -2776,6 +3311,96 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             </div>
           )}
 
+          {/* Controls Bar for Rocket Engine & De Laval Nozzle */}
+          {resolvedType === 'rocket-engine' && (
+            <div className="sim-controls-bar" style={{ flexWrap: 'wrap', gap: '10px' }}>
+              <button
+                type="button"
+                className={`sim-btn ${isEngineIgnited ? 'sim-btn--primary' : ''}`}
+                style={{
+                  fontWeight: 'bold',
+                  background: isEngineIgnited ? 'rgba(239, 68, 68, 0.22)' : 'rgba(34, 197, 94, 0.22)',
+                  borderColor: isEngineIgnited ? '#ef4444' : '#22c55e',
+                  color: isEngineIgnited ? '#f87171' : '#4ade80',
+                }}
+                onClick={() => setIsEngineIgnited(!isEngineIgnited)}
+              >
+                {isEngineIgnited ? '🛑 SHUTDOWN ENGINE' : '🔥 IGNITE ENGINE'}
+              </button>
+
+              <div className="sim-slider-group">
+                <label>Throttle</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="40"
+                  max="100"
+                  step="5"
+                  value={rocketThrottlePct}
+                  onChange={(e) => setRocketThrottlePct(parseInt(e.target.value, 10))}
+                />
+                <span className="sim-slider-val">{rocketThrottlePct}%</span>
+              </div>
+
+              <div className="sim-slider-group">
+                <label>Altitude</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={rocketAltitudeKm}
+                  onChange={(e) => setRocketAltitudeKm(parseInt(e.target.value, 10))}
+                />
+                <span className="sim-slider-val">
+                  {rocketAltitudeKm === 0
+                    ? '0 km (Sea Level)'
+                    : rocketAltitudeKm >= 100
+                    ? '100+ km (Vacuum)'
+                    : `${rocketAltitudeKm} km`}
+                </span>
+              </div>
+
+              <div className="sim-slider-group">
+                <label>O/F Ratio</label>
+                <input
+                  type="range"
+                  className="sim-slider"
+                  min="2.0"
+                  max="3.2"
+                  step="0.1"
+                  value={rocketOfRatio}
+                  onChange={(e) => setRocketOfRatio(parseFloat(e.target.value))}
+                />
+                <span className="sim-slider-val">{rocketOfRatio.toFixed(1)}</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: 'auto', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '10px', color: '#b0aca2', fontWeight: 600 }}>GAS FILTER:</span>
+                {(['all', 'H2O', 'CO2', 'CO', 'H2'] as const).map((spec) => (
+                  <button
+                    key={spec}
+                    type="button"
+                    className={`sim-btn ${rocketGasFilter === spec ? 'sim-btn--primary' : ''}`}
+                    style={{ fontSize: '10px', padding: '3px 8px' }}
+                    onClick={() => setRocketGasFilter(spec)}
+                  >
+                    {spec === 'all'
+                      ? 'All Species'
+                      : spec === 'H2O'
+                      ? 'H₂O Steam (66%)'
+                      : spec === 'CO2'
+                      ? 'CO₂ (20%)'
+                      : spec === 'CO'
+                      ? 'CO (9%)'
+                      : 'H₂ (5%)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Controls Bar for Sorting */}
           {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && (
             <div className="tree-controls-bar" style={{ flexWrap: 'wrap', gap: '8px' }}>
@@ -2917,6 +3542,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             )}
             {resolvedType === 'photosynthesis' && renderPhotosynthesisSvg()}
             {resolvedType === 'photochemical' && renderPhotochemicalSvg()}
+            {resolvedType === 'rocket-engine' && renderRocketEngineSvg()}
             {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && renderSortingSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}
             {/* Floating Sci-Fi HUD Tooltip Overlay */}
@@ -3224,6 +3850,127 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             </div>
           )}
 
+          {/* Bottom Telemetry Bar for Rocket Engine */}
+          {resolvedType === 'rocket-engine' && (
+            <div className="sim-telemetry">
+              <div className="sim-stats">
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Chamber Pressure (P_c)</span>
+                  <span className="sim-stat-value" style={{ color: '#e08365' }}>
+                    {chamberPressureMpa} MPa
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Net Thrust (F)</span>
+                  <span className="sim-stat-value" style={{ color: '#faf9f5' }}>
+                    {isEngineIgnited ? `${totalThrustKn} kN` : '0 kN'}
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Specific Impulse (I_sp)</span>
+                  <span className="sim-stat-value" style={{ color: '#fbbf24' }}>
+                    {isEngineIgnited ? `${ispSeconds} s` : '0 s'}
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Exit Velocity (v_e)</span>
+                  <span className="sim-stat-value" style={{ color: '#38bdf8' }}>
+                    {isEngineIgnited ? `Mach ${exitMach} (~3,150 m/s)` : '0 m/s'}
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Ambient Pressure</span>
+                  <span className="sim-stat-value" style={{ color: '#b0aca2' }}>
+                    {ambientPressureKpa} kPa
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Propellant Remaining</span>
+                  <span className="sim-stat-value" style={{ color: '#faf9f5' }}>
+                    {propellantMassKg} kg
+                  </span>
+                </div>
+                <div className="sim-stat-box">
+                  <span className="sim-stat-label">Gas Ejected</span>
+                  <span className="sim-stat-value" style={{ color: '#38bdf8' }}>
+                    {totalMoleculesEjected.toLocaleString()} pkts
+                  </span>
+                </div>
+              </div>
+
+              <div className="sim-actions">
+                <button
+                  type="button"
+                  className={`sim-btn ${isEngineIgnited ? 'sim-btn--primary' : ''}`}
+                  style={{
+                    background: isEngineIgnited ? 'rgba(239, 68, 68, 0.22)' : 'rgba(34, 197, 94, 0.22)',
+                    borderColor: isEngineIgnited ? '#ef4444' : '#22c55e',
+                    color: isEngineIgnited ? '#f87171' : '#4ade80',
+                    fontWeight: 600,
+                  }}
+                  onClick={() => setIsEngineIgnited(!isEngineIgnited)}
+                >
+                  {isEngineIgnited ? '🛑 Cutoff' : '🔥 Ignite'}
+                </button>
+                <button
+                  type="button"
+                  className="sim-btn"
+                  onClick={() => setIsPaused(!isPaused)}
+                >
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button
+                  type="button"
+                  className="sim-btn"
+                  onClick={() => {
+                    setRocketThrottlePct(85);
+                    setRocketAltitudeKm(0);
+                    setRocketOfRatio(2.6);
+                    setRocketGasFilter('all');
+                    setIsEngineIgnited(true);
+                  }}
+                >
+                  Reset Sea Level
+                </button>
+                <button
+                  type="button"
+                  className={`sim-btn ${showDetails ? 'sim-btn--primary' : ''}`}
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  Gas Dynamics & Stoichiometry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Rocket Engine Deep Dive Drawer */}
+          {showDetails && resolvedType === 'rocket-engine' && (
+            <div className="sim-details-drawer">
+              <div className="sim-details-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97757" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                Governing Gas Dynamics & Stoichiometry of Rocket Nozzle Expansion:
+              </div>
+              <div className="sim-details-content">
+                <p>
+                  • <strong>What Substance/Gas is Thrown?</strong> In a hydrocarbon/LOX rocket engine (CH₄/RP-1 + O₂), stoichiometric combustion produces: <em>Superheated H₂O Steam (66% molar fraction)</em>, <em>CO₂ Carbon Dioxide (20%)</em>, <em>CO Carbon Monoxide (9%)</em>, and <em>H₂ Hydrogen Gas (5%)</em>. High exhaust velocity (v_e ≈ 3,150 m/s) delivers upward reactive momentum (p = m · v_e).
+                </p>
+                <p>
+                  • <strong>De Laval Nozzle Sonic Choking:</strong> Converging walls compress the subsonic gas to acoustic speed (Mach 1.0) at the throat constriction (A*). Downstream, the diverging bell contour permits supersonic expansion (M &gt; 3.4), converting thermal enthalpy into axial kinetic energy.
+                </p>
+                <p>
+                  • <strong>Altitude Plume Morphology & Shock Diamonds:</strong> At sea level (0 km), ambient pressure (101.3 kPa) pinches the exhaust into overexpanded oblique shock diamonds. In deep space vacuum (100+ km), ambient pressure drops to zero, and exhaust gases expand outward into a wide 90° parabolic bell plume.
+                </p>
+                <p>
+                  • <strong>Thrust Equation:</strong> Total thrust is governed by <em>F = ṁ · v_e + (P_e - P_a) · A_e</em>. In vacuum, (P_e - P_a) delivers maximum thrust and highest specific impulse (I_sp = 348 s).
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Fusion Deep Dive Drawer */}
           {showDetails && resolvedType === 'nuclear-fusion' && (
             <div className="sim-details-drawer">
@@ -3237,13 +3984,13 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               </div>
               <div className="sim-details-content">
                 <p>
-                  â€¢ <strong>Reaction Equation:</strong> Â²H (Deuterium) + Â³H (Tritium) âž” â´He (Alpha, 3.5 MeV) + n (Neutron, 14.1 MeV) + <strong>17.6 MeV</strong> total net energy.
+                  • <strong>Reaction Equation:</strong> ²H (Deuterium) + ³H (Tritium) ⟶ â´He (Alpha, 3.5 MeV) + n (Neutron, 14.1 MeV) + <strong>17.6 MeV</strong> total net energy.
                 </p>
                 <p>
-                  â€¢ <strong>Coulomb Barrier & Quantum Tunneling:</strong> Both nuclei carry positive electric charges that violently repel. Only at astronomical temperatures (&gt;100 million &deg;C) do their kinetic speeds allow quantum tunneling through the electrostatic barrier.
+                  • <strong>Coulomb Barrier & Quantum Tunneling:</strong> Both nuclei carry positive electric charges that violently repel. Only at astronomical temperatures (&gt;100 million °C) do their kinetic speeds allow quantum tunneling through the electrostatic barrier.
                 </p>
                 <p>
-                  â€¢ <strong>Magnetic Confinement (Tokamak):</strong> Powerful toroidal magnetic fields (5&ndash;8 Tesla) exert inward Lorentz forces (<em>F = q v &times; B</em>), preventing the 100+ million degree plasma from touching and melting the reactor walls.
+                  • <strong>Magnetic Confinement (Tokamak):</strong> Powerful toroidal magnetic fields (5–8 Tesla) exert inward Lorentz forces (<em>F = q v × B</em>), preventing the 100+ million degree plasma from touching and melting the reactor walls.
                 </p>
               </div>
             </div>
@@ -3262,14 +4009,14 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               </div>
               <div className="sim-details-content">
                 <p>
-                  â€¢ <strong>Elastic Collisions:</strong> In ideal gases, atoms conserve both total kinetic energy (
-                  <em>E = &frac12; mv&sup2;</em>) and linear momentum (<em>p = mv</em>) during collisions.
+                  • <strong>Elastic Collisions:</strong> In ideal gases, atoms conserve both total kinetic energy (
+                  <em>E = ½ mv²</em>) and linear momentum (<em>p = mv</em>) during collisions.
                 </p>
                 <p>
-                  â€¢ <strong>Mass Disparity:</strong> When heavy purple atoms (4&times; mass) strike light green atoms (1&times; mass), the lighter atoms rebound with significantly greater velocity, transferring kinetic energy outward.
+                  • <strong>Mass Disparity:</strong> When heavy purple atoms (4× mass) strike light green atoms (1× mass), the lighter atoms rebound with significantly greater velocity, transferring kinetic energy outward.
                 </p>
                 <p>
-                  â€¢ <strong>Temperature & Maxwell-Boltzmann:</strong> Increasing temperature directly scales the mean kinetic energy of the particles, raising collision frequency and container pressure (<em>PV = N k_B T</em>).
+                  • <strong>Temperature & Maxwell-Boltzmann:</strong> Increasing temperature directly scales the mean kinetic energy of the particles, raising collision frequency and container pressure (<em>PV = N k_B T</em>).
                 </p>
               </div>
             </div>

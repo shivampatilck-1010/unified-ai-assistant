@@ -578,6 +578,8 @@ export default {
               '   - For Atomic Collisions & Thermal Gas: ```interactive-simulation\\ntype: atomic-collision\\n```\n' +
               '   - For Photosynthesis (Thylakoids & Calvin Cycle): ```interactive-simulation\\ntype: photosynthesis\\n```\n' +
               '   - For Photochemical Reactions, UV Photolysis, and Free Radical Reactions: ```interactive-simulation\\ntype: photochemical\\n```\n' +
+              '   - For Rocket Engines, De Laval Nozzles, Supersonic Gas Dynamics, Propulsion & Exhaust Plumes: ```interactive-simulation\\ntype: rocket-engine\\n```\n' +
+              '     Always explain what gas/substance is being thrown: Superheated H2O steam (66%), CO2 (20%), CO (9%), H2 (5%), chamber pressure Pc = 7.2 MPa, sonic choked throat M = 1.0, and altitude expansion (shock diamonds at sea level vs 90° vacuum flare).\n' +
               '   - CRITICAL RULE: NEVER output rocket engines, thruster nozzles, or unrelated aerospace machinery when the user asks about chemistry, photochemistry, photolysis, or molecular mechanisms! Always use ```interactive-simulation\\ntype: photochemical\\n```.\n' +
               '   - For arbitrary physics/math/canvas simulations: provide clean, working HTML5 Canvas or SVG code in ```canvas or ```html.\n\n' +
               '4. UNIVERSAL SCIENTIFIC DIAGRAMS & SCHEMATICS (WHEN SIMULATION IS NOT REQUIRED):\n' +

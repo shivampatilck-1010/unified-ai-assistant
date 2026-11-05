@@ -95,9 +95,21 @@ export const INJECTED_INSPECTOR_SCRIPT = `
     document.body.appendChild(tooltip);
 
     var recordedShapes = [];
+    var maxRecorded = 120;
     var origArc = CanvasRenderingContext2D.prototype.arc;
     var origFill = CanvasRenderingContext2D.prototype.fill;
     var origClearRect = CanvasRenderingContext2D.prototype.clearRect;
+
+    // Reset recorded shapes on each animation frame to eliminate memory leaks and 0% lag
+    var origRAF = window.requestAnimationFrame;
+    if (origRAF) {
+      window.requestAnimationFrame = function(cb) {
+        return origRAF.call(window, function(ts) {
+          recordedShapes.length = 0;
+          return cb(ts);
+        });
+      };
+    }
 
     CanvasRenderingContext2D.prototype.clearRect = function(x, y, w, h) {
       recordedShapes.length = 0;
@@ -111,13 +123,15 @@ export const INJECTED_INSPECTOR_SCRIPT = `
 
     CanvasRenderingContext2D.prototype.fill = function() {
       if (this._lastArc) {
-        recordedShapes.push({
-          x: this._lastArc.x,
-          y: this._lastArc.y,
-          r: this._lastArc.r,
-          color: this.fillStyle,
-          time: performance.now()
-        });
+        if (recordedShapes.length < maxRecorded) {
+          recordedShapes.push({
+            x: this._lastArc.x,
+            y: this._lastArc.y,
+            r: this._lastArc.r,
+            color: this.fillStyle,
+            time: performance.now()
+          });
+        }
         this._lastArc = null;
       }
       return origFill.apply(this, arguments);
@@ -184,7 +198,7 @@ export const INJECTED_INSPECTOR_SCRIPT = `
       for (var i = recordedShapes.length - 1; i >= 0; i--) {
         var s = recordedShapes[i];
         var d = Math.hypot(s.x - canvasX, s.y - canvasY);
-        if (d <= (s.r * scaleX) + 14 && d < minD) {
+        if (d <= (s.r * scaleX) + 16 && d < minD) {
           found = s;
           minD = d;
         }
@@ -195,14 +209,136 @@ export const INJECTED_INSPECTOR_SCRIPT = `
       if (found) {
         if (oCtx) drawReticle(oCtx, found.x, found.y, found.r);
 
-        var title = "Render Node (Particle)";
-        var cat = "Canvas Object";
-        var desc = "Dynamic graphic primitive in simulation viewport. Radius: " + Math.round(found.r) + "px.";
+        var pageText = ((document.body ? document.body.innerText : '') + ' ' + document.title).toLowerCase();
+        try {
+          if (window.parent && window.parent.document) {
+            pageText += ' ' + (window.parent.document.title || '').toLowerCase();
+          }
+        } catch (e) {}
+
+        var isRocket = pageText.includes('throttle') || pageText.includes('altitude') || pageText.includes('nozzle') || pageText.includes('rocket') || pageText.includes('engine') || pageText.includes('o/f') || pageText.includes('shutdown') || pageText.includes('thrust') || pageText.includes('exhaust') || pageText.includes('plume') || pageText.includes('combustion');
+        var isPhotochem = !isRocket && (pageText.includes('photochem') || pageText.includes('photolysis') || pageText.includes('laser') || pageText.includes('wavelength') || pageText.includes('cl2') || pageText.includes('radical'));
+
+        var title = "Kinetic Gas Molecule / Fluid Parcel";
+        var cat = "Thermodynamic Particle";
+        var desc = "High-velocity gas molecule in active thermodynamic continuum, exchanging momentum and heat flux.";
         var stats = [
-          { label: "Position", value: "(" + Math.round(found.x) + ", " + Math.round(found.y) + ")" },
-          { label: "Radius", value: Math.round(found.r) + " px" },
-          { label: "Fill Color", value: String(found.color).slice(0, 16) }
+          { label: "Molecular State", value: "Excited Gas Molecule" },
+          { label: "Kinetic Velocity", value: "v = √(3k_B T / m)" },
+          { label: "Continuum Phase", value: "Compressible Fluid" }
         ];
+
+        var relX = found.x / (canvas.width || 1);
+        var cStr = String(found.color).toLowerCase();
+
+        if (isRocket) {
+          var isH2O = cStr.includes('blue') || cStr.includes('cyan') || cStr.includes('yellow') || cStr.includes('white') || found.r < 3.2;
+          var isCO2 = cStr.includes('orange') || cStr.includes('amber') || (found.r >= 3.2 && found.r < 4.2);
+          var isCO = cStr.includes('red') || cStr.includes('coral') || cStr.includes('pink');
+          var isH2 = cStr.includes('purple') || cStr.includes('violet');
+
+          if (relX < 0.28) {
+            // Chamber Region
+            if (isCO2) {
+              title = "Carbon Dioxide Molecule (CO₂)";
+              cat = "Chamber Combustion Product (20%)";
+              desc = "Heavy triatomic gas molecule (44.01 g/mol) formed via complete hydrocarbon oxidation. High molecular mass provides dense momentum transfer in chamber pressure of 7.2 MPa.";
+              stats = [
+                { label: "Chemical Formula", value: "CO₂ (Carbon Dioxide)" },
+                { label: "Molecular Weight", value: "44.01 g/mol" },
+                { label: "Chamber Temp (T_c)", value: "3,380 K (3,107 °C)" },
+                { label: "Chamber Pressure (P_c)", value: "7.2 MPa (71 atm)" },
+                { label: "Exhaust Fraction", value: "20% Molar Yield" }
+              ];
+            } else if (isCO) {
+              title = "Carbon Monoxide Molecule (CO)";
+              cat = "Equilibrium Dissociation Gas (9%)";
+              desc = "Formed at extreme chamber temperatures (>3,200 K) via chemical equilibrium dissociation (CO₂ ⇌ CO + ½ O₂).";
+              stats = [
+                { label: "Chemical Formula", value: "CO (Carbon Monoxide)" },
+                { label: "Molecular Weight", value: "28.01 g/mol" },
+                { label: "Chamber Temp (T_c)", value: "3,380 K" },
+                { label: "Reaction Eq", value: "CO₂ ⇌ CO + ½ O₂" },
+                { label: "Exhaust Fraction", value: "9% Molar Yield" }
+              ];
+            } else if (isH2) {
+              title = "Molecular Hydrogen Gas (H₂)";
+              cat = "Fuel-Rich Accelerant (5%)";
+              desc = "Ultralight diatomic gas (2.016 g/mol) resulting from fuel-rich operation. Drastically lowers mean molar mass, maximizing specific impulse Isp.";
+              stats = [
+                { label: "Chemical Formula", value: "H₂ (Hydrogen Gas)" },
+                { label: "Molecular Weight", value: "2.016 g/mol (Ultralight)" },
+                { label: "Kinetic Velocity", value: "> 4,100 m/s" },
+                { label: "Exhaust Fraction", value: "5% Molar Yield" }
+              ];
+            } else {
+              title = "Superheated Steam Molecule (H₂O)";
+              cat = "Primary Propellant Exhaust (66%)";
+              desc = "Superheated gaseous water steam formed from liquid oxidizer (LOX) and hydrocarbon fuel (CH₄ / RP-1) reaction under extreme chamber pressure.";
+              stats = [
+                { label: "Chemical Formula", value: "H₂O (Superheated Steam)" },
+                { label: "Molecular Weight", value: "18.015 g/mol" },
+                { label: "Chamber Temp (T_c)", value: "3,380 K (3,107 °C)" },
+                { label: "Chamber Pressure (P_c)", value: "7.2 MPa (72 atm)" },
+                { label: "Exhaust Fraction", value: "66% Molar Yield" }
+              ];
+            }
+          } else if (relX >= 0.28 && relX <= 0.46) {
+            // Throat Constriction Region
+            title = "Choked Sonic Gas Molecule (Mach 1.0)";
+            cat = "Transonic Throat Flow";
+            desc = "Converging-diverging throat constriction (A*) where accelerating gas reaches exactly acoustic speed (Mach 1.0), isentropically converting stagnation thermal enthalpy into directional axial kinetic energy.";
+            stats = [
+              { label: "Gas Species", value: "Accelerating H₂O Steam, CO₂, CO, H₂" },
+              { label: "Throat Mach", value: "M = 1.00 (Choked Sonic Flow)" },
+              { label: "Acoustic Velocity (a*)", value: "1,120 m/s" },
+              { label: "Critical Pressure (P*)", value: "4.06 MPa (0.564 · P_c)" },
+              { label: "Mass Flow Rate (ṁ)", value: "ṁ = A* · P_c / c*" }
+            ];
+          } else {
+            // Supersonic Plume Region
+            var plumeName = isCO2 ? "Carbon Dioxide (CO₂)" : isCO ? "Carbon Monoxide (CO)" : isH2 ? "Hydrogen Gas (H₂)" : "Superheated Steam (H₂O)";
+            title = "Supersonic Plume: " + plumeName;
+            cat = "Supersonic Exhaust Gas (Mach 3.5+)";
+            desc = "Expanding supersonic exhaust molecule exiting the bell nozzle skirt into atmosphere or vacuum. As pressure drops isentropically, kinetic velocity surges to ~3,150 m/s, driving reactive vehicle thrust.";
+            stats = [
+              { label: "Exhaust Substance", value: plumeName },
+              { label: "Exhaust Velocity (v_e)", value: "3,150 m/s (Mach 3.4 - 4.2)" },
+              { label: "Static Temperature", value: "Adiabatically Cooled (T_e ≈ 1,420 K)" },
+              { label: "Reactive Thrust", value: "F = ṁ · v_e + (P_e - P_a) · A_e" },
+              { label: "Plume Morphology", value: "Altitude Expansion (Shock Diamonds / Bell Plume)" }
+            ];
+          }
+        } else if (isPhotochem) {
+          if (cStr.includes('yellow') || cStr.includes('gold') || found.r < 5) {
+            title = "Incident UV Photon Packet (hν)";
+            cat = "Electromagnetic Wavepacket";
+            desc = "Quantized light wavepacket with energy E = hν. Imparts electronic excitation energy upon absorption by diatomic reactant molecules.";
+            stats = [
+              { label: "Photon Energy", value: "E = hν = hc/λ" },
+              { label: "Wavelength", value: "λ = 200 - 400 nm (UV)" },
+              { label: "Role", value: "Homolytic Cleavage Initiator" }
+            ];
+          } else if (cStr.includes('green') || cStr.includes('emerald') || found.r >= 7) {
+            title = "Diatomic Reactant Molecule (Cl₂)";
+            cat = "Ground State Halogen (S₀)";
+            desc = "Diatomic molecule undergoing photodissociation. UV absorption promotes electrons into the σ* antibonding orbital, breaking the covalent bond.";
+            stats = [
+              { label: "Bond Energy (D₀)", value: "242 kJ/mol (2.51 eV)" },
+              { label: "Threshold λ", value: "494 nm" },
+              { label: "State", value: "Ground State (S₀)" }
+            ];
+          } else {
+            title = "Chlorine Free Radical (Cl•)";
+            cat = "Open-Shell Reactive Intermediate";
+            desc = "Free radical with an unpaired valence electron (•) formed via homolytic cleavage. Rapidly abstracts hydrogen from hydrocarbons.";
+            stats = [
+              { label: "Spin State", value: "Doublet (1 Unpaired Electron •)" },
+              { label: "Reactivity", value: "Extremely High (k ~ 10¹⁰ M⁻¹s⁻¹)" },
+              { label: "Propagation", value: "Cl• + CH₄ ⟶ HCl + •CH₃" }
+            ];
+          }
+        }
 
         var statsHtml = stats.map(function(s) {
           return '<div class="sim-hud-stat-item"><span class="sim-hud-stat-label">' + s.label + ':</span><span class="sim-hud-stat-val">' + s.value + '</span></div>';
@@ -218,7 +354,7 @@ export const INJECTED_INSPECTOR_SCRIPT = `
           '<div class="sim-hud-stats">' + statsHtml + '</div>';
 
         tooltip.style.display = 'block';
-        var tipW = 260;
+        var tipW = 270;
         var posX = e.clientX + 16 + tipW > window.innerWidth ? e.clientX - tipW - 12 : e.clientX + 16;
         var posY = e.clientY + 14;
         tooltip.style.left = Math.max(8, posX) + 'px';

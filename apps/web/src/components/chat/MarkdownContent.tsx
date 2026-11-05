@@ -321,6 +321,26 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       lowerLang === 'neural-net' ||
       (code.trim().startsWith('<svg') && (code.trim().includes('</svg>') || code.trim().endsWith('>')))
     ) {
+      // Safeguard: Never route photochemical or rocket simulations into generic Carbon atom diagram
+      if (/photochem|photolysis|homolytic|free\s*radical|cl2/i.test(code)) {
+        return (
+          <InteractiveSimulationCard
+            type="photochemical"
+            title="Photochemical Reaction & UV Photolysis Simulator"
+            code={code}
+          />
+        );
+      }
+      if (/rocket|nozzle|de\s*laval|delaval|propulsion|supersonic|exhaust\s*plume/i.test(code)) {
+        return (
+          <InteractiveSimulationCard
+            type="rocket-engine"
+            title="Rocket Engine & De Laval Nozzle Supersonic Gas Dynamics"
+            code={code}
+          />
+        );
+      }
+
       let diagType: string = lowerLang;
       let diagTitle: string | undefined = undefined;
       let diagElement: string = 'Carbon';
@@ -373,6 +393,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         | 'quick-sort'
         | 'photosynthesis'
         | 'photochemical'
+        | 'rocket-engine'
         | 'graph'
         | 'hash-table'
         | 'stack-queue'
@@ -472,6 +493,26 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         lowerCode.includes('quantum yield')
       ) {
         simType = 'photochemical';
+      } else if (
+        declaredType === 'rocket-engine' ||
+        declaredType === 'nozzle' ||
+        declaredType === 'gas-dynamics' ||
+        declaredType === 'propulsion' ||
+        declaredType === 'rocket' ||
+        declaredType === 'de-laval' ||
+        declaredType === 'delaval' ||
+        lowerLang.includes('rocket') ||
+        lowerLang.includes('nozzle') ||
+        lowerCode.includes('rocket-engine') ||
+        lowerCode.includes('de laval') ||
+        lowerCode.includes('delaval') ||
+        lowerCode.includes('nozzle') ||
+        lowerCode.includes('supersonic exhaust') ||
+        lowerCode.includes('thrust') ||
+        lowerCode.includes('throttle') ||
+        lowerCode.includes('o/f ratio')
+      ) {
+        simType = 'rocket-engine';
       } else if (
         declaredType === 'photosynthesis' ||
         declaredType === 'photo' ||
