@@ -1,5 +1,9 @@
 import { INJECTED_SIMULATION_INSPECTOR_HTML } from './simulationInspector';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { GraphVisualizer } from './GraphVisualizer';
+import { HashTableVisualizer } from './HashTableVisualizer';
+import { StackQueueVisualizer } from './StackQueueVisualizer';
+import { exportSvgSnapshot, exportPngSnapshot, exportStudyCardMarkdown } from './simulationExporter';
 import './InteractiveSimulationCard.css';
 
 export interface InteractiveSimulationCardProps {
@@ -12,6 +16,13 @@ export interface InteractiveSimulationCardProps {
     | 'merge-sort'
     | 'quick-sort'
     | 'photosynthesis'
+    | 'graph'
+    | 'dijkstra'
+    | 'bfs-dfs'
+    | 'hash-table'
+    | 'stack-queue'
+    | 'stack'
+    | 'queue'
     | 'custom-html';
   title?: string;
   code?: string;
@@ -89,6 +100,44 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
     const declaredType = typeMatch ? typeMatch[1].toLowerCase() : '';
 
+    if (
+      declaredType === 'graph' ||
+      declaredType === 'dijkstra' ||
+      declaredType === 'astar' ||
+      declaredType === 'bfs' ||
+      declaredType === 'dfs' ||
+      declaredType === 'bfs-dfs' ||
+      lowerCode.includes('dijkstra') ||
+      lowerCode.includes('shortest path') ||
+      lowerCode.includes('graph') ||
+      lowerCode.includes('breadth-first') ||
+      lowerCode.includes('depth-first')
+    ) {
+      return 'graph';
+    }
+    if (
+      declaredType === 'hash-table' ||
+      declaredType === 'hashtable' ||
+      declaredType === 'hashmap' ||
+      lowerCode.includes('hash-table') ||
+      lowerCode.includes('hashtable') ||
+      lowerCode.includes('hashmap') ||
+      lowerCode.includes('separate chaining')
+    ) {
+      return 'hash-table';
+    }
+    if (
+      declaredType === 'stack' ||
+      declaredType === 'queue' ||
+      declaredType === 'stack-queue' ||
+      lowerCode.includes('stack-queue') ||
+      lowerCode.includes('call stack') ||
+      lowerCode.includes('lifo') ||
+      lowerCode.includes('fifo') ||
+      (lowerCode.includes('stack') && lowerCode.includes('queue'))
+    ) {
+      return 'stack-queue';
+    }
     if (
       declaredType === 'linked-list' ||
       declaredType === 'linkedlist' ||
@@ -176,12 +225,95 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
     if (resolvedType === 'atomic-collision') return 'Atomic Collisions Simulation';
     if (resolvedType === 'binary-tree') return 'Binary Search Tree Visualizer';
     if (resolvedType === 'linked-list') return 'Singly Linked List Interactive Visualizer';
+    if (resolvedType === 'graph') return 'Graph Traversal & Shortest Path (Dijkstra / A* / BFS / DFS)';
+    if (resolvedType === 'hash-table') return 'Hash Table & Separate Chaining Collision Visualizer';
+    if (resolvedType === 'stack-queue') return 'LIFO Stack & FIFO Buffer Memory Visualizer';
     if (resolvedType === 'photosynthesis') return 'Photosynthesis & Solar Photolysis Simulation';
     if (resolvedType === 'merge-sort') return 'Merge Sort (Divide & Conquer O(n log n)) Visualizer';
     if (resolvedType === 'quick-sort') return 'Quick Sort (Partition O(n log n)) Visualizer';
     if (resolvedType === 'sorting') return 'Sorting Algorithm Visualizer';
     return 'Interactive Visual Simulation';
   }, [title, resolvedType]);
+
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [_hasSavedState, setHasSavedState] = useState<boolean>(true);
+
+  const handleExportPng = async () => {
+    setExportFeedback('Exporting PNG...');
+    const ok = await exportPngSnapshot(viewportRef.current, `${resolvedType}_snapshot.png`);
+    setExportFeedback(ok ? 'PNG Saved! ✓' : 'Export Failed');
+    setTimeout(() => setExportFeedback(null), 2500);
+  };
+
+  const handleExportSvg = () => {
+    setExportFeedback('Exporting SVG...');
+    const ok = exportSvgSnapshot(viewportRef.current, `${resolvedType}_diagram.svg`);
+    setExportFeedback(ok ? 'SVG Saved! ✓' : 'No SVG Found');
+    setTimeout(() => setExportFeedback(null), 2500);
+  };
+
+  const handleExportStudyCard = () => {
+    setExportFeedback('Exporting Study Sheet...');
+    let timeComp = 'O(1)';
+    let spaceComp = 'O(1)';
+    let summary = 'Interactive STEM & Algorithmic cognitive visualization.';
+
+    if (resolvedType === 'graph') {
+      timeComp = 'O((V + E) log V)';
+      spaceComp = 'O(V)';
+      summary = 'Graph traversal and shortest-path calculation using Dijkstra, A*, BFS, and DFS with priority queue relaxation.';
+    } else if (resolvedType === 'hash-table') {
+      timeComp = 'O(1) Average, O(N) Worst';
+      spaceComp = 'O(M + N)';
+      summary = 'Hash table key-value indexing utilizing separate chaining for collision resolution.';
+    } else if (resolvedType === 'stack-queue') {
+      timeComp = 'O(1) for all operations';
+      spaceComp = 'O(N)';
+      summary = 'LIFO Call Stack activation frames and FIFO ring buffer memory representations.';
+    } else if (resolvedType === 'merge-sort') {
+      timeComp = 'O(N log N)';
+      spaceComp = 'O(N)';
+      summary = 'Divide and conquer recursive array partitioning and auxiliary linear merging.';
+    } else if (resolvedType === 'quick-sort') {
+      timeComp = 'O(N log N) Average, O(N²) Worst';
+      spaceComp = 'O(log N)';
+      summary = 'Partitioning around a pivot element with in-place swaps.';
+    } else if (resolvedType === 'binary-tree') {
+      timeComp = 'O(log N) Balanced, O(N) Degenerate';
+      spaceComp = 'O(N)';
+      summary = 'Binary Search Tree invariant: left child < parent <= right child.';
+    } else if (resolvedType === 'linked-list') {
+      timeComp = 'O(1) Prepend/Delete Head, O(N) Search';
+      spaceComp = 'O(N)';
+      summary = 'Pointer-linked sequential memory allocation across heap addresses.';
+    } else if (resolvedType === 'nuclear-fusion') {
+      timeComp = 'Real-time plasma kinetics';
+      spaceComp = 'N-body';
+      summary = 'Deuterium-Tritium thermonuclear fusion yielding 17.6 MeV per reaction.';
+    }
+
+    const ok = exportStudyCardMarkdown({
+      title: defaultTitle,
+      type: resolvedType,
+      summary,
+      complexities: {
+        time: timeComp,
+        space: spaceComp,
+      },
+      keyInvariants: [
+        'Memory addresses simulate physical 64-bit hexadecimal allocation.',
+        'Zero layout-shift Obsidian HUD telemetry ensures continuous execution tracking.',
+      ],
+      currentTelemetry: {
+        type: resolvedType,
+        exportedAt: new Date().toISOString(),
+      },
+    });
+
+    setExportFeedback(ok ? 'Study Card Saved! ✓' : 'Export Failed');
+    setTimeout(() => setExportFeedback(null), 2500);
+  };
 
   // --- Atomic Collision State ---
   const [temperature, setTemperature] = useState<number>(1.2);
@@ -1854,17 +1986,38 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
           <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '440px', margin: '0 auto 20px', lineHeight: 1.5 }}>
             Select an interactive visual engine below to launch dynamic node manipulation, live algorithmic traversal, or scientific simulations:
           </p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '520px', margin: '0 auto' }}>
             <button
               type="button"
               className="sim-btn sim-btn--primary"
+              onClick={() => setActiveSimOverride('graph')}
+            >
+              🕸️ Graph (Dijkstra/A*)
+            </button>
+            <button
+              type="button"
+              className="sim-btn sim-btn--primary"
+              onClick={() => setActiveSimOverride('hash-table')}
+            >
+              🗄️ Hash Table
+            </button>
+            <button
+              type="button"
+              className="sim-btn sim-btn--primary"
+              onClick={() => setActiveSimOverride('stack-queue')}
+            >
+              🥞 Stack & Queue
+            </button>
+            <button
+              type="button"
+              className="sim-btn"
               onClick={() => setActiveSimOverride('linked-list')}
             >
               🔗 Singly Linked List
             </button>
             <button
               type="button"
-              className="sim-btn sim-btn--primary"
+              className="sim-btn"
               onClick={() => setActiveSimOverride('binary-tree')}
             >
               🌲 Binary Search Tree
@@ -1874,7 +2027,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
               className="sim-btn"
               onClick={() => setActiveSimOverride('sorting')}
             >
-              📊 Bubble Sort
+              📊 Merge / Quick Sort
             </button>
             <button
               type="button"
@@ -1966,6 +2119,67 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
         </div>
 
         <div className="sim-header__right">
+          {/* Persistence State Badge */}
+          <span
+            className="sim-header__badge"
+            style={{
+              background: 'rgba(52, 211, 153, 0.12)',
+              borderColor: 'rgba(52, 211, 153, 0.35)',
+              color: '#34d399',
+              fontSize: '10px',
+              padding: '2px 7px',
+            }}
+            title="Interactive modifications are auto-saved locally"
+          >
+            💾 Saved
+          </span>
+
+          {/* Export Actions Toolbar */}
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="sim-icon-btn"
+              onClick={handleExportPng}
+              title="Download high-resolution PNG snapshot"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="sim-icon-btn"
+              onClick={handleExportSvg}
+              title="Download Scalable Vector Graphic (SVG)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="sim-icon-btn"
+              onClick={handleExportStudyCard}
+              title="Export formatted Markdown study sheet / cheat sheet"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </button>
+          </div>
+
+          {exportFeedback && (
+            <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 600 }}>
+              {exportFeedback}
+            </span>
+          )}
+
           <button
             type="button"
             className={`sim-tab-btn ${activeTab === 'sim' ? 'sim-tab-btn--active' : ''}`}
@@ -2272,7 +2486,7 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
           )}
 
           {/* Interactive Simulation Viewport */}
-          <div className="sim-viewport">
+          <div ref={viewportRef} className="sim-viewport">
             {(resolvedType === 'atomic-collision' || resolvedType === 'nuclear-fusion') && (
               <canvas
                 ref={canvasRef}
@@ -2283,6 +2497,15 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
             )}
             {resolvedType === 'binary-tree' && renderTreeSvg()}
             {resolvedType === 'linked-list' && renderLinkedListSvg()}
+            {resolvedType === 'graph' && (
+              <GraphVisualizer onHover={setHoveredInfo} onStateChange={() => setHasSavedState(true)} />
+            )}
+            {resolvedType === 'hash-table' && (
+              <HashTableVisualizer onHover={setHoveredInfo} onStateChange={() => setHasSavedState(true)} />
+            )}
+            {resolvedType === 'stack-queue' && (
+              <StackQueueVisualizer onHover={setHoveredInfo} onStateChange={() => setHasSavedState(true)} />
+            )}
             {resolvedType === 'photosynthesis' && renderPhotosynthesisSvg()}
             {(resolvedType === 'sorting' || resolvedType === 'merge-sort' || resolvedType === 'quick-sort') && renderSortingSvg()}
             {resolvedType === 'custom-html' && renderCustomHtml()}

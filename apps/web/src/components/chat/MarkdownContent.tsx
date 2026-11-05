@@ -327,12 +327,61 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       lowerLang === 'generative-ui' ||
       (lowerLang === 'html' && (code.includes('<canvas') || code.includes('requestAnimationFrame') || code.includes('<script') || code.includes('<!DOCTYPE')))
     ) {
-      let simType: 'atomic-collision' | 'nuclear-fusion' | 'binary-tree' | 'linked-list' | 'sorting' | 'merge-sort' | 'quick-sort' | 'photosynthesis' | 'custom-html' = 'custom-html';
+      let simType:
+        | 'atomic-collision'
+        | 'nuclear-fusion'
+        | 'binary-tree'
+        | 'linked-list'
+        | 'sorting'
+        | 'merge-sort'
+        | 'quick-sort'
+        | 'photosynthesis'
+        | 'graph'
+        | 'hash-table'
+        | 'stack-queue'
+        | 'custom-html' = 'custom-html';
       const lowerCode = code.toLowerCase().trim();
       const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
       const declaredType = typeMatch ? typeMatch[1].toLowerCase() : '';
 
       if (
+        declaredType === 'graph' ||
+        declaredType === 'dijkstra' ||
+        declaredType === 'astar' ||
+        declaredType === 'bfs' ||
+        declaredType === 'dfs' ||
+        lowerLang.includes('graph') ||
+        lowerCode.includes('dijkstra') ||
+        lowerCode.includes('shortest path') ||
+        lowerCode.includes('graph') ||
+        lowerCode.includes('breadth-first') ||
+        lowerCode.includes('depth-first')
+      ) {
+        simType = 'graph';
+      } else if (
+        declaredType === 'hash-table' ||
+        declaredType === 'hashtable' ||
+        declaredType === 'hashmap' ||
+        lowerLang.includes('hash') ||
+        lowerCode.includes('hash-table') ||
+        lowerCode.includes('hashtable') ||
+        lowerCode.includes('hashmap') ||
+        lowerCode.includes('separate chaining')
+      ) {
+        simType = 'hash-table';
+      } else if (
+        declaredType === 'stack' ||
+        declaredType === 'queue' ||
+        declaredType === 'stack-queue' ||
+        lowerLang.includes('stack') ||
+        lowerLang.includes('queue') ||
+        lowerCode.includes('stack-queue') ||
+        lowerCode.includes('call stack') ||
+        lowerCode.includes('lifo') ||
+        lowerCode.includes('fifo')
+      ) {
+        simType = 'stack-queue';
+      } else if (
         declaredType === 'linked-list' ||
         declaredType === 'linkedlist' ||
         lowerLang.includes('linked-list') ||
@@ -594,6 +643,24 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         text
       );
 
+    const hasGraphMention =
+      !hasExplicitSimBlock &&
+      /(?:dijkstra.*(?:algorithm|visual|simulation)|graph\s+traversal.*(?:visual|simulation)|shortest\s+path.*(?:visual|simulation)|a\*\s+search.*(?:visual|simulation))/i.test(
+        text
+      );
+
+    const hasHashMention =
+      !hasExplicitSimBlock &&
+      /(?:hash\s*table.*(?:visual|simulation)|separate\s*chaining.*(?:visual|simulation)|hash\s*collision.*(?:visual|simulation))/i.test(
+        text
+      );
+
+    const hasStackQueueMention =
+      !hasExplicitSimBlock &&
+      /(?:stack\s*(?:and|&)\s*queue.*(?:visual|simulation)|lifo.*fifo.*(?:visual|simulation)|call\s*stack.*(?:visual|simulation))/i.test(
+        text
+      );
+
     const isExamGuide =
       text.includes('<!-- document-export:') ||
       text.includes('EXAM PREPARATION GUIDE') ||
@@ -607,6 +674,9 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
     let injectedTreeSim = false;
     let injectedPhotoSim = false;
     let injectedSortSim = false;
+    let injectedGraphSim = false;
+    let injectedHashSim = false;
+    let injectedStackSim = false;
 
     const flushList = () => {
       if (listItems.length === 0) return;
@@ -998,6 +1068,24 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
         <InteractiveSimulationCard key="auto-sort-sim-fallback" type="sorting" />
       );
       injectedSortSim = true;
+    }
+    if (hasGraphMention && !injectedGraphSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-graph-sim-fallback" type="graph" />
+      );
+      injectedGraphSim = true;
+    }
+    if (hasHashMention && !injectedHashSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-hash-sim-fallback" type="hash-table" />
+      );
+      injectedHashSim = true;
+    }
+    if (hasStackQueueMention && !injectedStackSim) {
+      nodes.unshift(
+        <InteractiveSimulationCard key="auto-stack-sim-fallback" type="stack-queue" />
+      );
+      injectedStackSim = true;
     }
 
     // Auto-inject high-fidelity printable PDF export card for study/exam guides

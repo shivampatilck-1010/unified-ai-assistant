@@ -1,0 +1,208 @@
+/**
+ * simulationExporter.ts
+ * High-fidelity client-side snapshot & educational study card generator.
+ * Exports vector SVGs, high-res PNGs, and structured student markdown study cards.
+ */
+
+export function exportSvgSnapshot(containerEl: HTMLElement | null, filename = 'simulation-vector.svg'): boolean {
+  if (!containerEl) return false;
+  const svgEl = containerEl.querySelector('svg');
+  if (!svgEl) return false;
+
+  try {
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    const serializer = new XMLSerializer();
+    let source = serializer.serializeToString(clone);
+
+    // Fix namespace prefix if missing
+    if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
+      source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+
+    const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename.endsWith('.svg') ? filename : `${filename}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch (err) {
+    console.error('[simulationExporter] SVG export failed:', err);
+    return false;
+  }
+}
+
+export async function exportPngSnapshot(
+  containerEl: HTMLElement | null,
+  filename = 'simulation-snapshot.png'
+): Promise<boolean> {
+  if (!containerEl) return false;
+
+  // 1. Direct Canvas snapshot
+  const canvasEl = containerEl.querySelector('canvas');
+  if (canvasEl) {
+    try {
+      const dataUrl = canvasEl.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename.endsWith('.png') ? filename : `${filename}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return true;
+    } catch (err) {
+      console.warn('[simulationExporter] Direct canvas toDataURL failed, attempting SVG raster:', err);
+    }
+  }
+
+  // 2. SVG rasterization to 2x retina Canvas
+  const svgEl = containerEl.querySelector('svg');
+  if (!svgEl) return false;
+
+  return new Promise<boolean>((resolve) => {
+    try {
+      const clone = svgEl.cloneNode(true) as SVGSVGElement;
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const serializer = new XMLSerializer();
+      const svgStr = serializer.serializeToString(clone);
+
+      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const img = new Image();
+
+      img.onload = () => {
+        try {
+          const scale = 2; // High-res retina scale
+          const offscreen = document.createElement('canvas');
+          const width = (svgEl.clientWidth || 560) * scale;
+          const height = (svgEl.clientHeight || 300) * scale;
+          offscreen.width = width;
+          offscreen.height = height;
+
+          const ctx = offscreen.getContext('2d');
+          if (!ctx) {
+            URL.revokeObjectURL(url);
+            resolve(false);
+            return;
+          }
+
+          // Obsidian background fill
+          ctx.fillStyle = '#070709';
+          ctx.fillRect(0, 0, width, height);
+
+          // Draw the SVG
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const pngUrl = offscreen.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.href = pngUrl;
+          link.download = filename.endsWith('.png') ? filename : `${filename}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          URL.revokeObjectURL(url);
+          resolve(true);
+        } catch (e) {
+          console.error('[simulationExporter] Canvas rasterization failed:', e);
+          URL.revokeObjectURL(url);
+          resolve(false);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(false);
+      };
+
+      img.src = url;
+    } catch (err) {
+      console.error('[simulationExporter] PNG export failed:', err);
+      resolve(false);
+    }
+  });
+}
+
+export interface StudyCardExportParams {
+  title: string;
+  type: string;
+  summary: string;
+  complexities?: {
+    time: string;
+    space: string;
+    best?: string;
+    worst?: string;
+  };
+  keyInvariants?: string[];
+  currentTelemetry?: Record<string, string | number>;
+  mathematicalFormulas?: string[];
+}
+
+export function exportStudyCardMarkdown(params: StudyCardExportParams): boolean {
+  try {
+    const timestamp = new Date().toLocaleString();
+    let content = `# Study Sheet: ${params.title}\n`;
+    content += `*Generated by Unified AI Assistant on ${timestamp}*\n\n`;
+
+    content += `## Overview\n${params.summary}\n\n`;
+
+    if (params.complexities) {
+      content += `## Asymptotic Complexity Analysis\n`;
+      content += `| Metric | Complexity |\n`;
+      content += `| :--- | :--- |\n`;
+      content += `| **Time Complexity (Average)** | \`${params.complexities.time}\` |\n`;
+      content += `| **Space Complexity** | \`${params.complexities.space}\` |\n`;
+      if (params.complexities.best) {
+        content += `| **Best Case** | \`${params.complexities.best}\` |\n`;
+      }
+      if (params.complexities.worst) {
+        content += `| **Worst Case** | \`${params.complexities.worst}\` |\n`;
+      }
+      content += `\n`;
+    }
+
+    if (params.mathematicalFormulas && params.mathematicalFormulas.length > 0) {
+      content += `## Theoretical Formulas & Invariants\n`;
+      params.mathematicalFormulas.forEach((formula) => {
+        content += `- ${formula}\n`;
+      });
+      content += `\n`;
+    }
+
+    if (params.keyInvariants && params.keyInvariants.length > 0) {
+      content += `## Core Invariants & Rules\n`;
+      params.keyInvariants.forEach((inv) => {
+        content += `- **${inv}**\n`;
+      });
+      content += `\n`;
+    }
+
+    if (params.currentTelemetry && Object.keys(params.currentTelemetry).length > 0) {
+      content += `## Live Simulation State Capture\n`;
+      content += `\`\`\`json\n${JSON.stringify(params.currentTelemetry, null, 2)}\n\`\`\`\n\n`;
+    }
+
+    content += `---\n*Unified AI Cognitive Workspace • Edge-Accelerated STEM Intelligence*\n`;
+
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = params.title.toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+    link.download = `${safeName}_study_card.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch (err) {
+    console.error('[simulationExporter] Study card export failed:', err);
+    return false;
+  }
+}

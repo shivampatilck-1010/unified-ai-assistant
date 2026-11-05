@@ -517,8 +517,44 @@
 .tree-node-group, .sim-svg-interactive {
   cursor: pointer;
   transition: transform 0.15s ease, filter 0.15s ease;
+  touch-action: none;
 }
 
 .tree-node-group:hover circle, .sim-svg-interactive:hover {
   filter: drop-shadow(0 0 10px #38bdf8);
+}
+
+/* --- Mobile Touch & Responsive Canvas Optimizations --- */
+@media (max-width: 640px) {
+  .sim-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .sim-header__right {
+    width: 100%;
+    justify-content: space-between;
+    overflow-x: auto;
+  }
+  .tree-controls-bar {
+    padding: 6px 10px;
+    overflow-x: auto;
+  }
+  .sim-viewport {
+    min-height: 240px;
+  }
+}
+
+.graph-visualizer-container,
+.hash-table-visualizer,
+.stack-queue-visualizer {
+  position: relative;
+  width: 100%;
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
