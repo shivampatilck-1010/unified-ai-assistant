@@ -61,10 +61,10 @@ export const COUNCIL_PRESETS: CouncilPresetConfig[] = [
     id: 'code-pair',
     name: 'Elite Engineering Pair',
     tag: 'Code & Architecture',
-    desc: 'Precision software chamber: Groq Qwen 27B system architecture paired with Mistral Devstral 24B automated code refactoring & edge-case testing.',
+    desc: 'Precision software chamber: Groq Qwen 27B system architecture paired with Cohere North Mini Code for rapid implementation & precision debugging.',
     members: [
       { id: 'groq/qwen/qwen3.8-27b', name: 'Groq Qwen 27B', role: 'Lead Architect & Code', provider: 'qwen' },
-      { id: 'openrouter/mistralai/devstral-24b:free', name: 'Devstral 24B', role: 'Refactor & Security Audit', provider: 'mistral' },
+      { id: 'openrouter/cohere/north-mini-code:free', name: 'Cohere North Code', role: 'Refactor & Logic Verification', provider: 'openrouter' },
     ],
   },
   {

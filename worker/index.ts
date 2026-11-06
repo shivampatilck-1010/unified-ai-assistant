@@ -658,22 +658,15 @@ export default {
             is_default: false,
             context_window: 131072,
           },
+
+          // 2. OpenRouter (Verified Live API - 100% Free Tier)
           {
-            id: 'groq/meta-llama/llama-3.3-70b-versatile',
-            name: 'Meta LLaMA 3.3 70B (High-Velocity Frontier LPU, 128k ctx)',
-            provider: 'Groq',
+            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
+            name: 'NVIDIA Nemotron 550B Ultra (Frontier MoE Titan, Free Tier)',
+            provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
           },
-          {
-            id: 'groq/mistralai/mixtral-8x7b-32768',
-            name: 'Mixtral 8x7B MoE (Ultra-Fast Hardware LPU, 32k ctx)',
-            provider: 'Groq',
-            is_default: false,
-            context_window: 32768,
-          },
-
-          // 2. OpenRouter (Verified Live API - Free Tier)
           {
             id: 'openrouter/nvidia/nemotron-3.5-super-vl:free',
             name: 'NVIDIA Nemotron 3.5 Super VL (120B-A12B Multimodal Flagship MoE, Free Tier)',
@@ -689,53 +682,11 @@ export default {
             context_window: 131072,
           },
           {
-            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
-            name: 'NVIDIA Nemotron 550B Ultra (Frontier MoE Titan, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'openrouter/mistralai/devstral-24b:free',
-            name: 'Mistral Devstral 24B (Code Specialization & Refactoring, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 32768,
-          },
-          {
-            id: 'openrouter/thudm/glm-4.5-air:free',
-            name: 'GLM-4.5 Air (Multilingual Agentic & Workflow Planning, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
             id: 'openrouter/am-thinking-v1:free',
             name: 'AM-Thinking-v1 (Specialized 32B STEM & Logic Engine, Free Tier)',
             provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
-          },
-          {
-            id: 'openrouter/meta-llama/llama-3.3-70b-instruct:free',
-            name: 'Meta LLaMA 3.3 70B Instruct (Frontier Open Weights, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'openrouter/mistralai/mistral-7b-instruct:free',
-            name: 'Mistral 7B Instruct (Compact Open Weights, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 32768,
-          },
-          {
-            id: 'openrouter/google/gemma-4-31b-it:free',
-            name: 'Google Gemma 4 31B Instruct (Frontier Open Weights, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 32768,
           },
           {
             id: 'openrouter/cohere/north-mini-code:free',
@@ -775,67 +726,7 @@ export default {
             context_window: 1048576,
           },
 
-          // 4. OpenAI Models
-          {
-            id: 'openai/gpt-5',
-            name: 'GPT-5 (Flagship Frontier Architecture, 400k ctx)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 400000,
-          },
-          {
-            id: 'openai/gpt-5-mini',
-            name: 'GPT-5 Mini (Fast Frontier Reasoning, 200k ctx)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'openai/gpt-4-turbo',
-            name: 'GPT-4 Turbo (High-Context Frontier Assistant, 128k ctx)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 128000,
-          },
-          {
-            id: 'openai/gpt-4o',
-            name: 'GPT-4o (Omni Flagship Multimodal)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 128000,
-          },
-          {
-            id: 'openai/gpt-4o-mini',
-            name: 'GPT-4o Mini (Fast Multimodal Reasoning)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 128000,
-          },
-          {
-            id: 'openai/o3-mini',
-            name: 'o3-mini (High-Precision STEM & Math Reasoning)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 200000,
-          },
-
-          // 5. Anthropic Claude Models
-          {
-            id: 'anthropic/claude-3-7-sonnet',
-            name: 'Claude 3.7 Sonnet (Hybrid Extended Thinking)',
-            provider: 'Anthropic',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'anthropic/claude-3-5-sonnet',
-            name: 'Claude 3.5 Sonnet (Senior Systems Architecture)',
-            provider: 'Anthropic',
-            is_default: false,
-            context_window: 200000,
-          },
-
-          // 6. Unified Team Multi-Model Intelligence (At the end of dropdown)
+          // 4. Unified Team Multi-Model Intelligence (At the end of dropdown)
           {
             id: 'unified-team',
             name: 'Unified Team (Multi-Model Collaborative Intelligence)',
@@ -864,20 +755,6 @@ export default {
             is_default: false,
             context_window: 200000,
           },
-          {
-            id: 'council/dual-expert-deliberation',
-            name: 'Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'council/executive-roundtable',
-            name: 'Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
         ],
         providers: {
           auto: true,
@@ -889,10 +766,6 @@ export default {
           groq: true,
           openrouter: true,
           qwen: true,
-          anthropic: true,
-          openai: true,
-          meta: true,
-          mistral: true,
         },
         has_custom_key: Boolean(clientApiKey),
         message: configured
@@ -1204,9 +1077,8 @@ export default {
             let groqModel = chosenModel.replace(/^groq\//, '');
             if (groqModel.includes('120b')) groqModel = 'openai/gpt-oss-120b';
             else if (groqModel.includes('20b')) groqModel = 'openai/gpt-oss-20b';
-            else if (groqModel.includes('llama') || groqModel.includes('70b')) groqModel = 'llama-3.3-70b-versatile';
-            else if (groqModel.includes('mixtral') || groqModel.includes('8x7b')) groqModel = 'mixtral-8x7b-32768';
-            else groqModel = 'qwen/qwen3.8-27b';
+            else if (groqModel.includes('qwen') || groqModel.includes('coder')) groqModel = 'qwen/qwen3.8-27b';
+            else groqModel = 'openai/gpt-oss-120b';
 
             usedProvider = 'groq';
             usedModel = groqModel;
@@ -1233,26 +1105,14 @@ export default {
             isHandled = true;
           } else if (isOpenRouter) {
             let orModel = chosenModel.replace(/^openrouter\//, '');
-            if (orModel.includes('devstral') || orModel.includes('codestral')) {
-              orModel = 'mistralai/mistral-small-24b-instruct-2501:free';
-            } else if (orModel.includes('glm') || orModel.includes('thudm')) {
-              orModel = 'thudm/glm-4-9b-chat:free';
-            } else if (orModel.includes('am-thinking') || orModel.includes('thinking-v1')) {
-              orModel = 'nvidia/nemotron-3.5-super-vl:free';
-            } else if (orModel.includes('mixtral') || orModel.includes('mistral-7b')) {
-              orModel = 'mistralai/mistral-7b-instruct:free';
-            } else if (orModel.includes('llama')) {
-              orModel = 'meta-llama/llama-3.3-70b-instruct:free';
-            } else if (orModel.includes('super-vl') || orModel.includes('super_vl')) {
-              orModel = 'nvidia/nemotron-3.5-super-vl:free';
+            if (orModel.includes('550b') || orModel.includes('nemotron-3-ultra')) {
+              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
             } else if (orModel.includes('lightning')) {
               orModel = 'nvidia/nemotron-3.5-lightning:free';
-            } else if (orModel.includes('550b') || orModel.includes('nemotron-4') || orModel.includes('nemotron-70b')) {
-              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
-            } else if (orModel.includes('gemma')) {
-              orModel = 'google/gemma-4-31b-it:free';
-            } else if (orModel.includes('north') || orModel.includes('code')) {
+            } else if (orModel.includes('north') || orModel.includes('code') || orModel.includes('devstral')) {
               orModel = 'cohere/north-mini-code:free';
+            } else if (orModel.includes('thinking')) {
+              orModel = 'am-thinking-v1:free';
             } else {
               orModel = 'nvidia/nemotron-3.5-super-vl:free';
             }
@@ -1285,69 +1145,92 @@ export default {
             }
             isHandled = true;
           } else if (chosenModel.startsWith('openai/') && !chosenModel.includes('gpt-oss')) {
-            let openaiModel = chosenModel.replace(/^openai\//, '');
-            if (!openaiModel) openaiModel = 'gpt-4o';
-
-            usedProvider = 'openai';
-            usedModel = openaiModel;
-            await sendSSE('text_delta', {
-              text: `> *[Model: **OpenAI ${openaiModel}** | Direct Upstream API]*\n\n`,
-            });
-
-            const openaiResult = await streamOpenAICompatible({
-              url: 'https://api.openai.com/v1/chat/completions',
-              apiKey: openAIApiKey,
-              model: openaiModel,
-              messages: rawList,
-              systemPrompt: systemInstruction.parts[0].text,
-              sendSSE,
-            });
-
-            if (openaiResult.success) {
-              accumulatedAssistantText = openaiResult.text;
+            const userProvidedKey = body.openai_api_key || request.headers.get('x-openai-key');
+            if (!userProvidedKey) {
+              // Seamlessly route unfunded OpenAI model requests to Groq GPT-OSS 120B (Open-weights GPT on LPUs)
+              await sendSSE('text_delta', {
+                text: `> *[Routing **${chosenModel}** to **Groq GPT-OSS 120B** | Free High-Throughput Hardware LPU]*\n\n`,
+              });
+              usedProvider = 'groq';
+              usedModel = 'openai/gpt-oss-120b';
+              const fallbackResult = await streamOpenAICompatible({
+                url: 'https://api.groq.com/openai/v1/chat/completions',
+                apiKey: groqApiKey,
+                model: 'openai/gpt-oss-120b',
+                messages: rawList,
+                systemPrompt: systemInstruction.parts[0].text,
+                sendSSE,
+              });
+              if (fallbackResult.success) {
+                accumulatedAssistantText = fallbackResult.text;
+              }
+              isHandled = true;
             } else {
-              const isQuota =
-                openaiResult.error?.includes('insufficient_quota') ||
-                openaiResult.error?.includes('credit_balance_exhausted');
-              const notice = isQuota
-                ? '> ⚠️ **OpenAI Direct Stream Notice**\n> Your OpenAI API key is authenticated, but your OpenAI account currently has $0 credit balance remaining. Add credits at [platform.openai.com/billing](https://platform.openai.com/settings/organization/billing) to enable direct OpenAI queries.\n> *Active live models that do not require credit: Groq GPT-OSS 120B, Groq Qwen 27B, NVIDIA Nemotron 550B, or Gemini 2.5 Pro.*\n\n'
-                : `> ⚠️ **OpenAI API Notice**: ${openaiResult.error || 'Connection failed'}\n\n`;
-              await sendSSE('text_delta', { text: notice });
+              let openaiModel = chosenModel.replace(/^openai\//, '');
+              if (!openaiModel) openaiModel = 'gpt-4o';
+
+              usedProvider = 'openai';
+              usedModel = openaiModel;
+              await sendSSE('text_delta', {
+                text: `> *[Model: **OpenAI ${openaiModel}** | Direct Upstream API]*\n\n`,
+              });
+
+              const openaiResult = await streamOpenAICompatible({
+                url: 'https://api.openai.com/v1/chat/completions',
+                apiKey: userProvidedKey,
+                model: openaiModel,
+                messages: rawList,
+                systemPrompt: systemInstruction.parts[0].text,
+                sendSSE,
+              });
+
+              if (openaiResult.success) {
+                accumulatedAssistantText = openaiResult.text;
+              } else {
+                const isQuota =
+                  openaiResult.error?.includes('insufficient_quota') ||
+                  openaiResult.error?.includes('credit_balance_exhausted');
+                const notice = isQuota
+                  ? '> ⚠️ **OpenAI Direct Stream Notice**\n> Your OpenAI API key is authenticated, but your OpenAI account currently has $0 credit balance remaining. Add credits at [platform.openai.com/billing](https://platform.openai.com/settings/organization/billing) to enable direct OpenAI queries.\n> *Active live models that do not require credit: Groq GPT-OSS 120B, Groq Qwen 27B, NVIDIA Nemotron 550B, or Gemini 2.5 Pro.*\n\n'
+                  : `> ⚠️ **OpenAI API Notice**: ${openaiResult.error || 'Connection failed'}\n\n`;
+                await sendSSE('text_delta', { text: notice });
+              }
+              isHandled = true;
             }
-            isHandled = true;
           } else if (chosenModel.startsWith('anthropic/')) {
-            let anthropicModel = chosenModel.replace(/^anthropic\//, '');
-            usedProvider = 'anthropic';
-            usedModel = anthropicModel;
-            await sendSSE('text_delta', {
-              text: `> *[Model: **Anthropic ${anthropicModel}** | Direct Upstream API]*\n\n`,
-            });
-
-            if (!anthropicApiKey) {
-              let handledViaOpenRouter = false;
-              if (openRouterApiKey) {
-                const orResult = await streamOpenAICompatible({
-                  url: 'https://openrouter.ai/api/v1/chat/completions',
-                  apiKey: openRouterApiKey,
-                  model: `anthropic/${anthropicModel}`,
-                  messages: rawList,
-                  systemPrompt: systemInstruction.parts[0].text,
-                  sendSSE,
-                });
-                if (orResult.success) {
-                  accumulatedAssistantText = orResult.text;
-                  handledViaOpenRouter = true;
-                }
+            const userProvidedAnthropicKey = body.anthropic_api_key || request.headers.get('x-anthropic-key');
+            if (!userProvidedAnthropicKey) {
+              // Seamlessly route unfunded Anthropic requests to NVIDIA Nemotron 550B Ultra
+              await sendSSE('text_delta', {
+                text: `> *[Routing **${chosenModel}** to **NVIDIA Nemotron 550B Ultra** | Free Frontier MoE Reasoning]*\n\n`,
+              });
+              usedProvider = 'openrouter';
+              usedModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+              const fallbackResult = await streamOpenAICompatible({
+                url: 'https://openrouter.ai/api/v1/chat/completions',
+                apiKey: openRouterApiKey,
+                model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+                messages: rawList,
+                systemPrompt: systemInstruction.parts[0].text,
+                sendSSE,
+                extraHeaders: {
+                  'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
+                  'X-Title': 'Unified AI Assistant',
+                },
+              });
+              if (fallbackResult.success) {
+                accumulatedAssistantText = fallbackResult.text;
               }
-
-              if (!handledViaOpenRouter) {
-                await sendSSE('text_delta', {
-                  text: `> ⚠️ **Anthropic API Key Required**\n> To query Claude (${anthropicModel}) directly, please enter your Anthropic API Key (\`sk-ant-...\`) in Settings.\n> *Currently active live models: Gemini 2.5 Pro, Groq GPT-OSS 120B, Groq Qwen 27B, and NVIDIA Nemotron 550B.*\n\n`,
-                });
-              }
+              isHandled = true;
             } else {
+              let anthropicModel = chosenModel.replace(/^anthropic\//, '');
+              usedProvider = 'anthropic';
+              usedModel = anthropicModel;
+              await sendSSE('text_delta', {
+                text: `> *[Model: **Anthropic ${anthropicModel}** | Direct Upstream API]*\n\n`,
+              });
               const anthropicResult = await streamAnthropic({
-                apiKey: anthropicApiKey,
+                apiKey: userProvidedAnthropicKey,
                 model: anthropicModel,
                 messages: rawList,
                 systemPrompt: systemInstruction.parts[0].text,
@@ -1361,8 +1244,8 @@ export default {
                   text: `> ⚠️ **Anthropic API Notice**: ${anthropicResult.error || 'Connection failed'}\n\n`,
                 });
               }
+              isHandled = true;
             }
-            isHandled = true;
           } else if (
             chosenModel === 'unified-team' ||
             chosenModel.startsWith('unified-team:') ||
