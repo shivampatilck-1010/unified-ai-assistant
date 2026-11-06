@@ -763,6 +763,20 @@ export default {
 
           // 4. OpenAI Models
           {
+            id: 'openai/gpt-5',
+            name: 'GPT-5 (Flagship Frontier Architecture, 400k ctx)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 400000,
+          },
+          {
+            id: 'openai/gpt-5-mini',
+            name: 'GPT-5 Mini (Fast Frontier Reasoning, 200k ctx)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
             id: 'openai/gpt-4o',
             name: 'GPT-4o (Omni Flagship Multimodal)',
             provider: 'OpenAI',
