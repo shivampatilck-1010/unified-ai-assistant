@@ -10,7 +10,6 @@ import { CompanyLogo } from '../brand/CompanyLogo';
 import { FollowupEmailModal } from './FollowupEmailModal';
 import { ApiKeyModal } from '../auth/ApiKeyModal';
 import { CouncilSetupModal } from './CouncilSetupModal';
-import { VoiceModeModal } from '../voice/VoiceModeModal';
 import { CalendarReminderCard, type CalendarReminderData } from '../calendar/CalendarReminderCard';
 import { detectCalendarIntent } from '../../utils/calendarIntentDetector';
 import { exportMarkdownToPdf } from '../../utils/pdfExporter';
@@ -39,6 +38,32 @@ interface ChatViewProps {
   onSelectModel?: (modelId: string) => void;
   conversationId?: string | null;
   conversationTitle?: string;
+}
+
+function deduplicateSpeech(text: string): string {
+  if (!text) return '';
+  return text
+    // Deduplicate repeating identical words ("hello hello" -> "hello")
+    .replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1')
+    // Deduplicate repeated 2-word phrases ("how to how to" -> "how to")
+    .replace(/\b(\w+\s+\w+)(?:\s+\1\b)+/gi, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanChunkForTTS(text: string): string {
+  return text
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/```[\s\S]*?```/g, 'Code block omitted.')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/[#*~_>]/g, '')
+    .replace(/\$\$[\s\S]*?\$\$/g, 'Formula omitted.')
+    .replace(/\$[^$]*?\$/g, '')
+    .replace(/⚡|🧠|🤖|💡|✨|📌|⚠️/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function ChatView({
@@ -221,7 +246,20 @@ export function ChatView({
   const [pendingCalendarData, setPendingCalendarData] = useState<CalendarReminderData | null>(null);
   const [showCalendarCard, setShowCalendarCard] = useState(false);
   const [showCouncilModal, setShowCouncilModal] = useState(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
+
+  // --- Unified AI Live Voice Mode (Continuous Ambient Talk with Voice Barge-In) ---
+  const [isLiveVoice, setIsLiveVoice] = useState(false);
+  const [liveVoiceState, setLiveVoiceState] = useState<'listening' | 'thinking' | 'speaking'>('listening');
+  const [liveTranscript, setLiveTranscript] = useState('');
+
+  const liveRecognitionRef = useRef<any>(null);
+  const liveSilenceTimerRef = useRef<any>(null);
+  const liveFinalTranscriptRef = useRef<string>('');
+  const spokenOffsetRef = useRef<number>(0);
+  const sentenceQueueRef = useRef<string[]>([]);
+  const isSpeakingRef = useRef<boolean>(false);
+  const currentLiveMessageIdRef = useRef<string | null>(null);
+
   // Queued Messages System (sends after agent finishes working)
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
   const [editPayload, setEditPayload] = useState<{ content: string; attachments?: ChatAttachment[] } | null>(null);
@@ -308,6 +346,289 @@ export function ChatView({
     });
   };
 
+  // --- Live Voice: Sentence-pipelined queue & voice barge-in methods ---
+  const playNextSentence = useCallback(() => {
+    if (sentenceQueueRef.current.length === 0) {
+      isSpeakingRef.current = false;
+      if (!isStreaming) {
+        setLiveVoiceState('listening');
+      }
+      return;
+    }
+
+    const nextSentence = sentenceQueueRef.current.shift();
+    if (!nextSentence || !nextSentence.trim()) {
+      playNextSentence();
+      return;
+    }
+
+    isSpeakingRef.current = true;
+    setLiveVoiceState('speaking');
+
+    const utter = new SpeechSynthesisUtterance(nextSentence.trim());
+    utter.rate = 1.05;
+    utter.pitch = 1.0;
+
+    // Pick a natural English voice if available
+    if ('speechSynthesis' in window) {
+      const voices = window.speechSynthesis.getVoices();
+      const natural = voices.find(
+        (v) =>
+          v.lang.startsWith('en') &&
+          (v.name.includes('Natural') ||
+            v.name.includes('Neural') ||
+            v.name.includes('Samantha') ||
+            v.name.includes('Google') ||
+            v.name.includes('Daniel') ||
+            v.name.includes('Jenny'))
+      );
+      if (natural) utter.voice = natural;
+    }
+
+    utter.onend = () => {
+      playNextSentence();
+    };
+
+    utter.onerror = () => {
+      playNextSentence();
+    };
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.speak(utter);
+    }
+  }, [isStreaming]);
+
+  // Interrupt assistant immediately
+  const handleInterruptVoice = useCallback(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    sentenceQueueRef.current = [];
+    isSpeakingRef.current = false;
+    if (isStreaming) {
+      onCancel();
+    }
+    setLiveVoiceState('listening');
+  }, [isStreaming, onCancel]);
+
+  // Start continuous recognition with full duplex voice interruption
+  const startLiveRecognition = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
+      setIsLiveVoice(false);
+      return;
+    }
+
+    if (liveRecognitionRef.current) {
+      try {
+        liveRecognitionRef.current.abort();
+      } catch {
+        // Ignore
+      }
+      liveRecognitionRef.current = null;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+
+    rec.onstart = () => {
+      setLiveVoiceState('listening');
+      setLiveTranscript('');
+      liveFinalTranscriptRef.current = '';
+    };
+
+    rec.onresult = (event: any) => {
+      let interim = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const item = event.results[i];
+        if (item.isFinal) {
+          liveFinalTranscriptRef.current += item[0].transcript + ' ';
+        } else {
+          interim += item[0].transcript;
+        }
+      }
+
+      const rawCombined = (liveFinalTranscriptRef.current + interim).trim();
+      const cleanCombined = deduplicateSpeech(rawCombined);
+
+      if (cleanCombined) {
+        // VOICE BARGE-IN: If AI is speaking or model is generating, shut it up instantly!
+        if (isSpeakingRef.current || (window.speechSynthesis && window.speechSynthesis.speaking) || isStreaming) {
+          handleInterruptVoice();
+        }
+
+        setLiveTranscript(cleanCombined);
+
+        if (liveSilenceTimerRef.current) clearTimeout(liveSilenceTimerRef.current);
+
+        // Fast 650ms silence detection
+        liveSilenceTimerRef.current = setTimeout(() => {
+          const userMsg = cleanCombined;
+          if (userMsg.length > 0) {
+            setLiveTranscript('');
+            liveFinalTranscriptRef.current = '';
+            setLiveVoiceState('thinking');
+            spokenOffsetRef.current = 0;
+            sentenceQueueRef.current = [];
+            currentLiveMessageIdRef.current = null;
+            handleSend(userMsg);
+          }
+        }, 650);
+      }
+    };
+
+    rec.onerror = (event: any) => {
+      if (event.error === 'no-speech') return;
+      if (event.error === 'not-allowed') {
+        alert('Microphone access denied. Please allow microphone permissions.');
+        setIsLiveVoice(false);
+      }
+    };
+
+    rec.onend = () => {
+      // If live voice is still active, restart seamlessly
+      if (isLiveVoice) {
+        try {
+          rec.start();
+        } catch {
+          // Ignore
+        }
+      }
+    };
+
+    try {
+      rec.start();
+      liveRecognitionRef.current = rec;
+    } catch (err) {
+      console.warn('Live recognition start error:', err);
+    }
+  }, [isLiveVoice, isStreaming, handleInterruptVoice, handleSend]);
+
+  // Toggle Live Voice mode on/off
+  const toggleLiveVoice = useCallback(() => {
+    setIsLiveVoice((prev) => {
+      const next = !prev;
+      if (!next) {
+        // Turning off
+        if (liveSilenceTimerRef.current) clearTimeout(liveSilenceTimerRef.current);
+        if (liveRecognitionRef.current) {
+          try {
+            liveRecognitionRef.current.abort();
+          } catch {
+            // Ignore
+          }
+          liveRecognitionRef.current = null;
+        }
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+        sentenceQueueRef.current = [];
+        isSpeakingRef.current = false;
+        liveFinalTranscriptRef.current = '';
+        setLiveTranscript('');
+      }
+      return next;
+    });
+  }, []);
+
+  // Sync recognition with isLiveVoice state
+  useEffect(() => {
+    if (isLiveVoice) {
+      spokenOffsetRef.current = 0;
+      sentenceQueueRef.current = [];
+      isSpeakingRef.current = false;
+      startLiveRecognition();
+    } else {
+      if (liveSilenceTimerRef.current) clearTimeout(liveSilenceTimerRef.current);
+      if (liveRecognitionRef.current) {
+        try {
+          liveRecognitionRef.current.abort();
+        } catch {
+          // Ignore
+        }
+        liveRecognitionRef.current = null;
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+    return () => {
+      if (liveSilenceTimerRef.current) clearTimeout(liveSilenceTimerRef.current);
+      if (liveRecognitionRef.current) {
+        try {
+          liveRecognitionRef.current.abort();
+        } catch {
+          // Ignore
+        }
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [isLiveVoice, startLiveRecognition]);
+
+  // Sentence-pipelined streaming TTS: Speaks incoming chunks in real-time (< 500ms latency)
+  useEffect(() => {
+    if (!isLiveVoice) return;
+
+    const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+    if (assistantMsgs.length === 0) return;
+
+    const latest = assistantMsgs[assistantMsgs.length - 1];
+
+    // Reset offset if this is a new message
+    if (latest.id !== currentLiveMessageIdRef.current) {
+      currentLiveMessageIdRef.current = latest.id;
+      spokenOffsetRef.current = 0;
+      sentenceQueueRef.current = [];
+    }
+
+    const unread = latest.content.slice(spokenOffsetRef.current);
+    if (!unread) return;
+
+    // Match full sentences (. ? ! or newlines)
+    const sentenceRegex = /[^.?!]+[.?!]+(?:\s+|$)|[^\n]+\n+/g;
+    let match;
+    let lastIndex = 0;
+
+    while ((match = sentenceRegex.exec(unread)) !== null) {
+      const sentenceText = match[0];
+      const clean = cleanChunkForTTS(sentenceText);
+      if (clean) {
+        sentenceQueueRef.current.push(clean);
+      }
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex > 0) {
+      spokenOffsetRef.current += lastIndex;
+      if (!isSpeakingRef.current) {
+        playNextSentence();
+      }
+    }
+
+    // If streaming just finished, speak whatever fragment remains
+    if (prevStreamingRef.current && !isStreaming) {
+      const remainder = latest.content.slice(spokenOffsetRef.current).trim();
+      if (remainder) {
+        const clean = cleanChunkForTTS(remainder);
+        if (clean) {
+          sentenceQueueRef.current.push(clean);
+        }
+        spokenOffsetRef.current = latest.content.length;
+        if (!isSpeakingRef.current) {
+          playNextSentence();
+        }
+      }
+    }
+  }, [isLiveVoice, messages, isStreaming, playNextSentence]);
+
   const handleCopy = (msgId: string, text: string) => {
     void navigator.clipboard.writeText(text);
     setCopiedId(msgId);
@@ -370,7 +691,11 @@ export function ChatView({
   };
 
   return (
-    <div className="chat-view">
+    <div className={`chat-view ${isLiveVoice ? 'chat-view--live-voice' : ''}`}>
+      {/* Ambient Glowing Screen Perimeter Aura */}
+      {isLiveVoice && (
+        <div className={`chat-view__live-voice-ring chat-view__live-voice-ring--${liveVoiceState}`} />
+      )}
       {/* Messages area */}
       <div
         className="chat-view__messages"
@@ -756,6 +1081,62 @@ export function ChatView({
         )}
       </div>
 
+      {/* Floating Live Voice Status Pill Bar */}
+      {isLiveVoice && (
+        <div className={`live-voice-pill-bar live-voice-pill-bar--${liveVoiceState}`}>
+          <div className="live-voice-pill-bar__status">
+            <span className="live-voice-pill-bar__wave-icon">
+              <span className="live-wave-bar bar-1" />
+              <span className="live-wave-bar bar-2" />
+              <span className="live-wave-bar bar-3" />
+            </span>
+            <span className="live-voice-pill-bar__text">
+              {liveVoiceState === 'listening' ? (
+                liveTranscript ? (
+                  <span className="live-voice-pill-bar__transcript">
+                    You: “{liveTranscript}”
+                  </span>
+                ) : (
+                  <span className="live-voice-pill-bar__hint">
+                    Live Talk: Listening… speak to chat
+                  </span>
+                )
+              ) : liveVoiceState === 'thinking' ? (
+                <span className="live-voice-pill-bar__thinking">
+                  Live Talk: Thinking…
+                </span>
+              ) : (
+                <span className="live-voice-pill-bar__speaking">
+                  Live Talk: Speaking… <span className="live-voice-pill-bar__subtext">(speak anytime to interrupt)</span>
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="live-voice-pill-bar__actions">
+            {liveVoiceState === 'speaking' && (
+              <button
+                type="button"
+                className="live-voice-pill-bar__interrupt-btn"
+                onClick={handleInterruptVoice}
+                title="Interrupt Assistant"
+              >
+                Interrupt
+              </button>
+            )}
+            <button
+              type="button"
+              className="live-voice-pill-bar__end-btn"
+              onClick={toggleLiveVoice}
+              title="Turn off Live Voice"
+            >
+              <span>End Live Talk</span>
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Composer */}
       <Composer
         onSend={handleSend}
@@ -768,17 +1149,9 @@ export function ChatView({
         onEditQueuedMessage={handleEditQueuedMessage}
         editPayload={editPayload}
         onClearEditPayload={() => setEditPayload(null)}
-        onOpenVoiceMode={() => setShowVoiceModal(true)}
-      />
-
-      {/* Live Interactive Voice Assistant Modal */}
-      <VoiceModeModal
-        isOpen={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onSendMessage={(text) => handleSend(text)}
-        isStreaming={isStreaming}
-        messages={messages}
-        currentModelName={currentModel?.name || 'Unified AI Assistant'}
+        onOpenVoiceMode={toggleLiveVoice}
+        isLiveVoiceActive={isLiveVoice}
+        liveVoiceState={liveVoiceState}
       />
 
       {/* Follow-up Email Modal */}

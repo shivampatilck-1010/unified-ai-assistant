@@ -16,6 +16,19 @@ export interface ComposerProps {
   editPayload?: { content: string; attachments?: ChatAttachment[] } | null;
   onClearEditPayload?: () => void;
   onOpenVoiceMode?: () => void;
+  isLiveVoiceActive?: boolean;
+  liveVoiceState?: 'listening' | 'thinking' | 'speaking';
+}
+
+function deduplicateSpeech(text: string): string {
+  if (!text) return '';
+  return text
+    // Deduplicate repeating identical words ("hello hello" -> "hello")
+    .replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1')
+    // Deduplicate repeated 2-word phrases ("how to how to" -> "how to")
+    .replace(/\b(\w+\s+\w+)(?:\s+\1\b)+/gi, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function Composer({
@@ -31,6 +44,8 @@ export function Composer({
   editPayload,
   onClearEditPayload,
   onOpenVoiceMode,
+  isLiveVoiceActive = false,
+  liveVoiceState = 'listening',
 }: ComposerProps) {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -39,6 +54,8 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const initialTextRef = useRef<string>('');
+  const finalTranscriptRef = useRef<string>('');
 
   // Toggle voice dictation directly into textarea
   const toggleDictation = () => {
@@ -64,6 +81,9 @@ export function Composer({
     }
 
     try {
+      initialTextRef.current = value;
+      finalTranscriptRef.current = '';
+
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -75,22 +95,22 @@ export function Composer({
 
       recognition.onresult = (event: any) => {
         let interim = '';
-        let final = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
+          const item = event.results[i];
+          if (item.isFinal) {
+            finalTranscriptRef.current += item[0].transcript + ' ';
           } else {
-            interim += event.results[i][0].transcript;
+            interim += item[0].transcript;
           }
         }
 
-        const spoken = final || interim;
-        if (spoken) {
-          setValue((prev) => {
-            const base = prev.trim();
-            return base ? `${base} ${spoken}` : spoken;
-          });
+        const rawSpoken = (finalTranscriptRef.current + interim).trim();
+        const cleanSpoken = deduplicateSpeech(rawSpoken);
+
+        if (cleanSpoken) {
+          const prefix = initialTextRef.current.trim();
+          setValue(prefix ? `${prefix} ${cleanSpoken}` : cleanSpoken);
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
@@ -409,21 +429,31 @@ export function Composer({
             {/* 2. Interactive Live Voice Assistant Button (Solid White Circle with Waveform & Sparkle) */}
             {onOpenVoiceMode && (
               <button
-                className="composer__live-voice-btn"
+                className={`composer__live-voice-btn ${
+                  isLiveVoiceActive ? 'composer__live-voice-btn--active' : ''
+                } ${isLiveVoiceActive && liveVoiceState === 'speaking' ? 'composer__live-voice-btn--speaking' : ''}`}
                 type="button"
                 onClick={onOpenVoiceMode}
                 disabled={disabled}
-                aria-label="Start Live Voice Mode"
-                title="Unified AI Live Voice Mode"
+                aria-label={isLiveVoiceActive ? 'Turn off Live Voice' : 'Start Live Voice Mode'}
+                title={isLiveVoiceActive ? 'Live Voice Active (click to turn off)' : 'Unified AI Live Voice Mode'}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  {/* 3 waveform bars */}
-                  <rect x="5" y="8" width="2.5" height="8" rx="1.25" />
-                  <rect x="10.5" y="4" width="2.5" height="16" rx="1.25" />
-                  <rect x="16" y="9" width="2.5" height="6" rx="1.25" />
-                  {/* 4-point sparkle on top right */}
-                  <path d="M19 1.5C19.3 3 20.5 4.2 22 4.5C20.5 4.8 19.3 6 19 7.5C18.7 6 17.5 4.8 16 4.5C17.5 4.2 18.7 3 19 1.5Z" />
-                </svg>
+                {isLiveVoiceActive ? (
+                  <div className="composer__live-bars">
+                    <span className="live-bar live-bar-1" />
+                    <span className="live-bar live-bar-2" />
+                    <span className="live-bar live-bar-3" />
+                  </div>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    {/* 3 waveform bars */}
+                    <rect x="5" y="8" width="2.5" height="8" rx="1.25" />
+                    <rect x="10.5" y="4" width="2.5" height="16" rx="1.25" />
+                    <rect x="16" y="9" width="2.5" height="6" rx="1.25" />
+                    {/* 4-point sparkle on top right */}
+                    <path d="M19 1.5C19.3 3 20.5 4.2 22 4.5C20.5 4.8 19.3 6 19 7.5C18.7 6 17.5 4.8 16 4.5C17.5 4.2 18.7 3 19 1.5Z" />
+                  </svg>
+                )}
               </button>
             )}
 
