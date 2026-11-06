@@ -75,13 +75,21 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     return availableModels.find((m) => m.id === selectedModelId) || availableModels[0];
   }, [availableModels, selectedModelId]);
 
-  // Extract unique provider categories
+  // Extract unique provider categories, ensuring Unified Team is placed last
   const categories = useMemo(() => {
     const set = new Set<string>();
     availableModels.forEach((m) => {
       if (m.provider) set.add(m.provider);
     });
-    return ['all', ...Array.from(set)];
+    const list = Array.from(set);
+    list.sort((a, b) => {
+      const aIsTeam = a.toLowerCase().includes('unified') || a.toLowerCase().includes('council');
+      const bIsTeam = b.toLowerCase().includes('unified') || b.toLowerCase().includes('council');
+      if (aIsTeam && !bIsTeam) return 1;
+      if (!aIsTeam && bIsTeam) return -1;
+      return 0;
+    });
+    return ['all', ...list];
   }, [availableModels]);
 
   // Filtered models based on search and category
@@ -98,15 +106,21 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     });
   }, [availableModels, selectedCategory, searchQuery]);
 
-  // Group filtered models by provider
-  const groupedModels = useMemo(() => {
+  // Group filtered models by provider, guaranteeing Unified Team models are at the very last
+  const sortedGroupedModels = useMemo(() => {
     const groups: Record<string, ModelInfo[]> = {};
     filteredModels.forEach((m) => {
       const key = m.provider || 'Other';
       if (!groups[key]) groups[key] = [];
       groups[key].push(m);
     });
-    return groups;
+    return Object.entries(groups).sort(([a], [b]) => {
+      const aIsTeam = a.toLowerCase().includes('unified') || a.toLowerCase().includes('council');
+      const bIsTeam = b.toLowerCase().includes('unified') || b.toLowerCase().includes('council');
+      if (aIsTeam && !bIsTeam) return 1;
+      if (!aIsTeam && bIsTeam) return -1;
+      return 0;
+    });
   }, [filteredModels]);
 
   const isUnifiedTeam = Boolean(
@@ -201,32 +215,6 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
             )}
           </div>
 
-          {/* Unified Team Banner Shortcut */}
-          <div className="model-dropdown__team-banner">
-            <div className="model-dropdown__team-icon-wrap">
-              <ModelBrandLogo modelId="unified-team" provider="unified-team" size={24} />
-            </div>
-            <div className="model-dropdown__team-info">
-              <span className="model-dropdown__team-badge">AUTHENTIC MULTI-MODEL TEAM</span>
-              <strong className="model-dropdown__team-title">Unified Collaborative Council</strong>
-              <p className="model-dropdown__team-desc">
-                Executes Nemotron 550B, Groq Qwen 27B, and Gemini 2.5 Pro together via real APIs.
-              </p>
-            </div>
-            {onOpenTeamModal && (
-              <button
-                type="button"
-                className="model-dropdown__team-btn"
-                onClick={() => {
-                  setIsOpen(false);
-                  onOpenTeamModal();
-                }}
-              >
-                Configure
-              </button>
-            )}
-          </div>
-
           {/* Category Filter Chips with Company Logos */}
           <div className="model-dropdown__categories">
             {categories.map((cat) => (
@@ -250,12 +238,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
 
           {/* Models List with Company Logos */}
           <div className="model-dropdown__list">
-            {Object.keys(groupedModels).length === 0 ? (
+            {sortedGroupedModels.length === 0 ? (
               <div className="model-dropdown__empty">
                 No models found matching "{searchQuery}"
               </div>
             ) : (
-              Object.entries(groupedModels).map(([providerName, models]) => (
+              sortedGroupedModels.map(([providerName, models]) => (
                 <div key={providerName} className="model-dropdown__group">
                   <div className="model-dropdown__group-header">
                     <ModelBrandLogo
@@ -324,6 +312,32 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                   </div>
                 </div>
               ))
+            )}
+          </div>
+
+          {/* Unified Team Banner Shortcut (At bottom of dropdown) */}
+          <div className="model-dropdown__team-banner">
+            <div className="model-dropdown__team-icon-wrap">
+              <ModelBrandLogo modelId="unified-team" provider="unified-team" size={24} />
+            </div>
+            <div className="model-dropdown__team-info">
+              <span className="model-dropdown__team-badge">AUTHENTIC MULTI-MODEL TEAM</span>
+              <strong className="model-dropdown__team-title">Unified Collaborative Council</strong>
+              <p className="model-dropdown__team-desc">
+                Executes Nemotron 550B, Groq Qwen 27B, and Gemini 2.5 Pro together via real APIs.
+              </p>
+            </div>
+            {onOpenTeamModal && (
+              <button
+                type="button"
+                className="model-dropdown__team-btn"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenTeamModal();
+                }}
+              >
+                Configure
+              </button>
             )}
           </div>
         </div>

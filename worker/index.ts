@@ -627,50 +627,6 @@ export default {
         active_provider: 'Unified Gateway (Google + Groq + OpenRouter + Anthropic + OpenAI)',
         active_model: 'gemini-2.5-pro',
         available_models: [
-          // 0. Unified Team Flagship Multi-Model Intelligence
-          {
-            id: 'unified-team',
-            name: 'Unified Team (Multi-Model Collaborative Intelligence)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'unified-team:dual-expert',
-            name: 'Unified Team: Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'unified-team:frontier-council',
-            name: 'Unified Team: Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'unified-team:code-pair',
-            name: 'Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'council/dual-expert-deliberation',
-            name: 'Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'council/executive-roundtable',
-            name: 'Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-
           // 1. Groq Hardware LPUs (Verified Live API - Free Tier)
           {
             id: 'groq/openai/gpt-oss-120b',
@@ -810,6 +766,50 @@ export default {
             id: 'anthropic/claude-3-5-sonnet',
             name: 'Claude 3.5 Sonnet (Senior Systems Architecture)',
             provider: 'Anthropic',
+            is_default: false,
+            context_window: 200000,
+          },
+
+          // 6. Unified Team Multi-Model Intelligence (At the end of dropdown)
+          {
+            id: 'unified-team',
+            name: 'Unified Team (Multi-Model Collaborative Intelligence)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:dual-expert',
+            name: 'Unified Team: Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:frontier-council',
+            name: 'Unified Team: Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:code-pair',
+            name: 'Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'council/dual-expert-deliberation',
+            name: 'Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'council/executive-roundtable',
+            name: 'Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
+            provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },

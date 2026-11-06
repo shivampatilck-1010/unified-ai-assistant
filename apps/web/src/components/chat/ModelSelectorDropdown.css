@@ -172,11 +172,11 @@
   color: #faf9f5;
 }
 
-/* Team Shortcut Banner */
+/* Team Shortcut Banner (Positioned at bottom of dropdown) */
 .model-dropdown__team-banner {
   padding: 10px 14px;
   background: rgba(217, 119, 87, 0.08);
-  border-bottom: 1px solid rgba(217, 119, 87, 0.22);
+  border-top: 1px solid rgba(217, 119, 87, 0.22);
   display: flex;
   align-items: center;
   justify-content: space-between;
