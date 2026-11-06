@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ChatMessage } from '../../types';
+import { MarkdownContent } from '../chat/MarkdownContent';
 import './LiveVoiceSpace.css';
 
 export interface LiveVoiceSpaceProps {
@@ -25,19 +26,64 @@ function deduplicateSpeech(text: string): string {
     .trim();
 }
 
+/**
+ * Natural English cleaner for speech synthesis:
+ * Translates LaTeX math expressions, environments, and markdown syntax
+ * into smooth, pronounceable English sentences.
+ */
 function cleanChunkForTTS(text: string): string {
-  return text
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/```[\s\S]*?```/g, 'Code block omitted.')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/[#*~_>]/g, '')
-    .replace(/\$\$[\s\S]*?\$\$/g, 'Formula omitted.')
-    .replace(/\$[^$]*?\$/g, '')
-    .replace(/⚡|🧠|🤖|💡|✨|📌|⚠️/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  if (!text) return '';
+  let t = text;
+
+  // 1. Remove markdown images, links, HTML comments, code blocks
+  t = t.replace(/!\[.*?\]\(.*?\)/g, '');
+  t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  t = t.replace(/<!--[\s\S]*?-->/g, '');
+  t = t.replace(/```[\s\S]*?```/g, 'Code block omitted.');
+  t = t.replace(/`([^`]+)`/g, '$1');
+
+  // 2. Clean LaTeX math environments and commands into natural speech
+  t = t.replace(/\\begin\{[^}]+\}[\s\S]*?\\end\{[^}]+\}/g, ' ');
+  t = t.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 over $2');
+  t = t.replace(/\\text\{([^}]+)\}/g, '$1');
+  t = t.replace(/\\textbf\{([^}]+)\}/g, '$1');
+  t = t.replace(/\\textit\{([^}]+)\}/g, '$1');
+  t = t.replace(/\\Phi/g, 'Phi');
+  t = t.replace(/\\alpha/g, 'alpha');
+  t = t.replace(/\\beta/g, 'beta');
+  t = t.replace(/\\gamma/g, 'gamma');
+  t = t.replace(/\\delta/g, 'delta');
+  t = t.replace(/\\theta/g, 'theta');
+  t = t.replace(/\\lambda/g, 'lambda');
+  t = t.replace(/\\nu/g, 'nu');
+  t = t.replace(/\\pi/g, 'pi');
+  t = t.replace(/\\sigma/g, 'sigma');
+  t = t.replace(/\\omega/g, 'omega');
+  t = t.replace(/\\gg/g, 'much greater than');
+  t = t.replace(/\\ll/g, 'much less than');
+  t = t.replace(/\\approx/g, 'approximately');
+  t = t.replace(/\\xrightarrow\{([^}]*)\}/g, 'yields $1');
+  t = t.replace(/\\rightarrow/g, 'yields');
+  t = t.replace(/\\to/g, 'to');
+  t = t.replace(/\\le|\\leq/g, 'less than or equal to');
+  t = t.replace(/\\ge|\\geq/g, 'greater than or equal to');
+  t = t.replace(/\\cdot/g, 'times');
+  t = t.replace(/\\times/g, 'times');
+  t = t.replace(/\\pm/g, 'plus or minus');
+  t = t.replace(/\\sqrt\{([^}]+)\}/g, 'square root of $1');
+  t = t.replace(/\\sum/g, 'sum of');
+  t = t.replace(/\\int/g, 'integral of');
+  t = t.replace(/\$\$|\$/g, ' ');
+  t = t.replace(/\\[a-zA-Z]+/g, ' ');
+  t = t.replace(/[\{\}\^_\\]/g, ' ');
+
+  // 3. Remove markdown syntax & emojis
+  t = t.replace(/[#*~_>]/g, ' ');
+  t = t.replace(/⚡|🧠|🤖|💡|✨|📌|⚠️|🔥|✅|❌/g, '');
+
+  // 4. Normalize whitespace
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
 }
 
 export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
@@ -63,6 +109,8 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
   const spokenOffsetRef = useRef<number>(0);
   const sentenceQueueRef = useRef<string[]>([]);
   const isSpeakingRef = useRef<boolean>(false);
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechFallbackTimerRef = useRef<any>(null);
   const currentLiveMessageIdRef = useRef<string | null>(null);
   const prevStreamingRef = useRef(isStreaming);
 
@@ -94,14 +142,30 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
 
     updateVoices();
     window.speechSynthesis.onvoiceschanged = updateVoices;
-  }, []);
+  }, [selectedVoice]);
 
-  // Sentence-pipelined audio playback
+  // Sentence-pipelined audio playback with Chrome GC protection and echo suppression
   const playNextSentence = useCallback(() => {
+    if (!('speechSynthesis' in window)) return;
+
+    if (speechFallbackTimerRef.current) {
+      clearTimeout(speechFallbackTimerRef.current);
+      speechFallbackTimerRef.current = null;
+    }
+
     if (sentenceQueueRef.current.length === 0) {
       isSpeakingRef.current = false;
+      activeUtteranceRef.current = null;
       if (!isStreaming) {
         setVoiceState('listening');
+        // Resume microphone recognition once speech finishes
+        if (recognitionRef.current && !isMuted) {
+          try {
+            recognitionRef.current.start();
+          } catch {
+            // Already active
+          }
+        }
       }
       return;
     }
@@ -115,42 +179,95 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     isSpeakingRef.current = true;
     setVoiceState('speaking');
 
+    // Mute mic recognition during audio playback so the computer's speakers don't self-cancel
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        // Ignore
+      }
+    }
+
+    try {
+      window.speechSynthesis.resume();
+    } catch {
+      // Ignore
+    }
+
     const utter = new SpeechSynthesisUtterance(nextSentence.trim());
+    activeUtteranceRef.current = utter; // Retain reference in ref to prevent Chrome V8 GC bug!
     utter.rate = 1.05;
     utter.pitch = 1.0;
+    utter.volume = 1.0;
 
-    if (selectedVoice && 'speechSynthesis' in window) {
+    if (selectedVoice && availableVoices.length > 0) {
       const match = availableVoices.find((v) => v.name === selectedVoice);
       if (match) utter.voice = match;
     }
 
     utter.onend = () => {
+      activeUtteranceRef.current = null;
+      if (speechFallbackTimerRef.current) clearTimeout(speechFallbackTimerRef.current);
       playNextSentence();
     };
 
-    utter.onerror = () => {
+    utter.onerror = (e) => {
+      console.warn('SpeechSynthesis error:', e);
+      activeUtteranceRef.current = null;
+      if (speechFallbackTimerRef.current) clearTimeout(speechFallbackTimerRef.current);
       playNextSentence();
     };
 
-    if ('speechSynthesis' in window) {
+    // Watchdog timer in case speech engine hangs
+    const durationEstimate = Math.max(1400, (nextSentence.length * 90) + 1400);
+    speechFallbackTimerRef.current = setTimeout(() => {
+      if (isSpeakingRef.current) {
+        console.warn('Speech watchdog advanced to next sentence');
+        playNextSentence();
+      }
+    }, durationEstimate);
+
+    try {
       window.speechSynthesis.speak(utter);
+      window.speechSynthesis.resume();
+    } catch (err) {
+      console.warn('window.speechSynthesis.speak failed:', err);
+      playNextSentence();
     }
-  }, [isStreaming, selectedVoice, availableVoices]);
+  }, [isStreaming, selectedVoice, availableVoices, isMuted]);
 
-  // Voice Barge-In: Interrupt assistant immediately
+  // Voice Barge-In: User interrupts speech (tapping orb, card, or interrupt button)
   const handleInterruptVoice = useCallback(() => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (speechFallbackTimerRef.current) {
+      clearTimeout(speechFallbackTimerRef.current);
+      speechFallbackTimerRef.current = null;
     }
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // Ignore
+      }
+    }
+    activeUtteranceRef.current = null;
     sentenceQueueRef.current = [];
     isSpeakingRef.current = false;
     if (isStreaming) {
       onCancelGeneration();
     }
     setVoiceState('listening');
-  }, [isStreaming, onCancelGeneration]);
 
-  // Start continuous recognition with full duplex voice interruption
+    // Re-engage speech recognition immediately
+    if (recognitionRef.current && !isMuted) {
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // Ignore
+      }
+    }
+  }, [isStreaming, onCancelGeneration, isMuted]);
+
+  // Start continuous recognition
   const startLiveRecognition = useCallback(() => {
     if (isMuted) return;
 
@@ -184,6 +301,11 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     };
 
     rec.onresult = (event: any) => {
+      // If AI is currently speaking, suppress mic deltas to prevent speaker echo feedback
+      if (isSpeakingRef.current) {
+        return;
+      }
+
       let interim = '';
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -199,11 +321,6 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
       const cleanCombined = deduplicateSpeech(rawCombined);
 
       if (cleanCombined) {
-        // VOICE BARGE-IN INTERRUPTION: If AI is speaking or model is generating, shut it up instantly!
-        if (isSpeakingRef.current || (window.speechSynthesis && window.speechSynthesis.speaking) || isStreaming) {
-          handleInterruptVoice();
-        }
-
         setTranscript(cleanCombined);
 
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -234,7 +351,8 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     };
 
     rec.onend = () => {
-      if (isOpen && !isMuted) {
+      // Automatically restart if user is listening and not muted
+      if (isOpen && !isMuted && !isSpeakingRef.current) {
         try {
           rec.start();
         } catch {
@@ -249,7 +367,7 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     } catch (err) {
       console.warn('Live recognition start error:', err);
     }
-  }, [isOpen, isMuted, isStreaming, handleInterruptVoice, onSendMessage]);
+  }, [isOpen, isMuted, onSendMessage]);
 
   // Lifecycle when Live Voice opens/closes
   useEffect(() => {
@@ -257,8 +375,17 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
       spokenOffsetRef.current = 0;
       sentenceQueueRef.current = [];
       isSpeakingRef.current = false;
+      // Unlock audio with user gesture
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.resume();
+        } catch {
+          // Ignore
+        }
+      }
       startLiveRecognition();
     } else {
+      if (speechFallbackTimerRef.current) clearTimeout(speechFallbackTimerRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (recognitionRef.current) {
         try {
@@ -269,8 +396,13 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
         recognitionRef.current = null;
       }
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Ignore
+        }
       }
+      activeUtteranceRef.current = null;
       sentenceQueueRef.current = [];
       isSpeakingRef.current = false;
       setTranscript('');
@@ -278,6 +410,7 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     }
 
     return () => {
+      if (speechFallbackTimerRef.current) clearTimeout(speechFallbackTimerRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (recognitionRef.current) {
         try {
@@ -287,7 +420,11 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
         }
       }
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Ignore
+        }
       }
     };
   }, [isOpen, startLiveRecognition]);
@@ -310,6 +447,7 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     const unread = latest.content.slice(spokenOffsetRef.current);
     if (!unread) return;
 
+    // Matches completed sentences (. ? ! or double newlines)
     const sentenceRegex = /[^.?!]+[.?!]+(?:\s+|$)|[^\n]+\n+/g;
     let match;
     let lastIndex = 0;
@@ -355,7 +493,7 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
 
   return (
     <div className="live-voice-space-overlay" role="dialog" aria-modal="true" aria-label="Unified AI Live Voice">
-      {/* 1. Blurred lively moving transparent layer with standard premium colors */}
+      {/* 1. Translucent animated chromatic aurora layer (Cyan, Indigo, Terracotta, Violet) */}
       <div className="live-voice-aurora-bg" />
 
       {/* 2. Top Navigation Bar */}
@@ -400,7 +538,15 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
       <div className="live-voice-center-stage">
         {/* The Live Interactive Moving Bubble (as depicted in PDF Page 2) */}
         <div className="live-bubble-stage">
-          <div className={`live-bubble-orb live-bubble-orb--${voiceState}`}>
+          <div
+            className={`live-bubble-orb live-bubble-orb--${voiceState}`}
+            onClick={() => {
+              if (voiceState === 'speaking') {
+                handleInterruptVoice();
+              }
+            }}
+            title={voiceState === 'speaking' ? 'Click to interrupt' : 'Interactive Orb'}
+          >
             {/* Morphing Organic Fluid Rings */}
             <div className="live-bubble-fluid-ring live-bubble-fluid-ring--1" />
             <div className="live-bubble-fluid-ring live-bubble-fluid-ring--2" />
@@ -411,7 +557,8 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
             <button
               type="button"
               className="live-bubble-core"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (voiceState === 'speaking') {
                   handleInterruptVoice();
                 } else if (voiceState === 'listening' && transcript.trim()) {
@@ -470,9 +617,14 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
               </span>
             )}
             {voiceState === 'speaking' && (
-              <span className="live-status-pill live-status-pill--speaking">
+              <span
+                className="live-status-pill live-status-pill--speaking"
+                onClick={handleInterruptVoice}
+                style={{ cursor: 'pointer' }}
+                title="Click to interrupt"
+              >
                 <span className="pulse-dot pulse-dot--orange" />
-                Speaking · Speak anytime to interrupt
+                Speaking · Click orb to interrupt
               </span>
             )}
           </div>
@@ -490,11 +642,11 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
             </div>
           )}
 
-          {/* Live Assistant Response Streaming View */}
+          {/* Live Assistant Response Streaming View with Full Math & Typography */}
           <div className="live-ai-response-card">
             {liveResponseText ? (
               <div className="live-ai-stream-text">
-                {liveResponseText}
+                <MarkdownContent content={liveResponseText} />
               </div>
             ) : voiceState === 'thinking' ? (
               <div className="live-ai-placeholder live-ai-placeholder--thinking">
