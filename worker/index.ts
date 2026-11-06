@@ -966,10 +966,10 @@ export default {
       const conversationId = body.conversation_id || `conv-${Date.now()}`;
       const messageId = `msg-${Date.now()}`;
       const userMessage = body.message || '';
-      const chosenModel =
+      let chosenModel =
         body.model && body.model.trim().length > 0 && !body.model.includes('2.0-flash-exp')
           ? body.model.trim()
-          : env.DEFAULT_MODEL || 'gemini-2.5-pro';
+          : env.DEFAULT_MODEL || 'auto';
 
       // Build sanitized multi-turn conversation contents for Google Gemini API with alternating roles
       type GeminiPart =
