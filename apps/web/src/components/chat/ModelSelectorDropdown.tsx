@@ -75,7 +75,7 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     return availableModels.find((m) => m.id === selectedModelId) || availableModels[0];
   }, [availableModels, selectedModelId]);
 
-  // Extract unique provider categories, ensuring Unified Team is placed last
+  // Extract unique provider categories, ensuring Auto Routing is first after 'all' and Unified Team is placed last
   const categories = useMemo(() => {
     const set = new Set<string>();
     availableModels.forEach((m) => {
@@ -83,8 +83,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     });
     const list = Array.from(set);
     list.sort((a, b) => {
-      const aIsTeam = a.toLowerCase().includes('unified') || a.toLowerCase().includes('council');
-      const bIsTeam = b.toLowerCase().includes('unified') || b.toLowerCase().includes('council');
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      if (aLower.includes('auto') && !bLower.includes('auto')) return -1;
+      if (!aLower.includes('auto') && bLower.includes('auto')) return 1;
+      const aIsTeam = aLower.includes('unified') || aLower.includes('council');
+      const bIsTeam = bLower.includes('unified') || bLower.includes('council');
       if (aIsTeam && !bIsTeam) return 1;
       if (!aIsTeam && bIsTeam) return -1;
       return 0;
@@ -106,7 +110,7 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     });
   }, [availableModels, selectedCategory, searchQuery]);
 
-  // Group filtered models by provider, guaranteeing Unified Team models are at the very last
+  // Group filtered models by provider, guaranteeing Auto Routing is first and Unified Team models are at the very last
   const sortedGroupedModels = useMemo(() => {
     const groups: Record<string, ModelInfo[]> = {};
     filteredModels.forEach((m) => {
@@ -115,8 +119,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
       groups[key].push(m);
     });
     return Object.entries(groups).sort(([a], [b]) => {
-      const aIsTeam = a.toLowerCase().includes('unified') || a.toLowerCase().includes('council');
-      const bIsTeam = b.toLowerCase().includes('unified') || b.toLowerCase().includes('council');
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      if (aLower.includes('auto') && !bLower.includes('auto')) return -1;
+      if (!aLower.includes('auto') && bLower.includes('auto')) return 1;
+      const aIsTeam = aLower.includes('unified') || aLower.includes('council');
+      const bIsTeam = bLower.includes('unified') || bLower.includes('council');
       if (aIsTeam && !bIsTeam) return 1;
       if (!aIsTeam && bIsTeam) return -1;
       return 0;

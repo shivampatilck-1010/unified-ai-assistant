@@ -22,6 +22,60 @@ export const CompanyLogo: React.FC<CompanyLogoProps> = ({
   const p = (provider || '').toLowerCase();
   const m = (modelId || '').toLowerCase();
 
+  // 0. Auto-Routing / Smart Engine - Dynamic Routing Pulse
+  if (p.includes('auto') || m === 'auto' || m.startsWith('auto/')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        className={className}
+        style={{ flexShrink: 0, ...style }}
+        aria-label="Auto-Routing Engine"
+      >
+        <circle cx="12" cy="12" r="10" stroke="#38bdf8" strokeWidth="1.6" strokeDasharray="3 3" />
+        <path d="M13 3L4 13h7l-1 8 10-11h-7l1-7z" fill="#38bdf8" />
+      </svg>
+    );
+  }
+
+  // GLM / Zhipu AI
+  if (p.includes('glm') || m.includes('glm') || p.includes('thudm')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        className={className}
+        style={{ flexShrink: 0, ...style }}
+        aria-label="GLM"
+      >
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  // AM-Thinking / Deep STEM Logic
+  if (m.includes('am-thinking') || m.includes('thinking-v1')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        className={className}
+        style={{ flexShrink: 0, ...style }}
+        aria-label="AM-Thinking"
+      >
+        <circle cx="12" cy="12" r="3" fill="#a855f7" />
+        <ellipse cx="12" cy="12" rx="9" ry="4" stroke="#a855f7" strokeWidth="1.5" transform="rotate(30 12 12)" />
+        <ellipse cx="12" cy="12" rx="9" ry="4" stroke="#a855f7" strokeWidth="1.5" transform="rotate(-30 12 12)" />
+      </svg>
+    );
+  }
+
   // 1. Unified Team / Council Modes
   if (p.includes('unified') || p.includes('council') || m.startsWith('unified-team') || m.startsWith('council/')) {
     return (

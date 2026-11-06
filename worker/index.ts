@@ -623,10 +623,19 @@ export default {
 
       return jsonResponse({
         configured,
-        provider: 'unified-team',
-        active_provider: 'Unified Gateway (Google + Groq + OpenRouter + Anthropic + OpenAI)',
-        active_model: 'gemini-2.5-pro',
+        provider: 'auto',
+        active_provider: 'Auto Routing (Smart Multi-Model Orchestration Engine)',
+        active_model: 'auto',
         available_models: [
+          // 0. Intelligent Auto-Routing (Default Model)
+          {
+            id: 'auto',
+            name: 'Auto-Select (Smart Multi-Model Orchestration Engine)',
+            provider: 'Auto Routing',
+            is_default: true,
+            context_window: 2000000,
+          },
+
           // 1. Groq Hardware LPUs (Verified Live API - Free Tier)
           {
             id: 'groq/openai/gpt-oss-120b',
@@ -648,6 +657,20 @@ export default {
             provider: 'Groq',
             is_default: false,
             context_window: 131072,
+          },
+          {
+            id: 'groq/meta-llama/llama-3.3-70b-versatile',
+            name: 'Meta LLaMA 3.3 70B (High-Velocity Frontier LPU, 128k ctx)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'groq/mistralai/mixtral-8x7b-32768',
+            name: 'Mixtral 8x7B MoE (Ultra-Fast Hardware LPU, 32k ctx)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 32768,
           },
 
           // 2. OpenRouter (Verified Live API - Free Tier)
@@ -673,6 +696,41 @@ export default {
             context_window: 131072,
           },
           {
+            id: 'openrouter/mistralai/devstral-24b:free',
+            name: 'Mistral Devstral 24B (Code Specialization & Refactoring, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 32768,
+          },
+          {
+            id: 'openrouter/thudm/glm-4.5-air:free',
+            name: 'GLM-4.5 Air (Multilingual Agentic & Workflow Planning, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/am-thinking-v1:free',
+            name: 'AM-Thinking-v1 (Specialized 32B STEM & Logic Engine, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/meta-llama/llama-3.3-70b-instruct:free',
+            name: 'Meta LLaMA 3.3 70B Instruct (Frontier Open Weights, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/mistralai/mistral-7b-instruct:free',
+            name: 'Mistral 7B Instruct (Compact Open Weights, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 32768,
+          },
+          {
             id: 'openrouter/google/gemma-4-31b-it:free',
             name: 'Google Gemma 4 31B Instruct (Frontier Open Weights, Free Tier)',
             provider: 'OpenRouter',
@@ -692,7 +750,7 @@ export default {
             id: 'gemini-2.5-pro',
             name: 'Gemini 2.5 Pro (Flagship Reasoning & Math, 2M Context)',
             provider: 'Google',
-            is_default: true,
+            is_default: false,
             context_window: 2097152,
           },
           {
@@ -704,7 +762,7 @@ export default {
           },
           {
             id: 'gemini-1.5-pro',
-            name: 'Gemini 1.5 Pro (Deep Architecture & Code)',
+            name: 'Gemini 1.5 Pro (Deep Architecture & Multimodal Media)',
             provider: 'Google',
             is_default: false,
             context_window: 2097152,
@@ -731,6 +789,13 @@ export default {
             provider: 'OpenAI',
             is_default: false,
             context_window: 200000,
+          },
+          {
+            id: 'openai/gpt-4-turbo',
+            name: 'GPT-4 Turbo (High-Context Frontier Assistant, 128k ctx)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 128000,
           },
           {
             id: 'openai/gpt-4o',
@@ -815,6 +880,7 @@ export default {
           },
         ],
         providers: {
+          auto: true,
           'unified-team': true,
           council: true,
           google: true,
@@ -825,6 +891,8 @@ export default {
           qwen: true,
           anthropic: true,
           openai: true,
+          meta: true,
+          mistral: true,
         },
         has_custom_key: Boolean(clientApiKey),
         message: configured
@@ -1067,22 +1135,77 @@ export default {
           let usedModel = chosenModel;
           let accumulatedAssistantText = '';
 
+          // 0. Auto-Routing Decision Engine (Classifies user prompt and routes to peak specialist model)
+          if (!chosenModel || chosenModel === 'auto' || chosenModel.startsWith('auto/')) {
+            const lastUserMsg = [...rawList].reverse().find((m) => m.role === 'user')?.content || '';
+            const lowerMsg = lastUserMsg.toLowerCase();
+
+            const isCode = /\b(code|function|bug|error|refactor|typescript|javascript|python|react|html|css|sql|api|loop|component|git|devstral|regex|syntax|class|compile|algorithm|database|json|schema|async|await|props|unit test|script)\b/.test(lowerMsg);
+            const isStem = /\b(math|equation|calculus|matrix|theorem|proof|physics|algebra|integral|derivative|quantum|probability|combinatorics|am-thinking|nemotron|eigenvalue|trigonometry|geometry|formula)\b/.test(lowerMsg);
+            const isDebate = /\b(debate|compare perspectives|council|deliberate|pros and cons|cross-check|multiple viewpoints|two sides)\b/.test(lowerMsg);
+            const isWorkflow = /\b(workflow|step by step plan|automate|agent|pipeline|translate|spanish|french|german|chinese|hindi|multilingual|glm|schedule|roadmap)\b/.test(lowerMsg);
+            const isDeepAnalysis = /\b(explain in depth|comprehensive analysis|history|essay|patent|research paper|summary of|architecture document|deep dive)\b/.test(lowerMsg) || lastUserMsg.length > 500;
+
+            let autoTarget = 'groq/openai/gpt-oss-120b';
+            let taskDomain = 'High-Velocity General Inference';
+            let specialistName = 'Groq Hardware LPUs & Gemini Pro';
+
+            if (isDebate) {
+              autoTarget = 'unified-team:dual-expert';
+              taskDomain = 'Multi-Model Frontier Deliberation';
+              specialistName = 'Unified Team (Dual-Expert Debate)';
+            } else if (isCode) {
+              autoTarget = 'groq/qwen/qwen3.8-27b';
+              taskDomain = 'Code Architecture & Implementation';
+              specialistName = 'Groq Qwen 3.8 27B & Mistral Devstral';
+            } else if (isStem) {
+              autoTarget = 'openrouter/nvidia/nemotron-3.5-super-vl:free';
+              taskDomain = 'STEM, Mathematics & Formal Logic';
+              specialistName = 'NVIDIA Nemotron 3.5 Super VL & AM-Thinking';
+            } else if (isWorkflow) {
+              autoTarget = 'openrouter/thudm/glm-4.5-air:free';
+              taskDomain = 'Agentic Workflow & Multilingual Planning';
+              specialistName = 'GLM-4.5 Air & Meta LLaMA 3.3 70B';
+            } else if (isDeepAnalysis) {
+              autoTarget = 'groq/openai/gpt-oss-120b';
+              taskDomain = 'Deep Analytical Synthesis & Long Context';
+              specialistName = 'Groq GPT-OSS 120B Titan';
+            } else {
+              autoTarget = 'groq/openai/gpt-oss-20b';
+              taskDomain = 'High-Velocity Conversational Inference';
+              specialistName = 'Groq Hardware LPU Ultra-Stream';
+            }
+
+            await sendSSE('text_delta', {
+              text: `> ⚡ **Auto-Routed** to **${specialistName}**\n> *Task Domain: **${taskDomain}** · Dynamically selected for peak effectiveness.*\n\n`,
+            });
+
+            chosenModel = autoTarget;
+          }
+
           const isGroq =
             chosenModel.startsWith('groq/') ||
             chosenModel === 'openai/gpt-oss-120b' ||
             chosenModel === 'qwen/qwen3.8-27b' ||
-            chosenModel === 'openai/gpt-oss-20b';
+            chosenModel === 'openai/gpt-oss-20b' ||
+            chosenModel.includes('llama-3.3') ||
+            chosenModel.includes('mixtral');
 
           const isOpenRouter =
             chosenModel.startsWith('openrouter/') ||
             chosenModel.includes('nemotron') ||
             chosenModel.includes('gemma-4') ||
+            chosenModel.includes('devstral') ||
+            chosenModel.includes('glm') ||
+            chosenModel.includes('thinking-v1') ||
             chosenModel.includes(':free');
 
           if (isGroq) {
             let groqModel = chosenModel.replace(/^groq\//, '');
             if (groqModel.includes('120b')) groqModel = 'openai/gpt-oss-120b';
             else if (groqModel.includes('20b')) groqModel = 'openai/gpt-oss-20b';
+            else if (groqModel.includes('llama') || groqModel.includes('70b')) groqModel = 'llama-3.3-70b-versatile';
+            else if (groqModel.includes('mixtral') || groqModel.includes('8x7b')) groqModel = 'mixtral-8x7b-32768';
             else groqModel = 'qwen/qwen3.8-27b';
 
             usedProvider = 'groq';
@@ -1110,7 +1233,17 @@ export default {
             isHandled = true;
           } else if (isOpenRouter) {
             let orModel = chosenModel.replace(/^openrouter\//, '');
-            if (orModel.includes('super-vl') || orModel.includes('super_vl')) {
+            if (orModel.includes('devstral') || orModel.includes('codestral')) {
+              orModel = 'mistralai/mistral-small-24b-instruct-2501:free';
+            } else if (orModel.includes('glm') || orModel.includes('thudm')) {
+              orModel = 'thudm/glm-4-9b-chat:free';
+            } else if (orModel.includes('am-thinking') || orModel.includes('thinking-v1')) {
+              orModel = 'nvidia/nemotron-3.5-super-vl:free';
+            } else if (orModel.includes('mixtral') || orModel.includes('mistral-7b')) {
+              orModel = 'mistralai/mistral-7b-instruct:free';
+            } else if (orModel.includes('llama')) {
+              orModel = 'meta-llama/llama-3.3-70b-instruct:free';
+            } else if (orModel.includes('super-vl') || orModel.includes('super_vl')) {
               orModel = 'nvidia/nemotron-3.5-super-vl:free';
             } else if (orModel.includes('lightning')) {
               orModel = 'nvidia/nemotron-3.5-lightning:free';
