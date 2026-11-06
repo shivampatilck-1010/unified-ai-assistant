@@ -696,15 +696,22 @@ export default {
 
           // 2. OpenRouter (Verified Live API - Free Tier)
           {
-            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
-            name: 'NVIDIA Nemotron 550B Ultra (Frontier MoE Titan, Free Tier)',
+            id: 'openrouter/nvidia/nemotron-3.5-super-vl:free',
+            name: 'NVIDIA Nemotron 3.5 Super VL (120B-A12B Multimodal Flagship MoE, Free Tier)',
             provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
           },
           {
             id: 'openrouter/nvidia/nemotron-3.5-lightning:free',
-            name: 'NVIDIA Nemotron 3.5 Lightning (Reward-Model Aligned, Free Tier)',
+            name: 'NVIDIA Nemotron 3.5 Lightning (30B-A3B High-Throughput MoE, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
+            name: 'NVIDIA Nemotron 550B Ultra (Frontier MoE Titan, Free Tier)',
             provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
@@ -1089,16 +1096,18 @@ export default {
             isHandled = true;
           } else if (isOpenRouter) {
             let orModel = chosenModel.replace(/^openrouter\//, '');
-            if (orModel.includes('550b') || orModel.includes('nemotron-4') || orModel.includes('nemotron-70b')) {
-              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+            if (orModel.includes('super-vl') || orModel.includes('super_vl')) {
+              orModel = 'nvidia/nemotron-3.5-super-vl:free';
             } else if (orModel.includes('lightning')) {
               orModel = 'nvidia/nemotron-3.5-lightning:free';
+            } else if (orModel.includes('550b') || orModel.includes('nemotron-4') || orModel.includes('nemotron-70b')) {
+              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
             } else if (orModel.includes('gemma')) {
               orModel = 'google/gemma-4-31b-it:free';
             } else if (orModel.includes('north') || orModel.includes('code')) {
               orModel = 'cohere/north-mini-code:free';
             } else {
-              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+              orModel = 'nvidia/nemotron-3.5-super-vl:free';
             }
 
             usedProvider = 'openrouter';
