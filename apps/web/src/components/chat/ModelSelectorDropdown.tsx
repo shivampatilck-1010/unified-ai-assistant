@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { ModelInfo } from '../../types';
+import { ModelBrandLogo } from '../brand/ModelBrandLogo';
 import './ModelSelectorDropdown.css';
 
 export interface ModelSelectorDropdownProps {
@@ -9,18 +10,11 @@ export interface ModelSelectorDropdownProps {
   onOpenTeamModal?: () => void;
 }
 
-function getProviderColor(provider: string): string {
-  const p = (provider || '').toLowerCase();
-  if (p.includes('unified') || p.includes('council')) return '#d97757'; // Terracotta
-  if (p.includes('google') || p.includes('gemini')) return '#38bdf8'; // Sky Blue
-  if (p.includes('anthropic') || p.includes('claude')) return '#f97316'; // Claude Orange
-  if (p.includes('openai')) return '#10b981'; // Emerald Green
-  if (p.includes('nvidia')) return '#84cc16'; // NVIDIA Lime
-  if (p.includes('deepseek')) return '#6366f1'; // Indigo
-  if (p.includes('qwen')) return '#a855f7'; // Purple
-  if (p.includes('groq') || p.includes('meta')) return '#ec4899'; // Magenta
-  if (p.includes('openrouter')) return '#3b82f6'; // OpenRouter Blue
-  return '#94a3b8';
+function cleanModelName(str?: string | null): string {
+  if (!str) return '';
+  return str
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, '')
+    .trim();
 }
 
 function formatContextWindow(tokens?: number | null): string {
@@ -133,15 +127,16 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <span
-          className="model-dropdown__trigger-dot"
-          style={{ backgroundColor: getProviderColor(activeModel?.provider || '') }}
-          aria-hidden="true"
+        <ModelBrandLogo
+          provider={activeModel?.provider}
+          modelId={activeModel?.id}
+          size={16}
+          className="model-dropdown__trigger-logo"
         />
 
         <div className="model-dropdown__trigger-text">
           <span className="model-dropdown__trigger-name">
-            {activeModel?.name.split('(')[0].trim() || 'Select Model'}
+            {cleanModelName(activeModel?.name.split('(')[0]) || 'Select Model'}
           </span>
           {activeModel?.provider && (
             <span className="model-dropdown__trigger-provider">{activeModel.provider}</span>
@@ -190,7 +185,7 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
               ref={searchInputRef}
               type="text"
               className="model-dropdown__search-input"
-              placeholder="Search real models (Nemotron, Qwen, Gemini, Claude, GPT-4o)..."
+              placeholder="Search models (Nemotron, Qwen, Gemini, Claude, GPT-4o)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -208,11 +203,14 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
 
           {/* Unified Team Banner Shortcut */}
           <div className="model-dropdown__team-banner">
+            <div className="model-dropdown__team-icon-wrap">
+              <ModelBrandLogo modelId="unified-team" provider="unified-team" size={24} />
+            </div>
             <div className="model-dropdown__team-info">
               <span className="model-dropdown__team-badge">AUTHENTIC MULTI-MODEL TEAM</span>
               <strong className="model-dropdown__team-title">Unified Collaborative Council</strong>
               <p className="model-dropdown__team-desc">
-                Executes Nemotron 550B, Groq Qwen 27B, and Gemini 2.5 Pro together via their real APIs.
+                Executes Nemotron 550B, Groq Qwen 27B, and Gemini 2.5 Pro together via real APIs.
               </p>
             </div>
             {onOpenTeamModal && (
@@ -224,12 +222,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                   onOpenTeamModal();
                 }}
               >
-                Configure ⚙
+                Configure
               </button>
             )}
           </div>
 
-          {/* Category Filter Chips */}
+          {/* Category Filter Chips with Company Logos */}
           <div className="model-dropdown__categories">
             {categories.map((cat) => (
               <button
@@ -242,12 +240,15 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                 }`}
                 onClick={() => setSelectedCategory(cat)}
               >
-                {cat === 'all' ? 'All Models' : cat}
+                {cat !== 'all' && (
+                  <ModelBrandLogo provider={cat} size={13} className="model-dropdown__cat-logo" />
+                )}
+                <span>{cat === 'all' ? 'All Models' : cat}</span>
               </button>
             ))}
           </div>
 
-          {/* Models List */}
+          {/* Models List with Company Logos */}
           <div className="model-dropdown__list">
             {Object.keys(groupedModels).length === 0 ? (
               <div className="model-dropdown__empty">
@@ -257,9 +258,10 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
               Object.entries(groupedModels).map(([providerName, models]) => (
                 <div key={providerName} className="model-dropdown__group">
                   <div className="model-dropdown__group-header">
-                    <span
-                      className="model-dropdown__group-dot"
-                      style={{ backgroundColor: getProviderColor(providerName) }}
+                    <ModelBrandLogo
+                      provider={providerName}
+                      size={14}
+                      className="model-dropdown__group-logo"
                     />
                     <span>{providerName}</span>
                     <span className="model-dropdown__group-count">({models.length})</span>
@@ -269,9 +271,10 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                     {models.map((m) => {
                       const isSelected = selectedModelId === m.id;
                       const hasSubtext = m.name.includes('(');
-                      const primaryName = hasSubtext ? m.name.split('(')[0].trim() : m.name;
+                      const rawPrimary = hasSubtext ? m.name.split('(')[0].trim() : m.name;
+                      const primaryName = cleanModelName(rawPrimary);
                       const detailText = hasSubtext
-                        ? m.name.slice(m.name.indexOf('(') + 1, m.name.lastIndexOf(')'))
+                        ? cleanModelName(m.name.slice(m.name.indexOf('(') + 1, m.name.lastIndexOf(')')))
                         : '';
 
                       return (
@@ -287,6 +290,15 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                           role="option"
                           aria-selected={isSelected}
                         >
+                          <div className="model-dropdown__item-logo-wrap">
+                            <ModelBrandLogo
+                              provider={m.provider}
+                              modelId={m.id}
+                              size={18}
+                              className="model-dropdown__item-logo"
+                            />
+                          </div>
+
                           <div className="model-dropdown__item-main">
                             <div className="model-dropdown__item-title-row">
                               <span className="model-dropdown__item-name">{primaryName}</span>

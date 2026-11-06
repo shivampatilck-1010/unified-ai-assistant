@@ -10,6 +10,7 @@ import {
   getCustomOpenAIKey,
   setCustomOpenAIKey,
 } from '../../lib/api';
+import { CompanyLogo } from '../brand/CompanyLogo';
 import './ApiKeyModal.css';
 
 interface ApiKeyModalProps {
@@ -97,7 +98,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
       <div className="apikey-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div className="apikey-modal__header">
           <div className="apikey-modal__title-row">
-            <span className="apikey-modal__icon">⚡</span>
+            <span className="apikey-modal__icon">
+              <CompanyLogo provider="unified-team" size={24} />
+            </span>
             <div>
               <h3 className="apikey-modal__title">AI Provider API Keys (Live Multi-Gateway)</h3>
               <p className="apikey-modal__subtitle">
@@ -112,7 +115,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
 
         <div className="apikey-modal__body">
           {/* Provider status pills */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span
               style={{
                 fontSize: 11,
@@ -121,9 +124,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
                 background: 'rgba(236, 72, 153, 0.15)',
                 border: '1px solid rgba(236, 72, 153, 0.3)',
                 color: '#f472b6',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
               }}
             >
-              ● Groq: Active (Qwen 27B, GPT-OSS 120B)
+              <CompanyLogo provider="groq" size={12} /> Groq: Active (Qwen 27B, GPT-OSS 120B)
             </span>
             <span
               style={{
@@ -133,9 +139,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
                 background: 'rgba(59, 130, 246, 0.15)',
                 border: '1px solid rgba(59, 130, 246, 0.3)',
                 color: '#60a5fa',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
               }}
             >
-              ● OpenRouter: Active (Nemotron 550B, Gemma 4)
+              <CompanyLogo provider="openrouter" size={12} /> OpenRouter: Active (Nemotron 550B, Gemma 4)
             </span>
             <span
               style={{
@@ -145,16 +154,19 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
                 background: 'rgba(56, 189, 248, 0.15)',
                 border: '1px solid rgba(56, 189, 248, 0.3)',
                 color: '#38bdf8',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
               }}
             >
-              ● Gemini: Active (2.5 Pro, 2.5 Flash)
+              <CompanyLogo provider="google" size={12} /> Gemini: Active (2.5 Pro, 2.5 Flash)
             </span>
           </div>
 
           {/* Groq API Key */}
           <div className="apikey-modal__input-group">
-            <label className="apikey-modal__label" htmlFor="groq-key-input">
-              ⚡ Groq API Key (Hardware LPUs - Qwen 3.8 27B & GPT-OSS 120B):
+            <label className="apikey-modal__label" htmlFor="groq-key-input" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CompanyLogo provider="groq" size={15} /> Groq API Key (Hardware LPUs - Qwen 3.8 27B & GPT-OSS 120B):
             </label>
             <div className="apikey-modal__input-wrapper">
               <input
@@ -172,8 +184,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
 
           {/* OpenRouter API Key */}
           <div className="apikey-modal__input-group">
-            <label className="apikey-modal__label" htmlFor="openrouter-key-input">
-              🌐 OpenRouter API Key (NVIDIA Nemotron 550B & Gemma 4):
+            <label className="apikey-modal__label" htmlFor="openrouter-key-input" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CompanyLogo provider="openrouter" size={15} /> OpenRouter API Key (NVIDIA Nemotron 550B & Gemma 4):
             </label>
             <div className="apikey-modal__input-wrapper">
               <input
@@ -191,8 +203,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
 
           {/* OpenAI API Key */}
           <div className="apikey-modal__input-group">
-            <label className="apikey-modal__label" htmlFor="openai-key-input">
-              🤖 OpenAI API Key (GPT-4o, GPT-4o Mini, o3-mini):
+            <label className="apikey-modal__label" htmlFor="openai-key-input" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CompanyLogo provider="openai" size={15} /> OpenAI API Key (GPT-4o, GPT-4o Mini, o3-mini):
             </label>
             <div className="apikey-modal__input-wrapper">
               <input
@@ -210,8 +222,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
 
           {/* Google Gemini API Key */}
           <div className="apikey-modal__input-group">
-            <label className="apikey-modal__label" htmlFor="gemini-key-input">
-              ✨ Google Gemini API Key (Flagship 2.5 Pro & Multimodal):
+            <label className="apikey-modal__label" htmlFor="gemini-key-input" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CompanyLogo provider="google" size={15} /> Google Gemini API Key (Flagship 2.5 Pro & Multimodal):
             </label>
             <div className="apikey-modal__input-wrapper">
               <input

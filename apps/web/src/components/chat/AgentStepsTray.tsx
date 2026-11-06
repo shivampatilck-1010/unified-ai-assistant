@@ -79,7 +79,7 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
         {
           id: 'step-3',
           action: 'Synthesized',
-          text: 'Analyzed ⚛️ PhotolysisReactionGraph.ts #L1-88',
+          text: 'Analyzed PhotolysisReactionGraph.ts #L1-88',
           tag: '#Biophysics',
         },
         {
@@ -114,7 +114,7 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
         {
           id: 'step-3',
           action: 'Synthesized',
-          text: 'Analyzed ⚛️ BinarySearchTreeNode.ts #L1-120',
+          text: 'Analyzed BinarySearchTreeNode.ts #L1-120',
           tag: '#Algorithms',
         },
         {
@@ -149,7 +149,7 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
         {
           id: 'step-3',
           action: 'Synthesized',
-          text: 'Analyzed ⚛️ InteractiveChoiceCard.tsx #L280-340',
+          text: 'Analyzed InteractiveChoiceCard.tsx #L280-340',
           tag: '#UI',
         },
         {
@@ -177,7 +177,7 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
       {
         id: 'step-3',
         action: 'Synthesized',
-        text: 'Analyzed ⚛️ ConceptualKnowledgeGraph.ts #L1-90',
+        text: 'Analyzed ConceptualKnowledgeGraph.ts #L1-90',
         tag: '#Framework',
       },
       {

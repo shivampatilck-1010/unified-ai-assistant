@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { ModelInfo } from '../../types';
+import { ModelBrandLogo } from '../brand/ModelBrandLogo';
 import './CouncilSetupModal.css';
 
 export interface CouncilSetupModalProps {
@@ -16,19 +17,6 @@ export type CouncilPresetType =
   | 'code-pair'
   | 'scientific-symposium'
   | 'custom';
-
-function getProviderColor(provider: string): string {
-  const p = (provider || '').toLowerCase();
-  if (p.includes('google') || p.includes('gemini')) return '#38bdf8';
-  if (p.includes('anthropic') || p.includes('claude')) return '#f97316';
-  if (p.includes('openai')) return '#10b981';
-  if (p.includes('nvidia')) return '#84cc16';
-  if (p.includes('deepseek')) return '#6366f1';
-  if (p.includes('qwen')) return '#a855f7';
-  if (p.includes('groq') || p.includes('meta')) return '#ec4899';
-  if (p.includes('local') || p.includes('ollama')) return '#eab308';
-  return '#94a3b8';
-}
 
 function inferRole(modelId: string, modelName: string): string {
   const s = (modelId + ' ' + modelName).toLowerCase();
@@ -142,7 +130,7 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
         <div className="council-modal__bench">
           <div className="council-modal__bench-header">
             <span className="council-modal__bench-title">
-              🏛️ Assembled Meeting Chamber ({customModelIds.length} Models Seated)
+              <ModelBrandLogo modelId="unified-team" provider="unified-team" size={16} /> Assembled Meeting Chamber ({customModelIds.length} Models Seated)
             </span>
             <span className="council-modal__bench-note">
               Estimated Deliberation Consensus: 99.4%
@@ -153,15 +141,15 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
             {customModelIds.map((id) => {
               const model = regularModels.find((m) => m.id === id);
               const name = model?.name.split('(')[0].trim() || id;
-              const color = getProviderColor(model?.provider || '');
               const role = inferRole(id, model?.name || '');
 
               return (
                 <div key={id} className="council-modal__seated-chip">
-                  <span
-                    className="council-modal__seated-dot"
-                    style={{ backgroundColor: color }}
-                    aria-hidden="true"
+                  <ModelBrandLogo
+                    provider={model?.provider}
+                    modelId={id}
+                    size={16}
+                    className="council-modal__seated-logo"
                   />
                   <div className="council-modal__seated-info">
                     <span className="council-modal__seated-name">{name}</span>
@@ -188,14 +176,14 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
             className={`council-modal__tab ${activeTab === 'presets' ? 'active' : ''}`}
             onClick={() => setActiveTab('presets')}
           >
-            ⚡ Curated Team Presets
+            Curated Team Presets
           </button>
           <button
             type="button"
             className={`council-modal__tab ${activeTab === 'custom' ? 'active' : ''}`}
             onClick={() => setActiveTab('custom')}
           >
-            🛠️ Custom Team Builder ({regularModels.length} Models)
+            Custom Team Builder ({regularModels.length} Models)
           </button>
         </div>
 
@@ -216,28 +204,28 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                   </div>
                   <div className="council-modal__preset-meta">
                     <div className="council-modal__preset-title-row">
-                      <span className="council-modal__preset-name">🏛️ Full Frontier Council</span>
-                      <span className="council-modal__preset-tag featured">Flagship (5 Roles)</span>
+                      <span className="council-modal__preset-name">Full Frontier Council</span>
+                      <span className="council-modal__preset-tag featured">Flagship (4 Roles)</span>
                     </div>
                     <p className="council-modal__preset-desc">
-                      A complete 5-member executive roundtable covering Theory, Red-Team Audit,
+                      A complete executive roundtable covering Theory, Red-Team Audit,
                       Architecture, Coding, and Consensus.
                     </p>
                   </div>
                 </div>
 
                 <div className="council-modal__preset-members">
-                  <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
-                    Nemotron 550B (Theorist & Critic)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="nvidia" size={13} /> Nemotron 550B (Critic)
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#ec4899' }}>
-                    Groq GPT-OSS 120B (Deep Reasoning)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="groq" size={13} /> Groq GPT-OSS 120B (Reasoning)
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
-                    Groq Qwen 27B (Implementation)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="qwen" size={13} /> Groq Qwen 27B (Implementation)
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#38bdf8' }}>
-                    Gemini 2.5 Pro (Executive Chair)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="google" size={13} /> Gemini 2.5 Pro (Chair)
                   </span>
                 </div>
               </div>
@@ -255,7 +243,7 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                   </div>
                   <div className="council-modal__preset-meta">
                     <div className="council-modal__preset-title-row">
-                      <span className="council-modal__preset-name">⚡ Dual-Expert Debate</span>
+                      <span className="council-modal__preset-name">Dual-Expert Debate</span>
                       <span className="council-modal__preset-tag">Top 2 Specialists</span>
                     </div>
                     <p className="council-modal__preset-desc">
@@ -265,11 +253,11 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                 </div>
 
                 <div className="council-modal__preset-members">
-                  <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
-                    Nemotron 550B (Architectural Critic)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="nvidia" size={13} /> Nemotron 550B (Critic)
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
-                    Groq Qwen 27B (LPU Code Lead)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="qwen" size={13} /> Groq Qwen 27B (LPU Code Lead)
                   </span>
                 </div>
               </div>
@@ -287,25 +275,25 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                   </div>
                   <div className="council-modal__preset-meta">
                     <div className="council-modal__preset-title-row">
-                      <span className="council-modal__preset-name">💻 Elite Engineering Pair</span>
+                      <span className="council-modal__preset-name">Elite Engineering Pair</span>
                       <span className="council-modal__preset-tag">Code & System Design</span>
                     </div>
                     <p className="council-modal__preset-desc">
-                      Dedicated software chamber: Architecture design by Claude paired with precision
+                      Dedicated software chamber: Architecture design paired with precision
                       implementation by Qwen 2.5 Coder and edge-case security audit by Nemotron.
                     </p>
                   </div>
                 </div>
 
                 <div className="council-modal__preset-members">
-                  <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
-                    Qwen 2.5 Coder 32B
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="qwen" size={13} /> Groq Qwen 27B
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#f97316' }}>
-                    Claude 3.5 Sonnet
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="anthropic" size={13} /> Claude 3.5 Sonnet
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
-                    Nemotron 70B (Audit)
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="nvidia" size={13} /> Nemotron 550B
                   </span>
                 </div>
               </div>
@@ -325,7 +313,7 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                   </div>
                   <div className="council-modal__preset-meta">
                     <div className="council-modal__preset-title-row">
-                      <span className="council-modal__preset-name">🔬 Scientific Symposium</span>
+                      <span className="council-modal__preset-name">Scientific Symposium</span>
                       <span className="council-modal__preset-tag">STEM, Physics & Math</span>
                     </div>
                     <p className="council-modal__preset-desc">
@@ -336,14 +324,14 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                 </div>
 
                 <div className="council-modal__preset-members">
-                  <span className="council-modal__member-pill" style={{ borderColor: '#38bdf8' }}>
-                    Gemini 2.5 Pro
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="google" size={13} /> Gemini 2.5 Pro
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#6366f1' }}>
-                    DeepSeek R1
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="deepseek" size={13} /> DeepSeek R1
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#10b981' }}>
-                    OpenAI o3-mini
+                  <span className="council-modal__member-pill">
+                    <ModelBrandLogo provider="openai" size={13} /> OpenAI o3-mini
                   </span>
                 </div>
               </div>
@@ -379,7 +367,6 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
               <div className="council-modal__model-cards-grid">
                 {filteredCustomList.map((m) => {
                   const isSeated = customModelIds.includes(m.id);
-                  const color = getProviderColor(m.provider);
                   const role = inferRole(m.id, m.name);
 
                   return (
@@ -389,10 +376,7 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                       onClick={() => toggleCustomModel(m.id)}
                     >
                       <div className="council-modal__model-card-top">
-                        <span
-                          className="council-modal__model-card-dot"
-                          style={{ backgroundColor: color }}
-                        />
+                        <ModelBrandLogo provider={m.provider} modelId={m.id} size={16} />
                         <span className="council-modal__model-card-provider">{m.provider}</span>
                         <button
                           type="button"

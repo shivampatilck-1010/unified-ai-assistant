@@ -32,7 +32,11 @@ export const PromptFlashcard: React.FC<PromptFlashcardProps> = ({
     <div className="prompt-flashcard">
       <div className="prompt-flashcard__header">
         <div className="prompt-flashcard__title-group">
-          <span className="prompt-flashcard__icon">💡</span>
+          <span className="prompt-flashcard__icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97757" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z" />
+            </svg>
+          </span>
           <div>
             <span className="prompt-flashcard__title">{title}</span>
             <span className="prompt-flashcard__badge">{category}</span>

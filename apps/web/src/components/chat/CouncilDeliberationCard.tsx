@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModelBrandLogo } from '../brand/ModelBrandLogo';
 import './CouncilDeliberationCard.css';
 
 export interface CouncilParticipant {
@@ -96,10 +97,11 @@ export const CouncilDeliberationCard: React.FC<CouncilDeliberationCardProps> = (
                 }
                 title={`Filter discussion by ${p.name} (${p.role})`}
               >
-                <span
-                  className="council-card__chip-dot"
-                  style={{ backgroundColor: p.avatarColor || '#d97757' }}
-                  aria-hidden="true"
+                <ModelBrandLogo
+                  provider={p.provider || p.name}
+                  modelId={p.id}
+                  size={14}
+                  className="council-card__chip-logo"
                 />
                 <span className="council-card__chip-name">{p.name}</span>
                 <span className="council-card__chip-role">{p.role.split('&')[0]}</span>
@@ -174,13 +176,14 @@ export const CouncilDeliberationCard: React.FC<CouncilDeliberationCardProps> = (
                 <div key={idx} className="council-card__speech-bubble">
                   <div className="council-card__speech-header" onClick={() => toggleRound(idx)}>
                     <div className="council-card__speaker-meta">
-                      <span
-                        className="council-card__speaker-avatar"
-                        style={{ backgroundColor: color }}
-                        aria-hidden="true"
-                      >
-                        {round.speaker.slice(0, 2).toUpperCase()}
-                      </span>
+                      <div className="council-card__speaker-avatar-wrap">
+                        <ModelBrandLogo
+                          provider={participant?.provider || round.speaker}
+                          modelId={participant?.id}
+                          size={18}
+                          className="council-card__speaker-logo"
+                        />
+                      </div>
                       <div className="council-card__speaker-names">
                         <span className="council-card__speaker-title">{round.speaker}</span>
                         <span className="council-card__speaker-badge" style={{ borderColor: color, color }}>

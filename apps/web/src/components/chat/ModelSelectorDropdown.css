@@ -38,6 +38,13 @@
   background: rgba(217, 119, 87, 0.1);
 }
 
+.model-dropdown__trigger-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .model-dropdown__trigger-dot {
   width: 7px;
   height: 7px;
@@ -173,7 +180,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.model-dropdown__team-icon-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(217, 119, 87, 0.15);
+  border: 1px solid rgba(217, 119, 87, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -238,15 +257,22 @@
 }
 
 .model-dropdown__cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: #252421;
   border: 1px solid #383734;
   color: #a8a29e;
   font-size: 11px;
-  padding: 2px 9px;
+  padding: 3px 9px;
   border-radius: 12px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
+}
+
+.model-dropdown__cat-logo {
+  flex-shrink: 0;
 }
 
 .model-dropdown__cat-chip:hover {
@@ -297,13 +323,17 @@
 .model-dropdown__group-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   padding: 6px 14px 4px;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #78716c;
+  color: #a8a29e;
+}
+
+.model-dropdown__group-logo {
+  flex-shrink: 0;
 }
 
 .model-dropdown__group-dot {
@@ -326,10 +356,27 @@
 .model-dropdown__item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 8px 14px;
   cursor: pointer;
   transition: background 0.12s ease;
+}
+
+.model-dropdown__item-logo-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.model-dropdown__item-logo {
+  flex-shrink: 0;
 }
 
 .model-dropdown__item:hover {

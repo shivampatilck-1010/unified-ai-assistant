@@ -7,6 +7,7 @@ import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
+import { ModelBrandLogo } from './components/brand/ModelBrandLogo';
 import './App.css';
 
 // Code-split heavy views to reduce initial bundle payload
@@ -201,8 +202,17 @@ export default function App() {
                   effectiveProviderStatus.configured ? '' : 'app-header__provider-badge--unconfigured'
                 }`}
                 title={effectiveProviderStatus.message}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                <span className="app-header__provider-dot" aria-hidden="true" />
+                <ModelBrandLogo
+                  provider={
+                    selectedModelId?.startsWith('unified-team') || selectedModelId?.startsWith('council/')
+                      ? 'unified-team'
+                      : (selectedModelId?.split('/')[0] || effectiveProviderStatus.active_provider || effectiveProviderStatus.provider || undefined)
+                  }
+                  modelId={selectedModelId || undefined}
+                  size={14}
+                />
                 <span>
                   {effectiveProviderStatus.configured
                     ? selectedModelId

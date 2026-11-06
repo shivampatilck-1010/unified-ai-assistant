@@ -628,42 +628,42 @@ export default {
           // 0. Unified Team Flagship Multi-Model Intelligence
           {
             id: 'unified-team',
-            name: '✨ Unified Team (Multi-Model Collaborative Intelligence)',
+            name: 'Unified Team (Multi-Model Collaborative Intelligence)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:dual-expert',
-            name: '⚡ Unified Team: Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
+            name: 'Unified Team: Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:frontier-council',
-            name: '🏛️ Unified Team: Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
+            name: 'Unified Team: Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:code-pair',
-            name: '💻 Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)',
+            name: 'Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'council/dual-expert-deliberation',
-            name: '⚡ Dual-Expert Debate (Alias: Top 2 Domain Specialists)',
+            name: 'Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'council/executive-roundtable',
-            name: '🏛️ Full Frontier Council (Alias: R1 + Claude + Nemotron + Qwen)',
+            name: 'Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
@@ -1200,8 +1200,8 @@ export default {
               chosenModel === 'council/dual-expert-deliberation';
 
             const teamMode = isDualExpert
-              ? '⚡ Dual-Expert Debate (Nemotron 550B + Groq Qwen 27B + Gemini 2.5 Pro)'
-              : '🏛️ Full Frontier Council (Nemotron 550B + Groq GPT-OSS 120B + Groq Qwen 27B + Gemini 2.5 Pro)';
+              ? 'Dual-Expert Debate (Nemotron 550B + Groq Qwen 27B + Gemini 2.5 Pro)'
+              : 'Full Frontier Council (Nemotron 550B + Groq GPT-OSS 120B + Groq Qwen 27B + Gemini 2.5 Pro)';
 
             await sendSSE('text_delta', {
               text: `> *[Unified Team: **${teamMode}** | Authentic Live Multi-Model Inference]*\n\n`,
@@ -1209,7 +1209,7 @@ export default {
 
             // ── ROUND 1: NVIDIA Nemotron 550B Ultra (via OpenRouter API) ───────────
             await sendSSE('text_delta', {
-              text: `### 🧠 Round 1: NVIDIA Nemotron 550B Ultra\n> *Role: Systems Theorist & Adversarial Critic | Real OpenRouter MoE 550B*\n\n`,
+              text: `### Round 1: NVIDIA Nemotron 550B Ultra\n> *Role: Systems Theorist & Adversarial Critic | Real OpenRouter MoE 550B*\n\n`,
             });
 
             const nemotronResult = await streamOpenAICompatible({
@@ -1232,7 +1232,7 @@ export default {
 
             // ── ROUND 2: Groq Qwen 27B (via Groq Hardware LPUs) ───────────────────
             await sendSSE('text_delta', {
-              text: `\n\n---\n\n### ⚡ Round 2: Groq Qwen 27B\n> *Role: Implementation Lead & Production Coder | Real Groq LPU Hardware*\n\n`,
+              text: `\n\n---\n\n### Round 2: Groq Qwen 27B\n> *Role: Implementation Lead & Production Coder | Real Groq LPU Hardware*\n\n`,
             });
 
             const qwenResult = await streamOpenAICompatible({
@@ -1257,7 +1257,7 @@ export default {
 
             // ── ROUND 3: Gemini 2.5 Pro (via Google API) ─────────────────────────
             await sendSSE('text_delta', {
-              text: `\n\n---\n\n### 🏛️ Round 3: Gemini 2.5 Pro\n> *Role: Executive Chairperson | Consensus Synthesis & Final Verification*\n\n`,
+              text: `\n\n---\n\n### Round 3: Google Gemini 2.5 Pro\n> *Role: Executive Chairperson | Consensus Synthesis & Final Verification*\n\n`,
             });
 
             const chairContents = [
