@@ -341,14 +341,14 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   let targetModel = 'Google Gemini 2.5 Flash';
   const autoMatch = stripped.match(/(?:Auto-Routed to|Routing to|Model:)\s*([^\n|·]+)/i);
   if (autoMatch && autoMatch[1]) {
-    targetModel = autoMatch[1].trim();
+    targetModel = autoMatch[1].replace(/[\[\]]/g, '').trim();
   }
 
   // Extract task domain
   let taskDomain = '';
   const domainMatch = stripped.match(/Task Domain:\s*([^\n·]+)/i);
   if (domainMatch && domainMatch[1]) {
-    taskDomain = domainMatch[1].trim();
+    taskDomain = domainMatch[1].replace(/[\[\]]/g, '').trim();
   }
 
   // Determine provider for vector logo
@@ -359,6 +359,9 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   if (lower.includes('nemotron') || lower.includes('nvidia')) {
     provider = 'nvidia';
     modelId = 'nemotron';
+  } else if (lower.includes('deepseek')) {
+    provider = 'deepseek';
+    modelId = 'deepseek-r1';
   } else if (lower.includes('groq') || lower.includes('gpt-oss') || lower.includes('lpu')) {
     provider = 'groq';
     modelId = lower.includes('qwen') ? 'qwen' : 'gpt-oss-120b';
@@ -368,7 +371,7 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   } else if (lower.includes('cohere') || lower.includes('north')) {
     provider = 'cohere';
     modelId = 'north-mini-code';
-  } else if (lower.includes('openai') || lower.includes('gpt-4') || lower.includes('gpt-5') || lower.includes('o3-mini')) {
+  } else if (lower.includes('openai') || lower.includes('gpt-4') || lower.includes('gpt-5') || lower.includes('o3-mini') || lower.includes('o1')) {
     provider = 'openai';
     modelId = 'gpt-4o';
   } else if (lower.includes('anthropic') || lower.includes('claude')) {
@@ -1545,33 +1548,64 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
         nodes.push(<div key={`br-${nodes.length}`} className="md-spacer" />);
       } else {
         const trimmed = line.trim();
-        const isPromptIntro =
-          /(?:copy\s+and\s+paste\s+this|prompt\s+for\s+your\s+ai|use\s+this\s+prompt|test\s+you|copy\s+this)/i.test(trimmed);
 
-        const isQuotedPrompt =
-          ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-            (trimmed.startsWith('“') && trimmed.endsWith('”'))) &&
-          trimmed.length >= 30 &&
-          (/\b(?:act as|test my|questions|provide the answers|quiz|explain|prompt|tutor)\b/i.test(trimmed) ||
-            isPreviousLinePromptIntro);
-
-        if (isQuotedPrompt) {
+        // Check for Auto-Route announcement even outside blockquotes
+        if (
+          trimmed.includes('Auto-Routed to') ||
+          trimmed.includes('Auto-Routed') ||
+          /^⚡?\s*\*?\[?(?:Auto-Routed|Routing to|Model:)/i.test(trimmed)
+        ) {
+          const bannerLines = [line];
+          while (i + 1 < lines.length) {
+            const nextL = lines[i + 1].trim();
+            if (
+              nextL.startsWith('*Task Domain:') ||
+              nextL.startsWith('Task Domain:') ||
+              nextL.startsWith('*[Model:') ||
+              nextL.startsWith('[Model:')
+            ) {
+              bannerLines.push(lines[i + 1]);
+              i++;
+            } else {
+              break;
+            }
+          }
           nodes.push(
-            <PromptFlashcard
-              key={`pf-${nodes.length}`}
-              promptText={trimmed}
-              title="Interactive Quiz Prompt"
-              category="Study Flashcard"
+            <AutoRouteBanner
+              key={`autoroute-${nodes.length}`}
+              rawText={bannerLines.join('\n')}
             />
           );
           isPreviousLinePromptIntro = false;
         } else {
-          nodes.push(
-            <p key={`p-${nodes.length}`} className="md-paragraph">
-              {formatInline(line)}
-            </p>
-          );
-          isPreviousLinePromptIntro = isPromptIntro;
+          const isPromptIntro =
+            /(?:copy\s+and\s+paste\s+this|prompt\s+for\s+your\s+ai|use\s+this\s+prompt|test\s+you|copy\s+this)/i.test(trimmed);
+
+          const isQuotedPrompt =
+            ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+              (trimmed.startsWith('“') && trimmed.endsWith('”'))) &&
+            trimmed.length >= 30 &&
+            (/\b(?:act as|test my|questions|provide the answers|quiz|explain|prompt|tutor)\b/i.test(trimmed) ||
+              isPreviousLinePromptIntro);
+
+          if (isQuotedPrompt) {
+            nodes.push(
+              <PromptFlashcard
+                key={`pf-${nodes.length}`}
+                promptText={trimmed}
+                title="Interactive Quiz Prompt"
+                category="Study Flashcard"
+              />
+            );
+            isPreviousLinePromptIntro = false;
+          } else {
+            nodes.push(
+              <p key={`p-${nodes.length}`} className="md-paragraph">
+                {formatInline(line)}
+              </p>
+            );
+            isPreviousLinePromptIntro = isPromptIntro;
+          }
         }
       }
     }
