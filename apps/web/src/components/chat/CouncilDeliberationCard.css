@@ -2,25 +2,25 @@
 
 .council-card {
   margin: 20px 0;
-  background: #1f1e1c;
-  border: 1px solid #383734;
+  background: #070709;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   color: #faf9f5;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .council-card:hover {
-  border-color: #4a4843;
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Header */
 .council-card__header {
   padding: 16px 20px 14px;
-  background: #252421;
-  border-bottom: 1px solid #383734;
+  background: #0c0e15;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .council-card__title-row {

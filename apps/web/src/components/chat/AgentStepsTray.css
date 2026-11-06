@@ -7,10 +7,10 @@
    - Pure Monochrome (Zero Color)
    ========================================================================== */
 
-/* Main Single-Line Obsidian Bar (#1f1e1c) */
+/* Main Single-Line Obsidian Bar (#0c0e15) */
 .ghost-single-bar {
-  background: #1f1e1c;
-  border: 1px solid rgba(240, 237, 230, 0.09);
+  background: #0c0e15;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 9px;
   padding: 0 14px;
   height: 38px;
@@ -137,14 +137,14 @@
 
 .ghost-single-bar--completed {
   cursor: pointer;
-  background: #1f1e1c;
-  border-color: rgba(240, 237, 230, 0.08);
+  background: #0c0e15;
+  border-color: rgba(255, 255, 255, 0.08);
   text-align: left;
 }
 
 .ghost-single-bar--completed:hover {
-  background: #252422;
-  border-color: rgba(217, 119, 87, 0.35);
+  background: #111420;
+  border-color: rgba(56, 189, 248, 0.35);
 }
 
 .ghost-check-icon {
