@@ -134,6 +134,46 @@ const MermaidDiagram: React.FC<{ code: string }> = ({ code }) => {
   );
 };
 
+// Collapsible Model Thought / Reasoning Accordion
+const ThoughtAccordion: React.FC<{ rawThought: string }> = ({ rawThought }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const clean = rawThought.trim();
+  const stepCount = clean.split('\n').filter(Boolean).length;
+
+  return (
+    <div className="thought-accordion">
+      <button
+        type="button"
+        className="thought-accordion__header"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+      >
+        <span className="thought-accordion__icon" aria-hidden="true">🧠</span>
+        <span className="thought-accordion__title">
+          Thought Process
+          <span className="thought-accordion__badge">{stepCount} lines</span>
+        </span>
+        <svg
+          className={`thought-accordion__chevron ${isOpen ? 'thought-accordion__chevron--open' : ''}`}
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="thought-accordion__content">
+          <pre className="thought-accordion__text">{clean}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Seamless Embedded Figure for SVG diagrams & scientific illustrations without bulky flashcard borders
 const EmbeddedFigure: React.FC<{ svgCode: string; title?: string }> = ({ svgCode, title }) => {
   const [copied, setCopied] = useState<boolean>(false);
@@ -1366,28 +1406,53 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
           nodes.push(<h6 key={`h6-${nodes.length}`} className="md-h6 md-microheading">{formatInline(headingText)}</h6>);
         }
         continue;
-      } else if (line.startsWith('> ')) {
-        const bqContent = line.slice(2).trim();
-        const isPromptLike =
-          /^(?:["“]|act as|please act as|i have been studying|prompt|quiz me)/i.test(bqContent) ||
-          bqContent.includes('Provide the answers') ||
-          isPreviousLinePromptIntro;
+      } else if (line.startsWith('> ') || line.startsWith('>')) {
+        flushList();
+        // Gather all consecutive blockquote lines
+        const bqLines = [line.replace(/^>\s?/, '')];
+        while (i + 1 < lines.length && (lines[i + 1].startsWith('> ') || lines[i + 1].startsWith('>'))) {
+          i++;
+          bqLines.push(lines[i].replace(/^>\s?/, ''));
+        }
+        const fullBq = bqLines.join('\n');
 
-        if (isPromptLike) {
+        if (
+          fullBq.includes('[Model Reasoning & Chain of Thought]') ||
+          fullBq.includes('Model Reasoning') ||
+          fullBq.includes("Here's a thinking process:")
+        ) {
           nodes.push(
-            <PromptFlashcard
-              key={`pf-${nodes.length}`}
-              promptText={bqContent}
-              title="AI Prompt Flashcard"
-              category="Direct Copy"
+            <ThoughtAccordion
+              key={`thought-${nodes.length}`}
+              rawThought={fullBq.replace(/🧠\s*\*?\[Model Reasoning & Chain of Thought\]\*?/g, '').trim()}
             />
           );
         } else {
-          nodes.push(
-            <blockquote key={`bq-${nodes.length}`} className="md-blockquote">
-              {formatInline(bqContent)}
-            </blockquote>
-          );
+          const isPromptLike =
+            /^(?:["“]|act as|please act as|i have been studying|prompt|quiz me)/i.test(fullBq) ||
+            fullBq.includes('Provide the answers') ||
+            isPreviousLinePromptIntro;
+
+          if (isPromptLike) {
+            nodes.push(
+              <PromptFlashcard
+                key={`pf-${nodes.length}`}
+                promptText={fullBq}
+                title="AI Prompt Flashcard"
+                category="Direct Copy"
+              />
+            );
+          } else {
+            nodes.push(
+              <blockquote key={`bq-${nodes.length}`} className="md-blockquote">
+                {bqLines.map((bql, bqIdx) => (
+                  <p key={bqIdx} style={{ margin: bqIdx === 0 ? 0 : '4px 0 0' }}>
+                    {formatInline(bql)}
+                  </p>
+                ))}
+              </blockquote>
+            );
+          }
         }
         isPreviousLinePromptIntro = false;
       } else if (line.trim() === '') {
