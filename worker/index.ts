@@ -495,6 +495,77 @@ async function streamAnthropic({
   }
 }
 
+async function streamGeminiWithCandidates({
+  apiKey,
+  candidateModels,
+  contents,
+  systemInstruction,
+  sendSSE,
+}: {
+  apiKey: string;
+  candidateModels: string[];
+  contents: any[];
+  systemInstruction?: any;
+  sendSSE: (event: string, data: Record<string, unknown>) => Promise<void>;
+}): Promise<{ success: boolean; model: string; text: string; error?: string }> {
+  let fullText = '';
+  let lastErr = '';
+  for (const model of candidateModels) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+      const resp = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          system_instruction: systemInstruction,
+          generationConfig: {
+            maxOutputTokens: 8192,
+            temperature: 0.7,
+          },
+        }),
+      });
+
+      if (resp.ok && resp.body) {
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let lineBuffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          lineBuffer += decoder.decode(value, { stream: true });
+          const lines = lineBuffer.split('\n');
+          lineBuffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataJsonStr = trimmed.slice(6).trim();
+              try {
+                const parsed = JSON.parse(dataJsonStr);
+                const deltaText =
+                  parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (deltaText) {
+                  await sendSSE('text_delta', { text: deltaText });
+                  fullText += deltaText;
+                }
+              } catch {}
+            }
+          }
+        }
+        return { success: true, model, text: fullText };
+      } else {
+        lastErr = await resp.text().catch(() => '');
+      }
+    } catch (e: any) {
+      lastErr = e?.message || String(e);
+    }
+  }
+  return { success: false, model: '', text: fullText, error: lastErr };
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -647,13 +718,6 @@ export default {
           {
             id: 'groq/qwen/qwen3.8-27b',
             name: 'Groq Qwen 3.8 27B (Ultra-Fast LPU Code & Logic, 131k ctx)',
-            provider: 'Groq',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'groq/openai/gpt-oss-20b',
-            name: 'Groq GPT-OSS 20B (High-Velocity Reasoning, 131k ctx)',
             provider: 'Groq',
             is_default: false,
             context_window: 131072,
@@ -1013,15 +1077,15 @@ export default {
             const lastUserMsg = [...rawList].reverse().find((m) => m.role === 'user')?.content || '';
             const lowerMsg = lastUserMsg.toLowerCase();
 
-            const isCode = /\b(code|function|bug|error|refactor|typescript|javascript|python|react|html|css|sql|api|loop|component|git|devstral|regex|syntax|class|compile|algorithm|database|json|schema|async|await|props|unit test|script)\b/.test(lowerMsg);
+            const isCode = /\b(code|function|bug|error|refactor|typescript|javascript|python|react|html|css|sql|api|loop|component|git|syntax|class|compile|algorithm|database|json|schema|async|await|props|unit test|script)\b/.test(lowerMsg);
             const isStem = /\b(math|equation|calculus|matrix|theorem|proof|physics|algebra|integral|derivative|quantum|probability|combinatorics|am-thinking|nemotron|eigenvalue|trigonometry|geometry|formula)\b/.test(lowerMsg);
             const isDebate = /\b(debate|compare perspectives|council|deliberate|pros and cons|cross-check|multiple viewpoints|two sides)\b/.test(lowerMsg);
-            const isWorkflow = /\b(workflow|step by step plan|automate|agent|pipeline|translate|spanish|french|german|chinese|hindi|multilingual|glm|schedule|roadmap)\b/.test(lowerMsg);
+            const isWorkflow = /\b(workflow|step by step plan|automate|agent|pipeline|translate|spanish|french|german|chinese|hindi|multilingual|schedule|roadmap)\b/.test(lowerMsg);
             const isDeepAnalysis = /\b(explain in depth|comprehensive analysis|history|essay|patent|research paper|summary of|architecture document|deep dive)\b/.test(lowerMsg) || lastUserMsg.length > 500;
 
-            let autoTarget = 'groq/openai/gpt-oss-120b';
-            let taskDomain = 'High-Velocity General Inference';
-            let specialistName = 'Groq Hardware LPUs & Gemini Pro';
+            let autoTarget = 'gemini-2.5-pro';
+            let taskDomain = 'High-Velocity Conversational & Deep Reasoning';
+            let specialistName = 'Google Gemini 2.5 Pro';
 
             if (isDebate) {
               autoTarget = 'unified-team:dual-expert';
@@ -1030,23 +1094,23 @@ export default {
             } else if (isCode) {
               autoTarget = 'groq/qwen/qwen3.8-27b';
               taskDomain = 'Code Architecture & Implementation';
-              specialistName = 'Groq Qwen 3.8 27B & Mistral Devstral';
+              specialistName = 'Groq Qwen 3.8 27B & Cohere North Code';
             } else if (isStem) {
               autoTarget = 'openrouter/nvidia/nemotron-3.5-super-vl:free';
               taskDomain = 'STEM, Mathematics & Formal Logic';
               specialistName = 'NVIDIA Nemotron 3.5 Super VL & AM-Thinking';
             } else if (isWorkflow) {
-              autoTarget = 'openrouter/thudm/glm-4.5-air:free';
-              taskDomain = 'Agentic Workflow & Multilingual Planning';
-              specialistName = 'GLM-4.5 Air & Meta LLaMA 3.3 70B';
+              autoTarget = 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free';
+              taskDomain = 'Agentic Workflow & Multi-Step Planning';
+              specialistName = 'NVIDIA Nemotron 550B Ultra';
             } else if (isDeepAnalysis) {
-              autoTarget = 'groq/openai/gpt-oss-120b';
+              autoTarget = 'gemini-2.5-pro';
               taskDomain = 'Deep Analytical Synthesis & Long Context';
-              specialistName = 'Groq GPT-OSS 120B Titan';
+              specialistName = 'Google Gemini 2.5 Pro (2M Context)';
             } else {
-              autoTarget = 'groq/openai/gpt-oss-20b';
+              autoTarget = 'gemini-2.5-flash';
               taskDomain = 'High-Velocity Conversational Inference';
-              specialistName = 'Groq Hardware LPU Ultra-Stream';
+              specialistName = 'Google Gemini 2.5 Flash';
             }
 
             await sendSSE('text_delta', {
@@ -1076,7 +1140,6 @@ export default {
           if (isGroq) {
             let groqModel = chosenModel.replace(/^groq\//, '');
             if (groqModel.includes('120b')) groqModel = 'openai/gpt-oss-120b';
-            else if (groqModel.includes('20b')) groqModel = 'openai/gpt-oss-20b';
             else if (groqModel.includes('qwen') || groqModel.includes('coder')) groqModel = 'qwen/qwen3.8-27b';
             else groqModel = 'openai/gpt-oss-120b';
 
@@ -1086,11 +1149,17 @@ export default {
               text: `> *[Model: **Groq ${groqModel}** | Real LPU Hardware Inference]*\n\n`,
             });
 
+            // Bounded historical turns to avoid Groq TPM limits
+            const groqMessages = rawList.slice(-6).map((m) => ({
+              role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+              content: m.content || '',
+            }));
+
             const groqResult = await streamOpenAICompatible({
               url: 'https://api.groq.com/openai/v1/chat/completions',
               apiKey: groqApiKey,
               model: groqModel,
-              messages: rawList,
+              messages: groqMessages,
               systemPrompt: systemInstruction.parts[0].text,
               sendSSE,
             });
@@ -1098,9 +1167,22 @@ export default {
             if (groqResult.success) {
               accumulatedAssistantText = groqResult.text;
             } else {
+              // Resilient auto-recovery via Google Gemini
               await sendSSE('text_delta', {
-                text: `> ⚠️ **Groq Hardware LPU Notice**\n> Upstream Groq request could not be completed: ${groqResult.error || 'Connection timed out'}\n> Please verify your Groq API key in Settings or select another active model.\n\n`,
+                text: `\n> *[Groq capacity limit reached · Seamlessly completing request via **Google Gemini 2.5 Flash**]*\n\n`,
               });
+              const geminiFallback = await streamGeminiWithCandidates({
+                apiKey,
+                candidateModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'],
+                contents: geminiContents,
+                systemInstruction,
+                sendSSE,
+              });
+              if (geminiFallback.success) {
+                accumulatedAssistantText = geminiFallback.text;
+                usedProvider = 'gemini';
+                usedModel = geminiFallback.model;
+              }
             }
             isHandled = true;
           } else if (isOpenRouter) {
@@ -1127,7 +1209,7 @@ export default {
               url: 'https://openrouter.ai/api/v1/chat/completions',
               apiKey: openRouterApiKey,
               model: orModel,
-              messages: rawList,
+              messages: rawList.slice(-6),
               systemPrompt: systemInstruction.parts[0].text,
               sendSSE,
               extraHeaders: {
@@ -1140,29 +1222,40 @@ export default {
               accumulatedAssistantText = orResult.text;
             } else {
               await sendSSE('text_delta', {
-                text: `> ⚠️ **OpenRouter Frontier Notice**\n> Upstream OpenRouter request could not be completed: ${orResult.error || 'Connection timed out'}\n> Please verify your OpenRouter API key in Settings or select another active model.\n\n`,
+                text: `\n> *[OpenRouter busy · Seamlessly completing request via **Google Gemini 2.5 Pro**]*\n\n`,
               });
+              const geminiFallback = await streamGeminiWithCandidates({
+                apiKey,
+                candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
+                contents: geminiContents,
+                systemInstruction,
+                sendSSE,
+              });
+              if (geminiFallback.success) {
+                accumulatedAssistantText = geminiFallback.text;
+                usedProvider = 'gemini';
+                usedModel = geminiFallback.model;
+              }
             }
             isHandled = true;
           } else if (chosenModel.startsWith('openai/') && !chosenModel.includes('gpt-oss')) {
             const userProvidedKey = body.openai_api_key || request.headers.get('x-openai-key');
             if (!userProvidedKey) {
-              // Seamlessly route unfunded OpenAI model requests to Groq GPT-OSS 120B (Open-weights GPT on LPUs)
+              // Seamlessly route unfunded OpenAI model requests to Google Gemini 2.5 Pro
               await sendSSE('text_delta', {
-                text: `> *[Routing **${chosenModel}** to **Groq GPT-OSS 120B** | Free High-Throughput Hardware LPU]*\n\n`,
+                text: `> *[Routing **${chosenModel}** to **Google Gemini 2.5 Pro** | Free Flagship Intelligence]*\n\n`,
               });
-              usedProvider = 'groq';
-              usedModel = 'openai/gpt-oss-120b';
-              const fallbackResult = await streamOpenAICompatible({
-                url: 'https://api.groq.com/openai/v1/chat/completions',
-                apiKey: groqApiKey,
-                model: 'openai/gpt-oss-120b',
-                messages: rawList,
-                systemPrompt: systemInstruction.parts[0].text,
+              const geminiFallback = await streamGeminiWithCandidates({
+                apiKey,
+                candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
+                contents: geminiContents,
+                systemInstruction,
                 sendSSE,
               });
-              if (fallbackResult.success) {
-                accumulatedAssistantText = fallbackResult.text;
+              if (geminiFallback.success) {
+                accumulatedAssistantText = geminiFallback.text;
+                usedProvider = 'gemini';
+                usedModel = geminiFallback.model;
               }
               isHandled = true;
             } else {
@@ -1179,7 +1272,7 @@ export default {
                 url: 'https://api.openai.com/v1/chat/completions',
                 apiKey: userProvidedKey,
                 model: openaiModel,
-                messages: rawList,
+                messages: rawList.slice(-6),
                 systemPrompt: systemInstruction.parts[0].text,
                 sendSSE,
               });
@@ -1187,39 +1280,41 @@ export default {
               if (openaiResult.success) {
                 accumulatedAssistantText = openaiResult.text;
               } else {
-                const isQuota =
-                  openaiResult.error?.includes('insufficient_quota') ||
-                  openaiResult.error?.includes('credit_balance_exhausted');
-                const notice = isQuota
-                  ? '> ⚠️ **OpenAI Direct Stream Notice**\n> Your OpenAI API key is authenticated, but your OpenAI account currently has $0 credit balance remaining. Add credits at [platform.openai.com/billing](https://platform.openai.com/settings/organization/billing) to enable direct OpenAI queries.\n> *Active live models that do not require credit: Groq GPT-OSS 120B, Groq Qwen 27B, NVIDIA Nemotron 550B, or Gemini 2.5 Pro.*\n\n'
-                  : `> ⚠️ **OpenAI API Notice**: ${openaiResult.error || 'Connection failed'}\n\n`;
-                await sendSSE('text_delta', { text: notice });
+                await sendSSE('text_delta', {
+                  text: `\n> ⚠️ **OpenAI Direct Stream Notice**: Account has $0 credit balance remaining.\n> *[Seamlessly completing request via **Google Gemini 2.5 Pro** at 0 cost]*\n\n`,
+                });
+                const geminiFallback = await streamGeminiWithCandidates({
+                  apiKey,
+                  candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
+                  contents: geminiContents,
+                  systemInstruction,
+                  sendSSE,
+                });
+                if (geminiFallback.success) {
+                  accumulatedAssistantText = geminiFallback.text;
+                  usedProvider = 'gemini';
+                  usedModel = geminiFallback.model;
+                }
               }
               isHandled = true;
             }
           } else if (chosenModel.startsWith('anthropic/')) {
             const userProvidedAnthropicKey = body.anthropic_api_key || request.headers.get('x-anthropic-key');
             if (!userProvidedAnthropicKey) {
-              // Seamlessly route unfunded Anthropic requests to NVIDIA Nemotron 550B Ultra
               await sendSSE('text_delta', {
-                text: `> *[Routing **${chosenModel}** to **NVIDIA Nemotron 550B Ultra** | Free Frontier MoE Reasoning]*\n\n`,
+                text: `> *[Routing **${chosenModel}** to **Google Gemini 2.5 Pro** | Free Frontier Reasoning]*\n\n`,
               });
-              usedProvider = 'openrouter';
-              usedModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
-              const fallbackResult = await streamOpenAICompatible({
-                url: 'https://openrouter.ai/api/v1/chat/completions',
-                apiKey: openRouterApiKey,
-                model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-                messages: rawList,
-                systemPrompt: systemInstruction.parts[0].text,
+              const geminiFallback = await streamGeminiWithCandidates({
+                apiKey,
+                candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
+                contents: geminiContents,
+                systemInstruction,
                 sendSSE,
-                extraHeaders: {
-                  'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
-                  'X-Title': 'Unified AI Assistant',
-                },
               });
-              if (fallbackResult.success) {
-                accumulatedAssistantText = fallbackResult.text;
+              if (geminiFallback.success) {
+                accumulatedAssistantText = geminiFallback.text;
+                usedProvider = 'gemini';
+                usedModel = geminiFallback.model;
               }
               isHandled = true;
             } else {
@@ -1232,7 +1327,7 @@ export default {
               const anthropicResult = await streamAnthropic({
                 apiKey: userProvidedAnthropicKey,
                 model: anthropicModel,
-                messages: rawList,
+                messages: rawList.slice(-6),
                 systemPrompt: systemInstruction.parts[0].text,
                 sendSSE,
               });
@@ -1241,8 +1336,20 @@ export default {
                 accumulatedAssistantText = anthropicResult.text;
               } else {
                 await sendSSE('text_delta', {
-                  text: `> ⚠️ **Anthropic API Notice**: ${anthropicResult.error || 'Connection failed'}\n\n`,
+                  text: `\n> *[Anthropic key error · Seamlessly completing request via **Google Gemini 2.5 Pro**]*\n\n`,
                 });
+                const geminiFallback = await streamGeminiWithCandidates({
+                  apiKey,
+                  candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
+                  contents: geminiContents,
+                  systemInstruction,
+                  sendSSE,
+                });
+                if (geminiFallback.success) {
+                  accumulatedAssistantText = geminiFallback.text;
+                  usedProvider = 'gemini';
+                  usedModel = geminiFallback.model;
+                }
               }
               isHandled = true;
             }

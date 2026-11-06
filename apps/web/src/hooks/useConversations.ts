@@ -533,9 +533,9 @@ export function useConversations(backendConnected: boolean = true) {
           content: m.content.trim(),
         }));
 
-      // Sliding context window: limit to the last 14 messages (7 dialogue turns)
-      // to keep recent context fresh and prevent cross-topic or old-chat conflicts
-      const boundedPriorHistory = priorHistory.slice(-14);
+      // Sliding context window: limit to the last 6 messages (3 dialogue turns)
+      // to keep recent context fresh and prevent token overflows on provider TPM limits
+      const boundedPriorHistory = priorHistory.slice(-6);
       const fullHistory = [...boundedPriorHistory, { role: 'user', content: content.trim() }];
 
       try {
