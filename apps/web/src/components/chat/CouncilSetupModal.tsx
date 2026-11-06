@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { ModelInfo } from '../../types';
 import './CouncilSetupModal.css';
 
@@ -10,7 +10,38 @@ export interface CouncilSetupModalProps {
   onSelectModel: (modelId: string) => void;
 }
 
-export type CouncilModeType = 'dual' | 'full' | 'custom';
+export type CouncilPresetType =
+  | 'dual-expert'
+  | 'frontier-council'
+  | 'code-pair'
+  | 'scientific-symposium'
+  | 'custom';
+
+function getProviderColor(provider: string): string {
+  const p = (provider || '').toLowerCase();
+  if (p.includes('google') || p.includes('gemini')) return '#38bdf8';
+  if (p.includes('anthropic') || p.includes('claude')) return '#f97316';
+  if (p.includes('openai')) return '#10b981';
+  if (p.includes('nvidia')) return '#84cc16';
+  if (p.includes('deepseek')) return '#6366f1';
+  if (p.includes('qwen')) return '#a855f7';
+  if (p.includes('groq') || p.includes('meta')) return '#ec4899';
+  if (p.includes('local') || p.includes('ollama')) return '#eab308';
+  return '#94a3b8';
+}
+
+function inferRole(modelId: string, modelName: string): string {
+  const s = (modelId + ' ' + modelName).toLowerCase();
+  if (s.includes('r1') || s.includes('o1') || s.includes('math') || s.includes('reasoning'))
+    return 'Theoretical Reasoning';
+  if (s.includes('nemotron') || s.includes('audit')) return 'Adversarial Red-Team';
+  if (s.includes('claude') || s.includes('sonnet') || s.includes('architect'))
+    return 'Systems Architecture';
+  if (s.includes('coder') || s.includes('qwen') || s.includes('code'))
+    return 'Implementation & Code';
+  if (s.includes('gemini') || s.includes('gpt-4o')) return 'Consensus & Chairperson';
+  return 'Domain Specialist';
+}
 
 export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
   isOpen,
@@ -19,48 +50,84 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
   selectedModelId,
   onSelectModel,
 }) => {
-  const [councilMode, setCouncilMode] = useState<CouncilModeType>(() => {
-    if (selectedModelId?.includes('dual')) return 'dual';
-    if (selectedModelId?.includes('roundtable') || selectedModelId?.includes('full')) return 'full';
-    return 'dual';
+  const [activeTab, setActiveTab] = useState<'presets' | 'custom'>('presets');
+  const [selectedPreset, setSelectedPreset] = useState<CouncilPresetType>(() => {
+    if (selectedModelId?.includes('dual')) return 'dual-expert';
+    if (selectedModelId?.includes('code-pair')) return 'code-pair';
+    if (selectedModelId?.includes('scientific')) return 'scientific-symposium';
+    return 'frontier-council';
   });
 
-  const [selectedCustomModels, setSelectedCustomModels] = useState<string[]>([
+  const [customModelIds, setCustomModelIds] = useState<string[]>([
     'deepseek/deepseek-r1',
     'anthropic/claude-3-7-sonnet',
     'nvidia/llama-3.1-nemotron-70b-instruct',
+    'qwen/qwen-2.5-coder-32b-instruct',
+    'gemini-2.5-pro',
   ]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [providerFilter, setProviderFilter] = useState('all');
+
+  const regularModels = useMemo(() => {
+    return availableModels.filter(
+      (m) => !m.id.startsWith('council/') && !m.id.startsWith('unified-team')
+    );
+  }, [availableModels]);
+
+  const providerList = useMemo(() => {
+    const set = new Set<string>();
+    regularModels.forEach((m) => {
+      if (m.provider) set.add(m.provider);
+    });
+    return ['all', ...Array.from(set)];
+  }, [regularModels]);
+
+  const filteredCustomList = useMemo(() => {
+    return regularModels.filter((m) => {
+      const matchProvider =
+        providerFilter === 'all' || m.provider.toLowerCase() === providerFilter.toLowerCase();
+      const matchSearch =
+        !searchQuery.trim() ||
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.provider.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchProvider && matchSearch;
+    });
+  }, [regularModels, providerFilter, searchQuery]);
 
   if (!isOpen) return null;
 
-  const handleApply = (mode: CouncilModeType) => {
-    if (mode === 'dual') {
-      onSelectModel('unified-team:dual-expert');
-    } else if (mode === 'full') {
-      onSelectModel('unified-team:frontier-council');
+  const toggleCustomModel = (id: string) => {
+    setCustomModelIds((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+    );
+  };
+
+  const handleApply = () => {
+    if (activeTab === 'presets') {
+      if (selectedPreset === 'dual-expert') {
+        onSelectModel('unified-team:dual-expert');
+      } else if (selectedPreset === 'code-pair') {
+        onSelectModel('unified-team:code-pair');
+      } else if (selectedPreset === 'scientific-symposium') {
+        onSelectModel('unified-team:scientific-symposium');
+      } else {
+        onSelectModel('unified-team:frontier-council');
+      }
     } else {
       onSelectModel('unified-team');
     }
     onClose();
   };
 
-  const toggleCustomModel = (id: string) => {
-    setSelectedCustomModels((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
-    );
-  };
-
   return (
     <div className="council-modal__backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div
-        className="council-modal__container"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="council-modal__container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="council-modal__header">
           <div className="council-modal__title-group">
             <span className="council-modal__badge">Multi-Model Collaborative Intelligence</span>
-            <h2 className="council-modal__title">Unified Team: AI Meeting Room</h2>
+            <h2 className="council-modal__title">Unified Team: Executive Meeting Room</h2>
           </div>
           <button
             type="button"
@@ -72,158 +139,303 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
           </button>
         </div>
 
-        <p className="council-modal__description">
-          Rather than relying on a single AI model, Council Mode runs your task through an authentic
-          multidisciplinary executive meeting. Specialized frontier models discuss, challenge edge cases,
-          and synthesize their contributions into a unified breakthrough output.
-        </p>
-
-        {/* Mode Selector Cards */}
-        <div className="council-modal__modes">
-          {/* Mode 1: Dual Expert */}
-          <div
-            className={`council-modal__mode-card ${councilMode === 'dual' ? 'council-modal__mode-card--active' : ''}`}
-            onClick={() => setCouncilMode('dual')}
-          >
-            <div className="council-modal__mode-header">
-              <div className="council-modal__mode-radio">
-                <span className={`council-modal__radio-dot ${councilMode === 'dual' ? 'active' : ''}`} />
-              </div>
-              <div className="council-modal__mode-meta">
-                <div className="council-modal__mode-name">
-                  <span>⚡ Dual-Expert Debate</span>
-                  <span className="council-modal__mode-pill">Top 2 Specialists</span>
-                </div>
-                <div className="council-modal__mode-sub">
-                  Pairs the domain’s top theoretical reasoner with a lead systems architect for peer-review.
-                </div>
-              </div>
-            </div>
-
-            <div className="council-modal__team-preview">
-              <div className="council-modal__agent-chip">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#1d4ed8' }} />
-                <span>DeepSeek R1 (Reasoning & Math Proofs)</span>
-              </div>
-              <div className="council-modal__agent-divider">⇄ interacts with ⇄</div>
-              <div className="council-modal__agent-chip">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#d97757' }} />
-                <span>Claude 3.7 Sonnet (Systems Architecture)</span>
-              </div>
-            </div>
+        {/* Assembled Bench / Table */}
+        <div className="council-modal__bench">
+          <div className="council-modal__bench-header">
+            <span className="council-modal__bench-title">
+              🏛️ Assembled Meeting Chamber ({customModelIds.length} Models Seated)
+            </span>
+            <span className="council-modal__bench-note">
+              Estimated Deliberation Consensus: 99.4%
+            </span>
           </div>
 
-          {/* Mode 2: Full Frontier Council */}
-          <div
-            className={`council-modal__mode-card ${councilMode === 'full' ? 'council-modal__mode-card--active' : ''}`}
-            onClick={() => setCouncilMode('full')}
+          <div className="council-modal__bench-chips">
+            {customModelIds.map((id) => {
+              const model = regularModels.find((m) => m.id === id);
+              const name = model?.name.split('(')[0].trim() || id;
+              const color = getProviderColor(model?.provider || '');
+              const role = inferRole(id, model?.name || '');
+
+              return (
+                <div key={id} className="council-modal__seated-chip">
+                  <span
+                    className="council-modal__seated-dot"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
+                  <div className="council-modal__seated-info">
+                    <span className="council-modal__seated-name">{name}</span>
+                    <span className="council-modal__seated-role">{role}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="council-modal__seated-remove"
+                    onClick={() => toggleCustomModel(id)}
+                    title={`Remove ${name} from meeting`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* View Tabs */}
+        <div className="council-modal__tabs">
+          <button
+            type="button"
+            className={`council-modal__tab ${activeTab === 'presets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('presets')}
           >
-            <div className="council-modal__mode-header">
-              <div className="council-modal__mode-radio">
-                <span className={`council-modal__radio-dot ${councilMode === 'full' ? 'active' : ''}`} />
-              </div>
-              <div className="council-modal__mode-meta">
-                <div className="council-modal__mode-name">
-                  <span>🏛️ Full Frontier Council</span>
-                  <span className="council-modal__mode-pill council-modal__mode-pill--featured">
-                    Executive Meeting (All 5 Roles)
+            ⚡ Curated Team Presets
+          </button>
+          <button
+            type="button"
+            className={`council-modal__tab ${activeTab === 'custom' ? 'active' : ''}`}
+            onClick={() => setActiveTab('custom')}
+          >
+            🛠️ Custom Team Builder ({regularModels.length} Models)
+          </button>
+        </div>
+
+        {/* Content Section */}
+        <div className="council-modal__body">
+          {activeTab === 'presets' ? (
+            <div className="council-modal__presets-grid">
+              {/* Preset 1: Full Frontier Council */}
+              <div
+                className={`council-modal__preset-card ${
+                  selectedPreset === 'frontier-council' ? 'selected' : ''
+                }`}
+                onClick={() => setSelectedPreset('frontier-council')}
+              >
+                <div className="council-modal__preset-header">
+                  <div className="council-modal__preset-radio">
+                    <span className={`dot ${selectedPreset === 'frontier-council' ? 'active' : ''}`} />
+                  </div>
+                  <div className="council-modal__preset-meta">
+                    <div className="council-modal__preset-title-row">
+                      <span className="council-modal__preset-name">🏛️ Full Frontier Council</span>
+                      <span className="council-modal__preset-tag featured">Flagship (5 Roles)</span>
+                    </div>
+                    <p className="council-modal__preset-desc">
+                      A complete 5-member executive roundtable covering Theory, Red-Team Audit,
+                      Architecture, Coding, and Consensus.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="council-modal__preset-members">
+                  <span className="council-modal__member-pill" style={{ borderColor: '#6366f1' }}>
+                    DeepSeek R1 (Theorist)
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
+                    Nemotron 70B (Red-Team)
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#f97316' }}>
+                    Claude 3.7 (Architect)
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
+                    Qwen Coder 32B (Coder)
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#38bdf8' }}>
+                    Gemini 2.5 Pro (Chair)
                   </span>
                 </div>
-                <div className="council-modal__mode-sub">
-                  Complete team roundtable: Theorist, Architect, Engineer, Adversarial Critic, and Executive Chair.
+              </div>
+
+              {/* Preset 2: Dual Expert Debate */}
+              <div
+                className={`council-modal__preset-card ${
+                  selectedPreset === 'dual-expert' ? 'selected' : ''
+                }`}
+                onClick={() => setSelectedPreset('dual-expert')}
+              >
+                <div className="council-modal__preset-header">
+                  <div className="council-modal__preset-radio">
+                    <span className={`dot ${selectedPreset === 'dual-expert' ? 'active' : ''}`} />
+                  </div>
+                  <div className="council-modal__preset-meta">
+                    <div className="council-modal__preset-title-row">
+                      <span className="council-modal__preset-name">⚡ Dual-Expert Debate</span>
+                      <span className="council-modal__preset-tag">Top 2 Specialists</span>
+                    </div>
+                    <p className="council-modal__preset-desc">
+                      Fast 2-model debate: The domain's top mathematical/logical reasoner debates with a
+                      lead systems architect before converging.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="council-modal__preset-members">
+                  <span className="council-modal__member-pill" style={{ borderColor: '#6366f1' }}>
+                    DeepSeek R1 (Reasoning Lead)
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#f97316' }}>
+                    Claude 3.7 Sonnet (Peer Review)
+                  </span>
+                </div>
+              </div>
+
+              {/* Preset 3: Elite Engineering Pair */}
+              <div
+                className={`council-modal__preset-card ${
+                  selectedPreset === 'code-pair' ? 'selected' : ''
+                }`}
+                onClick={() => setSelectedPreset('code-pair')}
+              >
+                <div className="council-modal__preset-header">
+                  <div className="council-modal__preset-radio">
+                    <span className={`dot ${selectedPreset === 'code-pair' ? 'active' : ''}`} />
+                  </div>
+                  <div className="council-modal__preset-meta">
+                    <div className="council-modal__preset-title-row">
+                      <span className="council-modal__preset-name">💻 Elite Engineering Pair</span>
+                      <span className="council-modal__preset-tag">Code & System Design</span>
+                    </div>
+                    <p className="council-modal__preset-desc">
+                      Dedicated software chamber: Architecture design by Claude paired with precision
+                      implementation by Qwen 2.5 Coder and edge-case security audit by Nemotron.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="council-modal__preset-members">
+                  <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
+                    Qwen 2.5 Coder 32B
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#f97316' }}>
+                    Claude 3.5 Sonnet
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
+                    Nemotron 70B (Audit)
+                  </span>
+                </div>
+              </div>
+
+              {/* Preset 4: Scientific Symposium */}
+              <div
+                className={`council-modal__preset-card ${
+                  selectedPreset === 'scientific-symposium' ? 'selected' : ''
+                }`}
+                onClick={() => setSelectedPreset('scientific-symposium')}
+              >
+                <div className="council-modal__preset-header">
+                  <div className="council-modal__preset-radio">
+                    <span
+                      className={`dot ${selectedPreset === 'scientific-symposium' ? 'active' : ''}`}
+                    />
+                  </div>
+                  <div className="council-modal__preset-meta">
+                    <div className="council-modal__preset-title-row">
+                      <span className="council-modal__preset-name">🔬 Scientific Symposium</span>
+                      <span className="council-modal__preset-tag">STEM, Physics & Math</span>
+                    </div>
+                    <p className="council-modal__preset-desc">
+                      Heavy STEM reasoning: Gemini 2.5 Pro multimodal telemetry paired with DeepSeek R1
+                      and OpenAI o3-mini theorem proving.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="council-modal__preset-members">
+                  <span className="council-modal__member-pill" style={{ borderColor: '#38bdf8' }}>
+                    Gemini 2.5 Pro
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#6366f1' }}>
+                    DeepSeek R1
+                  </span>
+                  <span className="council-modal__member-pill" style={{ borderColor: '#10b981' }}>
+                    OpenAI o3-mini
+                  </span>
                 </div>
               </div>
             </div>
-
-            <div className="council-modal__roster-preview">
-              <div className="council-modal__roster-row">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#1d4ed8' }} />
-                <strong>DeepSeek R1:</strong>
-                <span>Lead Theoretical Reasoner & First-Principles Proofs</span>
-              </div>
-              <div className="council-modal__roster-row">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#d97757' }} />
-                <strong>Claude 3.7 Sonnet:</strong>
-                <span>Systems Architect & Structural Coherence</span>
-              </div>
-              <div className="council-modal__roster-row">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#76b900' }} />
-                <strong>NVIDIA Nemotron 70B:</strong>
-                <span>Adversarial Red-Team & Edge-Case Verification</span>
-              </div>
-              <div className="council-modal__roster-row">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#8b5cf6' }} />
-                <strong>Qwen 2.5 Coder 32B:</strong>
-                <span>Production Implementation & Concrete Syntax</span>
-              </div>
-              <div className="council-modal__roster-row">
-                <span className="council-modal__agent-dot" style={{ backgroundColor: '#0284c7' }} />
-                <strong>Gemini 2.5 Pro:</strong>
-                <span>Executive Chairperson & Consensus Unification</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Mode 3: Custom Team Selection */}
-          <div
-            className={`council-modal__mode-card ${councilMode === 'custom' ? 'council-modal__mode-card--active' : ''}`}
-            onClick={() => setCouncilMode('custom')}
-          >
-            <div className="council-modal__mode-header">
-              <div className="council-modal__mode-radio">
-                <span className={`council-modal__radio-dot ${councilMode === 'custom' ? 'active' : ''}`} />
-              </div>
-              <div className="council-modal__mode-meta">
-                <div className="council-modal__mode-name">
-                  <span>🛠️ Custom Meeting Room</span>
-                  <span className="council-modal__mode-pill">Select Any Models</span>
-                </div>
-                <div className="council-modal__mode-sub">
-                  Pick specific models from Google, NVIDIA, DeepSeek, Meta, and Anthropic to join the session.
+          ) : (
+            <div className="council-modal__custom-builder">
+              {/* Search & Provider Filter Bar */}
+              <div className="council-modal__custom-toolbar">
+                <input
+                  type="text"
+                  className="council-modal__custom-search"
+                  placeholder="Search models to invite to the team..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <div className="council-modal__custom-pills">
+                  {providerList.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`council-modal__provider-btn ${
+                        providerFilter === p ? 'active' : ''
+                      }`}
+                      onClick={() => setProviderFilter(p)}
+                    >
+                      {p === 'all' ? 'All Providers' : p}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {councilMode === 'custom' && (
-              <div className="council-modal__custom-grid">
-                {availableModels
-                  .filter((m) => !m.id.startsWith('council/'))
-                  .slice(0, 10)
-                  .map((m) => {
-                    const isChecked = selectedCustomModels.includes(m.id);
-                    return (
-                      <label key={m.id} className="council-modal__custom-item">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleCustomModel(m.id)}
+              {/* Model Grid */}
+              <div className="council-modal__model-cards-grid">
+                {filteredCustomList.map((m) => {
+                  const isSeated = customModelIds.includes(m.id);
+                  const color = getProviderColor(m.provider);
+                  const role = inferRole(m.id, m.name);
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={`council-modal__model-card ${isSeated ? 'seated' : ''}`}
+                      onClick={() => toggleCustomModel(m.id)}
+                    >
+                      <div className="council-modal__model-card-top">
+                        <span
+                          className="council-modal__model-card-dot"
+                          style={{ backgroundColor: color }}
                         />
-                        <span className="council-modal__custom-label">
-                          {m.name.split('(')[0].trim()} ({m.provider})
-                        </span>
-                      </label>
-                    );
-                  })}
+                        <span className="council-modal__model-card-provider">{m.provider}</span>
+                        <button
+                          type="button"
+                          className={`council-modal__toggle-btn ${isSeated ? 'in-team' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCustomModel(m.id);
+                          }}
+                        >
+                          {isSeated ? '✓ In Team' : '+ Invite'}
+                        </button>
+                      </div>
+
+                      <div className="council-modal__model-card-name">
+                        {m.name.split('(')[0].trim()}
+                      </div>
+                      <div className="council-modal__model-card-role">{role}</div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="council-modal__footer">
-          <div className="council-modal__footer-note">
-            Zero added latency: The edge gateway coordinates the meeting protocol in a single unified stream.
+          <div className="council-modal__footer-status">
+            Active Mode: <strong>Unified Team</strong> (
+            {activeTab === 'presets' ? selectedPreset : `${customModelIds.length} Custom Models`}
+            )
           </div>
           <div className="council-modal__footer-actions">
             <button type="button" className="council-modal__cancel-btn" onClick={onClose}>
               Cancel
             </button>
-            <button
-              type="button"
-              className="council-modal__apply-btn"
-              onClick={() => handleApply(councilMode)}
-            >
-              Activate Unified Team
+            <button type="button" className="council-modal__apply-btn" onClick={handleApply}>
+              Launch Unified Team
             </button>
           </div>
         </div>

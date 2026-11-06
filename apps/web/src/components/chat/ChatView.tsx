@@ -9,6 +9,7 @@ import { UnifiedLogo } from '../brand/UnifiedLogo';
 import { FollowupEmailModal } from './FollowupEmailModal';
 import { ApiKeyModal } from '../auth/ApiKeyModal';
 import { CouncilSetupModal } from './CouncilSetupModal';
+import { ModelSelectorDropdown } from './ModelSelectorDropdown';
 import { CalendarReminderCard, type CalendarReminderData } from '../calendar/CalendarReminderCard';
 import { detectCalendarIntent } from '../../utils/calendarIntentDetector';
 import { exportMarkdownToPdf } from '../../utils/pdfExporter';
@@ -399,31 +400,12 @@ export function ChatView({
           })()}
 
           {availableModels.length > 0 ? (
-            <div className="chat-view__model-selector">
-              <select
-                className="chat-view__model-select"
-                value={selectedModelId || availableModels[0]?.id}
-                onChange={(e) => onSelectModel?.(e.target.value)}
-                aria-label="Select AI Model"
-              >
-                {Object.entries(
-                  availableModels.reduce((acc, m) => {
-                    const group = m.provider || 'Other';
-                    if (!acc[group]) acc[group] = [];
-                    acc[group].push(m);
-                    return acc;
-                  }, {} as Record<string, typeof availableModels>)
-                ).map(([providerName, groupModels]) => (
-                  <optgroup key={providerName} label={`── ${providerName.toUpperCase()} ──`}>
-                    {groupModels.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
+            <ModelSelectorDropdown
+              availableModels={availableModels}
+              selectedModelId={selectedModelId ?? null}
+              onSelectModel={(id) => onSelectModel?.(id)}
+              onOpenTeamModal={() => setShowCouncilModal(true)}
+            />
           ) : (
             <div className="chat-view__model-unconfigured">
               <span>Connecting to AI gateway...</span>
