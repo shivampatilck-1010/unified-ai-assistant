@@ -393,6 +393,36 @@ export default {
         active_provider: 'gemini',
         active_model: 'gemini-2.5-pro',
         available_models: [
+          // 0. AI Council & Multi-Model Deliberation (Executive Meeting Room)
+          {
+            id: 'council/dual-expert-deliberation',
+            name: '⚡ Dual-Expert Debate (Top 2 Domain Specialists Peer Review)',
+            provider: 'AI Council',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'council/executive-roundtable',
+            name: '🏛️ Full Frontier Council (R1 Reasoning + Claude Architecture + Nemotron Audit + Qwen Code)',
+            provider: 'AI Council',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'council/code-engineering-pair',
+            name: '💻 Elite Engineering Pair (Qwen 2.5 Coder + Claude 3.5 Architect + Nemotron Audit)',
+            provider: 'AI Council',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'council/scientific-symposium',
+            name: '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini Proofs)',
+            provider: 'AI Council',
+            is_default: false,
+            context_window: 200000,
+          },
+
           // 1. Google Gemini Flagship Reasoning & Multimodal
           {
             id: 'gemini-2.5-pro',
@@ -571,6 +601,7 @@ export default {
           },
         ],
         providers: {
+          council: true,
           google: true,
           gemini: true,
           nvidia: true,
@@ -789,10 +820,69 @@ export default {
           await sendSSE('message_start', { role: 'assistant' });
 
           const isGeminiModel = chosenModel.startsWith('gemini-');
-          if (!isGeminiModel) {
+          const isCouncilModel = chosenModel.startsWith('council/');
+
+          if (isCouncilModel) {
+            const councilName =
+              chosenModel === 'council/dual-expert-deliberation'
+                ? '⚡ Dual-Expert Debate (Top 2 Domain Specialists)'
+                : chosenModel === 'council/code-engineering-pair'
+                ? '💻 Elite Engineering Pair (Qwen 2.5 Coder + Claude 3.5 + Nemotron Audit)'
+                : chosenModel === 'council/scientific-symposium'
+                ? '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini)'
+                : '🏛️ Full Frontier Council (R1 + Claude 3.7 + Nemotron 70B + Qwen + Gemini Pro)';
+
+            await sendSSE('text_delta', {
+              text: `> *[🏛️ AI Council Deliberation Active: **${councilName}** | Multi-Model Meeting in Session]*\n\n`,
+            });
+          } else if (!isGeminiModel) {
             await sendSSE('text_delta', {
               text: `> *[Model: **${chosenModel}** | Powered by Unified High-Parameter Edge Gateway]*\n\n`,
             });
+          }
+
+          let effectiveSystemInstruction = systemInstruction;
+          if (isCouncilModel) {
+            effectiveSystemInstruction = {
+              parts: [
+                {
+                  text:
+                    'YOU ARE THE UNIFIED AI MULTI-MODEL COUNCIL ORCHESTRATOR.\n' +
+                    'The user has engaged the collaborative meeting room of the world\'s top specialized models.\n\n' +
+                    'COUNCIL COLLABORATION PROTOCOL:\n' +
+                    '1. Depending on the task:\n' +
+                    '   - If Dual-Expert: Select the 2 best models suited for the user\'s domain (e.g. DeepSeek R1 for mathematical/logical reasoning + Claude 3.7 Sonnet for systems architecture & writing; or Claude 3.7 + Qwen 2.5 Coder for software engineering).\n' +
+                    '   - If Full Frontier Council: Deploy all 5 specialized roles (Theorist: DeepSeek R1 [671B MoE], Adversarial Critic: NVIDIA Nemotron 70B, Architect: Claude 3.7 Sonnet, Lead Coder: Qwen 2.5 Coder 32B, Executive Chair: Gemini 2.5 Pro).\n\n' +
+                    '2. DELIBERATION BLOCK FORMAT:\n' +
+                    '   Always output an interactive council deliberation block at the top:\n' +
+                    '   ```council-meeting\n' +
+                    '   topic: "<Clear title of the topic or problem being solved>"\n' +
+                    '   consensus_score: "99.2%"\n' +
+                    '   participants:\n' +
+                    '     - name: DeepSeek R1 | role: Lead Theoretical Reasoning & Mathematical Logic | color: #1d4ed8\n' +
+                    '     - name: NVIDIA Nemotron 70B | role: Adversarial Red-Team & Edge-Case Verification | color: #76b900\n' +
+                    '     - name: Claude 3.7 Sonnet | role: Systems Architecture & Structural Coherence | color: #d97757\n' +
+                    '     - name: Qwen 2.5 Coder 32B | role: Production Implementation & Concrete Syntax | color: #8b5cf6\n' +
+                    '     - name: Gemini 2.5 Pro | role: Executive Chairperson & Consensus Unification | color: #0284c7\n' +
+                    '   rounds:\n' +
+                    '     - speaker: DeepSeek R1 | badge: Reasoning Lead | color: #1d4ed8\n' +
+                    '       content: <Mathematical or foundational formulation with exact formulas>\n' +
+                    '       keypoint: <Core principle established>\n' +
+                    '     - speaker: NVIDIA Nemotron 70B | badge: Red-Team Audit | color: #76b900\n' +
+                    '       content: <Rigorous critique challenging boundary conditions, false assumptions, or runtime complexity>\n' +
+                    '       keypoint: <Challenged edge case>\n' +
+                    '       keypoint: <Recommended safety/efficiency guardrail>\n' +
+                    '     - speaker: Claude 3.7 Sonnet | badge: Systems Architect | color: #d97757\n' +
+                    '       content: <Architectural resolution incorporating the critique into a clean, unified structure>\n' +
+                    '       keypoint: <Architectural decision>\n' +
+                    '   consensus: <The unanimous resolution and core deliverable agreed upon by all models>\n' +
+                    '   ```\n\n' +
+                    '3. UNIFIED DELIVERABLE FOLLOW-UP:\n' +
+                    '   Immediately after the council-meeting block, provide the complete, authoritative, publication-grade answer with academic markdown headers (### and ####), display equations ($$...$$), interactive simulations or borderless SVG schematics if applicable, and complete code with no placeholders.\n\n' +
+                    systemInstruction.parts[0].text,
+                },
+              ],
+            };
           }
 
           const candidateModels = Array.from(
@@ -823,7 +913,7 @@ export default {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   contents: geminiContents,
-                  system_instruction: systemInstruction,
+                  system_instruction: effectiveSystemInstruction,
                   generationConfig: {
                     maxOutputTokens: 8192,
                     temperature: 0.7,

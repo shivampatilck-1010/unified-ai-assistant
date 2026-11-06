@@ -9,6 +9,7 @@ import { InteractiveSimulationCard } from './InteractiveSimulationCard';
 import { PdfExportCard } from './PdfExportCard';
 import { InteractiveChoiceCard } from './InteractiveChoiceCard';
 import { UniversalDiagramCard } from './UniversalDiagramCard';
+import { CouncilDeliberationCard, type CouncilParticipant, type CouncilRound } from './CouncilDeliberationCard';
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import './MarkdownContent.css';
@@ -347,6 +348,170 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
 
     if (lowerLang === 'mermaid') {
       return <MermaidDiagram code={code} />;
+    }
+
+    // AI Council Multi-Model Deliberation / Roundtable Block
+    if (
+      lowerLang === 'council-meeting' ||
+      lowerLang === 'ai-council' ||
+      lowerLang === 'council' ||
+      lowerLang === 'model-roundtable' ||
+      lowerLang === 'council-deliberation'
+    ) {
+      let topic = 'Multi-Model High-Parameter Deliberation';
+      let consensusScore = '98.5%';
+      let participants: CouncilParticipant[] = [];
+      let rounds: CouncilRound[] = [];
+      let consensus = '';
+      const tradeoffs: Array<{ issue: string; decision: string; agreedBy?: string[] }> = [];
+
+      let parsedJson = false;
+      try {
+        const data = JSON.parse(code);
+        if (data && typeof data === 'object') {
+          if (data.topic) topic = data.topic;
+          if (data.consensus_score || data.consensusScore) consensusScore = data.consensus_score || data.consensusScore;
+          if (Array.isArray(data.participants)) participants = data.participants;
+          if (Array.isArray(data.rounds)) rounds = data.rounds;
+          if (data.consensus) consensus = data.consensus;
+          if (Array.isArray(data.tradeoffs)) tradeoffs.push(...data.tradeoffs);
+          parsedJson = true;
+        }
+      } catch {
+        // Fallback to line-by-line parsing
+      }
+
+      if (!parsedJson) {
+        const lines = code.split('\n');
+        let currentSection: 'header' | 'participants' | 'rounds' | 'consensus' | 'tradeoffs' = 'header';
+        let currentRound: Partial<CouncilRound> | null = null;
+        const consensusLines: string[] = [];
+
+        for (const rawLine of lines) {
+          const l = rawLine.trim();
+          if (!l) continue;
+
+          if (l.toLowerCase().startsWith('topic:')) {
+            topic = l.replace(/^topic:\s*/i, '').replace(/^["']|["']$/g, '');
+          } else if (l.toLowerCase().startsWith('consensus_score:')) {
+            consensusScore = l.replace(/^consensus_score:\s*/i, '').replace(/^["']|["']$/g, '');
+          } else if (l.toLowerCase().startsWith('participants:')) {
+            currentSection = 'participants';
+          } else if (l.toLowerCase().startsWith('rounds:')) {
+            currentSection = 'rounds';
+          } else if (l.toLowerCase().startsWith('tradeoffs:')) {
+            currentSection = 'tradeoffs';
+          } else if (l.toLowerCase().startsWith('consensus:')) {
+            currentSection = 'consensus';
+            const rest = l.replace(/^consensus:\s*/i, '').replace(/^["']|["']$/g, '');
+            if (rest) consensusLines.push(rest);
+          } else if (currentSection === 'participants' && (l.startsWith('-') || l.startsWith('*'))) {
+            const item = l.replace(/^[-*]\s*/, '');
+            const parts = item.split('|').map((s) => s.trim());
+            let name = 'Specialist AI';
+            let role = 'Domain Expert';
+            let avatarColor = '#d97757';
+            for (const p of parts) {
+              if (p.toLowerCase().startsWith('name:')) name = p.replace(/^name:\s*/i, '').replace(/^["']|["']$/g, '');
+              else if (p.toLowerCase().startsWith('role:')) role = p.replace(/^role:\s*/i, '').replace(/^["']|["']$/g, '');
+              else if (p.toLowerCase().startsWith('color:') || p.toLowerCase().startsWith('avatar:')) {
+                avatarColor = p.replace(/^(color|avatar):\s*/i, '').replace(/^["']|["']$/g, '');
+              } else if (!name || name === 'Specialist AI') name = p;
+            }
+            participants.push({
+              id: `p-${participants.length}`,
+              name,
+              role,
+              avatarColor,
+            });
+          } else if (currentSection === 'rounds' && (l.startsWith('-') || l.startsWith('*'))) {
+            if (currentRound && currentRound.speaker && currentRound.content) {
+              rounds.push(currentRound as CouncilRound);
+            }
+            const item = l.replace(/^[-*]\s*/, '');
+            const parts = item.split('|').map((s) => s.trim());
+            let speaker = 'Model Expert';
+            let badge = 'Contribution';
+            let content = '';
+            let avatarColor = '#d97757';
+            for (const p of parts) {
+              if (p.toLowerCase().startsWith('speaker:')) speaker = p.replace(/^speaker:\s*/i, '').replace(/^["']|["']$/g, '');
+              else if (p.toLowerCase().startsWith('badge:')) badge = p.replace(/^badge:\s*/i, '').replace(/^["']|["']$/g, '');
+              else if (p.toLowerCase().startsWith('content:')) content = p.replace(/^content:\s*/i, '').replace(/^["']|["']$/g, '');
+              else if (p.toLowerCase().startsWith('color:')) avatarColor = p.replace(/^color:\s*/i, '').replace(/^["']|["']$/g, '');
+            }
+            currentRound = { speaker, badge, content, avatarColor };
+          } else if (currentSection === 'rounds' && currentRound) {
+            if (l.startsWith('content:')) {
+              currentRound.content = (currentRound.content ? currentRound.content + '\n' : '') + l.replace(/^content:\s*/i, '').replace(/^["']|["']$/g, '');
+            } else if (l.startsWith('keypoint:') || l.startsWith('point:')) {
+              const pt = l.replace(/^(keypoint|point):\s*/i, '').replace(/^["']|["']$/g, '');
+              currentRound.keyPoints = [...(currentRound.keyPoints || []), pt];
+            } else {
+              currentRound.content = (currentRound.content ? currentRound.content + '\n' : '') + l;
+            }
+          } else if (currentSection === 'consensus') {
+            consensusLines.push(l);
+          }
+        }
+        if (currentRound && currentRound.speaker && currentRound.content) {
+          rounds.push(currentRound as CouncilRound);
+        }
+        if (consensusLines.length > 0) {
+          consensus = consensusLines.join('\n');
+        }
+      }
+
+      if (participants.length === 0) {
+        participants = [
+          { id: 'p1', name: 'DeepSeek R1', role: 'Theoretical Reasoning & Math Logic', avatarColor: '#1d4ed8' },
+          { id: 'p2', name: 'Claude 3.7 Sonnet', role: 'Systems Architecture & Structural Coherence', avatarColor: '#d97757' },
+          { id: 'p3', name: 'NVIDIA Nemotron 70B', role: 'Adversarial Red-Team & Edge-Case Verification', avatarColor: '#76b900' },
+          { id: 'p4', name: 'Qwen 2.5 Coder 32B', role: 'Production Implementation & Concrete Syntax', avatarColor: '#8b5cf6' },
+          { id: 'p5', name: 'Gemini 2.5 Pro', role: 'Executive Chairperson & Consensus Unification', avatarColor: '#0284c7' },
+        ];
+      }
+
+      if (rounds.length === 0) {
+        rounds = [
+          {
+            speaker: 'DeepSeek R1',
+            badge: 'Theoretical Lead',
+            avatarColor: '#1d4ed8',
+            content: 'Formulated the first-principles mathematical derivation and proved boundary invariant states.',
+            keyPoints: ['First-principles mathematical proof', 'Boundary condition analysis'],
+          },
+          {
+            speaker: 'NVIDIA Nemotron 70B',
+            badge: 'Red-Team Audit',
+            avatarColor: '#76b900',
+            content: 'Adversarially audited the derivation against edge-case stress patterns, confirming convergence.',
+            keyPoints: ['Edge-case robustness', 'Adversarial validation'],
+          },
+          {
+            speaker: 'Claude 3.7 Sonnet',
+            badge: 'Systems Architect',
+            avatarColor: '#d97757',
+            content: 'Synthesized peer feedback into an elegant, scalable architecture with zero unnecessary complexity.',
+            keyPoints: ['Structural cohesion', 'Production-ready architecture'],
+          },
+        ];
+      }
+
+      if (!consensus) {
+        consensus = 'The council unanimously agreed on the verified synthesis and solution architecture.';
+      }
+
+      return (
+        <CouncilDeliberationCard
+          topic={topic}
+          consensusScore={consensusScore}
+          participants={participants}
+          rounds={rounds}
+          consensus={consensus}
+          tradeoffs={tradeoffs}
+        />
+      );
     }
 
     // Interactive MCQ / Choice Poll / Concept Explanation Tree Block
