@@ -311,9 +311,30 @@ export function ChatView({
     });
   };
 
-  // Toggle Live Voice mode on/off (PDF-specified Live Voice Space)
+  // Toggle Live Voice mode on/off (PDF-specified Live Voice Space with synchronous audio unlock)
   const toggleLiveVoice = useCallback(() => {
-    setIsLiveVoice((prev) => !prev);
+    setIsLiveVoice((prev) => {
+      const nextState = !prev;
+      if (nextState && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          // Synchronous user click unlock: speaks a silent utterance to satisfy browser audio autoplay policy
+          const unlock = new SpeechSynthesisUtterance(' ');
+          unlock.volume = 0.001;
+          window.speechSynthesis.speak(unlock);
+          window.speechSynthesis.resume();
+        } catch {
+          // Ignore
+        }
+      } else if (!nextState && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Ignore
+        }
+      }
+      return nextState;
+    });
   }, []);
 
   const handleCopy = (msgId: string, text: string) => {
