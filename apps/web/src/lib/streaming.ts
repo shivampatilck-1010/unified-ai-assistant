@@ -1,7 +1,13 @@
 // SSE streaming client for the chat endpoint
 
 import type { SSEEvent, SSEEventType, ChatRequest, ChunkCitation, ErrorData } from '../types';
-import { getStreamUrl, getCustomApiKey, getAuthToken } from './api';
+import {
+  getStreamUrl,
+  getCustomApiKey,
+  getCustomGroqKey,
+  getCustomOpenRouterKey,
+  getAuthToken,
+} from './api';
 
 export interface StreamCallbacks {
   onMessageStart: (conversationId: string, messageId: string) => void;
@@ -56,6 +62,8 @@ export async function streamChat(
 
   try {
     const customKey = getCustomApiKey();
+    const groqKey = getCustomGroqKey();
+    const openRouterKey = getCustomOpenRouterKey();
     const token = getAuthToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -63,6 +71,12 @@ export async function streamChat(
     };
     if (customKey) {
       headers['X-Gemini-Key'] = customKey;
+    }
+    if (groqKey) {
+      headers['X-Groq-Key'] = groqKey;
+    }
+    if (openRouterKey) {
+      headers['X-OpenRouter-Key'] = openRouterKey;
     }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -74,6 +88,8 @@ export async function streamChat(
       body: JSON.stringify({
         ...request,
         custom_api_key: customKey || undefined,
+        groq_api_key: groqKey || undefined,
+        openrouter_api_key: openRouterKey || undefined,
       }),
       signal,
     });

@@ -118,6 +118,36 @@ export function setCustomApiKey(key: string | null): void {
   }
 }
 
+export function getCustomGroqKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  const key = localStorage.getItem('unified_ai_custom_groq_key');
+  return key && key.trim() ? key.trim() : null;
+}
+
+export function setCustomGroqKey(key: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (key && key.trim()) {
+    localStorage.setItem('unified_ai_custom_groq_key', key.trim());
+  } else {
+    localStorage.removeItem('unified_ai_custom_groq_key');
+  }
+}
+
+export function getCustomOpenRouterKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  const key = localStorage.getItem('unified_ai_custom_openrouter_key');
+  return key && key.trim() ? key.trim() : null;
+}
+
+export function setCustomOpenRouterKey(key: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (key && key.trim()) {
+    localStorage.setItem('unified_ai_custom_openrouter_key', key.trim());
+  } else {
+    localStorage.removeItem('unified_ai_custom_openrouter_key');
+  }
+}
+
 export async function validateGeminiApiKey(
   key: string
 ): Promise<{ valid: boolean; message: string; models?: string[] }> {

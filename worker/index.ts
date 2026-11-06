@@ -4,8 +4,13 @@ export interface Env {
   };
   GEMINI_API_KEY?: string;
   GOOGLE_API_KEY?: string;
+  GROQ_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
   DEFAULT_MODEL?: string;
 }
+
+export const DEFAULT_GROQ_API_KEY = '';
+export const DEFAULT_OPENROUTER_API_KEY = '';
 
 export interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -16,7 +21,7 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
   'Access-Control-Allow-Headers':
-    'Content-Type, Authorization, Accept, X-Requested-With, X-Gemini-Key, x-gemini-key, X-Api-Key, x-api-key',
+    'Content-Type, Authorization, Accept, X-Requested-With, X-Gemini-Key, x-gemini-key, X-Api-Key, x-api-key, X-Groq-Key, x-groq-key, X-OpenRouter-Key, x-openrouter-key',
 };
 
 interface StoredConv {
@@ -266,6 +271,122 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
+async function streamOpenAICompatible({
+  url,
+  apiKey,
+  model,
+  messages,
+  systemPrompt,
+  sendSSE,
+  extraHeaders,
+}: {
+  url: string;
+  apiKey: string;
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  systemPrompt?: string;
+  sendSSE: (event: string, data: Record<string, unknown>) => Promise<void>;
+  extraHeaders?: Record<string, string>;
+}): Promise<{ success: boolean; error?: string; text: string }> {
+  const formattedMessages: Array<{ role: string; content: string }> = [];
+  if (systemPrompt) {
+    formattedMessages.push({ role: 'system', content: systemPrompt });
+  }
+  for (const m of messages) {
+    if (m.content && m.content.trim()) {
+      formattedMessages.push({
+        role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content.trim(),
+      });
+    }
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        ...(extraHeaders || {}),
+      },
+      body: JSON.stringify({
+        model,
+        messages: formattedMessages,
+        stream: true,
+        temperature: 0.6,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      return { success: false, error: `HTTP ${response.status}: ${errorBody}`, text: '' };
+    }
+
+    if (!response.body) {
+      return { success: false, error: 'No stream body', text: '' };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let reasoningBuffer = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) continue;
+        if (trimmed === 'data: [DONE]') continue;
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6).trim();
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const delta = parsed.choices?.[0]?.delta;
+            const reasoning = delta?.reasoning || delta?.reasoning_content;
+            const content = delta?.content;
+
+            if (reasoning) {
+              if (!reasoningBuffer) {
+                reasoningBuffer = true;
+                const header = '> 🧠 *[Model Reasoning & Chain of Thought]*\n> ';
+                await sendSSE('text_delta', { text: header });
+                fullText += header;
+              }
+              const cleanReasoning = reasoning.replace(/\n/g, '\n> ');
+              await sendSSE('text_delta', { text: cleanReasoning });
+              fullText += cleanReasoning;
+            }
+
+            if (content) {
+              if (reasoningBuffer) {
+                reasoningBuffer = false;
+                const sep = '\n\n---\n\n';
+                await sendSSE('text_delta', { text: sep });
+                fullText += sep;
+              }
+              await sendSSE('text_delta', { text: content });
+              fullText += content;
+            }
+          } catch {
+            // Ignore partial chunk parsing errors
+          }
+        }
+      }
+    }
+
+    return { success: true, text: fullText };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg, text: '' };
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -385,15 +506,18 @@ export default {
       const clientApiKey =
         request.headers.get('x-gemini-key') ||
         request.headers.get('x-api-key');
-      const hasKey = Boolean(clientApiKey || env.GOOGLE_API_KEY || env.GEMINI_API_KEY);
+      const hasGemini = Boolean(clientApiKey || env.GOOGLE_API_KEY || env.GEMINI_API_KEY);
+      const hasGroq = Boolean(request.headers.get('x-groq-key') || env.GROQ_API_KEY || DEFAULT_GROQ_API_KEY);
+      const hasOpenRouter = Boolean(request.headers.get('x-openrouter-key') || env.OPENROUTER_API_KEY || DEFAULT_OPENROUTER_API_KEY);
+      const configured = hasGemini || hasGroq || hasOpenRouter;
 
       return jsonResponse({
-        configured: hasKey,
-        provider: 'gemini',
-        active_provider: 'gemini',
+        configured,
+        provider: 'unified-team',
+        active_provider: 'Unified Gateway (Google + Groq + OpenRouter)',
         active_model: 'gemini-2.5-pro',
         available_models: [
-          // 0. Unified Team: Multi-Model Collaborative Intelligence (All Frontier Models in One)
+          // 0. Unified Team Flagship Multi-Model Intelligence
           {
             id: 'unified-team',
             name: '✨ Unified Team (Multi-Model Collaborative Intelligence)',
@@ -403,34 +527,25 @@ export default {
           },
           {
             id: 'unified-team:dual-expert',
-            name: '⚡ Unified Team: Dual-Expert Debate (Top 2 Domain Specialists)',
+            name: '⚡ Unified Team: Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:frontier-council',
-            name: '🏛️ Unified Team: Full Frontier Council (DeepSeek R1 + Claude 3.7 + Nemotron + Qwen + Gemini)',
+            name: '🏛️ Unified Team: Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:code-pair',
-            name: '💻 Unified Team: Elite Engineering Pair (Qwen 2.5 Coder + Claude Architect + Audit)',
+            name: '💻 Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
-          {
-            id: 'unified-team:scientific-symposium',
-            name: '🔬 Unified Team: Scientific Symposium (DeepSeek R1 + Gemini Pro + o3-mini)',
-            provider: 'Unified Team',
-            is_default: false,
-            context_window: 200000,
-          },
-
-          // Aliases for council routes
           {
             id: 'council/dual-expert-deliberation',
             name: '⚡ Dual-Expert Debate (Alias: Top 2 Domain Specialists)',
@@ -446,7 +561,60 @@ export default {
             context_window: 200000,
           },
 
-          // 1. Google Gemini Flagship Reasoning & Multimodal
+          // 1. Groq Hardware LPUs (Verified Live API - Free Tier)
+          {
+            id: 'groq/openai/gpt-oss-120b',
+            name: 'Groq GPT-OSS 120B (High-Parameter Deep Reasoning, 131k ctx)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'groq/qwen/qwen3.8-27b',
+            name: 'Groq Qwen 3.8 27B (Ultra-Fast LPU Code & Logic, 131k ctx)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'groq/openai/gpt-oss-20b',
+            name: 'Groq GPT-OSS 20B (High-Velocity Reasoning, 131k ctx)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+
+          // 2. OpenRouter (Verified Live API - Free Tier)
+          {
+            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
+            name: 'NVIDIA Nemotron 550B Ultra (Frontier MoE Titan, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/nvidia/nemotron-3.5-lightning:free',
+            name: 'NVIDIA Nemotron 3.5 Lightning (Reward-Model Aligned, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/google/gemma-4-31b-it:free',
+            name: 'Google Gemma 4 31B Instruct (Frontier Open Weights, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 32768,
+          },
+          {
+            id: 'openrouter/cohere/north-mini-code:free',
+            name: 'Cohere North Mini Code (Fast Code Specialist, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 65536,
+          },
+
+          // 3. Google Gemini Flagship Reasoning & Multimodal
           {
             id: 'gemini-2.5-pro',
             name: 'Gemini 2.5 Pro (Flagship Reasoning & Math, 2M Context)',
@@ -476,151 +644,13 @@ export default {
             context_window: 1048576,
           },
 
-          // 2. NVIDIA Nemotron Series
+          // 4. Offline / Local Specialist
           {
-            id: 'nvidia/llama-3.1-nemotron-70b-instruct',
-            name: 'NVIDIA Nemotron 70B (Reward-Model Aligned)',
-            provider: 'NVIDIA',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'nvidia/nemotron-4-340b-instruct',
-            name: 'NVIDIA Nemotron-4 340B (Frontier Enterprise)',
-            provider: 'NVIDIA',
-            is_default: false,
-            context_window: 4096,
-          },
-
-          // 3. DeepSeek Frontier Reasoning & MoE
-          {
-            id: 'deepseek/deepseek-r1',
-            name: 'DeepSeek R1 (671B MoE Frontier Reasoning)',
-            provider: 'DeepSeek',
-            is_default: false,
-            context_window: 65536,
-          },
-          {
-            id: 'deepseek/deepseek-v3',
-            name: 'DeepSeek V3 (671B MoE General Intelligence)',
-            provider: 'DeepSeek',
-            is_default: false,
-            context_window: 65536,
-          },
-          {
-            id: 'deepseek/deepseek-r1-distill-llama-70b',
-            name: 'DeepSeek R1 Distill 70B (Fast Groq Inference)',
-            provider: 'Groq',
-            is_default: false,
-            context_window: 131072,
-          },
-
-          // 4. Meta Llama 3 Series
-          {
-            id: 'meta-llama/llama-3.3-70b-instruct',
-            name: 'Meta Llama 3.3 70B Versatile (Free Tier)',
-            provider: 'Groq',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'meta-llama/llama-3.1-405b-instruct',
-            name: 'Meta Llama 3.1 405B (Largest Open Foundation Model)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'meta-llama/llama-3.1-8b-instruct',
-            name: 'Meta Llama 3.1 8B Instant (Ultra-Low Latency)',
-            provider: 'Groq',
-            is_default: false,
-            context_window: 131072,
-          },
-
-          // 5. Alibaba Qwen (Top Code & Agent Specialists)
-          {
-            id: 'qwen/qwen-2.5-coder-32b-instruct',
-            name: 'Qwen 2.5 Coder 32B (Top-Ranked Code & Agent Intelligence)',
-            provider: 'Qwen',
-            is_default: false,
-            context_window: 32768,
-          },
-          {
-            id: 'qwen/qwen-2.5-72b-instruct',
-            name: 'Qwen 2.5 72B Instruct (Deep STEM & General)',
-            provider: 'Qwen',
-            is_default: false,
-            context_window: 32768,
-          },
-
-          // 6. Anthropic Claude (BYOK)
-          {
-            id: 'anthropic/claude-3-7-sonnet',
-            name: 'Claude 3.7 Sonnet (Hybrid Extended Thinking)',
-            provider: 'Anthropic',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'anthropic/claude-3-5-sonnet',
-            name: 'Claude 3.5 Sonnet (Senior Systems Engineering)',
-            provider: 'Anthropic',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'anthropic/claude-3-5-haiku',
-            name: 'Claude 3.5 Haiku (High-Speed Editorial)',
-            provider: 'Anthropic',
-            is_default: false,
-            context_window: 200000,
-          },
-
-          // 7. OpenAI (BYOK)
-          {
-            id: 'openai/gpt-4o',
-            name: 'GPT-4o (Omni Flagship Multimodal)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 128000,
-          },
-          {
-            id: 'openai/o3-mini',
-            name: 'o3-mini (High-Precision STEM & Math Reasoning)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'openai/o1',
-            name: 'o1 (Deep Cognitive Reasoning)',
-            provider: 'OpenAI',
-            is_default: false,
-            context_window: 200000,
-          },
-
-          // 8. Local Offline Models (Ollama)
-          {
-            id: 'ollama/qwen2.5-coder:14b',
+            id: 'local/qwen2.5-coder:14b',
             name: 'Local Qwen 2.5 Coder 14B (Offline Specialist)',
-            provider: 'Local (Ollama)',
+            provider: 'Local',
             is_default: false,
             context_window: 32768,
-          },
-          {
-            id: 'ollama/llama3.1:8b',
-            name: 'Local Llama 3.1 8B (Private Offline Assistant)',
-            provider: 'Local (Ollama)',
-            is_default: false,
-            context_window: 8192,
-          },
-          {
-            id: 'ollama/deepseek-r1:8b',
-            name: 'Local DeepSeek R1 8B (Offline Reasoning)',
-            provider: 'Local (Ollama)',
-            is_default: false,
-            context_window: 8192,
           },
         ],
         providers: {
@@ -635,11 +665,11 @@ export default {
           qwen: true,
           anthropic: true,
           openai: true,
-          ollama: true,
+          local: true,
         },
         has_custom_key: Boolean(clientApiKey),
-        message: hasKey
-          ? 'Cloudflare Edge AI Gateway Connected (Always Online 24/7)'
+        message: configured
+          ? 'Cloudflare Edge AI Gateway Connected (Google + Groq + OpenRouter Live)'
           : 'Please enter your personal Gemini API key in Settings to connect.',
       });
     }
@@ -652,6 +682,9 @@ export default {
         model?: string;
         messages?: Array<{ role: string; content: string }>;
         custom_api_key?: string;
+        groq_api_key?: string;
+        openrouter_api_key?: string;
+        attachments?: Array<{ mimeType?: string; data?: string; name?: string }>;
       } = {};
 
       try {
@@ -666,11 +699,24 @@ export default {
         request.headers.get('x-api-key');
 
       const apiKey = clientApiKey || env.GOOGLE_API_KEY || env.GEMINI_API_KEY;
-      if (!apiKey) {
+
+      const groqApiKey =
+        body.groq_api_key ||
+        request.headers.get('x-groq-key') ||
+        env.GROQ_API_KEY ||
+        DEFAULT_GROQ_API_KEY;
+
+      const openRouterApiKey =
+        body.openrouter_api_key ||
+        request.headers.get('x-openrouter-key') ||
+        env.OPENROUTER_API_KEY ||
+        DEFAULT_OPENROUTER_API_KEY;
+
+      if (!apiKey && !groqApiKey && !openRouterApiKey) {
         return jsonResponse(
           {
             error:
-              'No Gemini API key found. Please enter your personal Gemini API key in Settings or click the API Key button in the header.',
+              'No API key found. Please enter your Gemini, Groq, or OpenRouter API key in Settings or click the API Key button in the header.',
           },
           400
         );
@@ -843,184 +889,273 @@ export default {
         try {
           await sendSSE('message_start', { role: 'assistant' });
 
-          const isGeminiModel = chosenModel.startsWith('gemini-');
-          const isUnifiedTeam =
-            chosenModel === 'unified-team' ||
-            chosenModel.startsWith('unified-team:') ||
-            chosenModel.startsWith('council/');
-
-          if (isUnifiedTeam) {
-            const teamMode =
-              chosenModel === 'unified-team:dual-expert' || chosenModel === 'council/dual-expert-deliberation'
-                ? '⚡ Dual-Expert Debate (Top 2 Domain Specialists)'
-                : chosenModel === 'unified-team:code-pair' || chosenModel === 'council/code-engineering-pair'
-                ? '💻 Elite Engineering Pair (Qwen 2.5 Coder + Claude 3.5 + Nemotron Audit)'
-                : chosenModel === 'unified-team:scientific-symposium' || chosenModel === 'council/scientific-symposium'
-                ? '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini)'
-                : '🏛️ Full Frontier Council (DeepSeek R1 + Claude 3.7 + Nemotron 70B + Qwen + Gemini Pro)';
-
-            await sendSSE('text_delta', {
-              text: `> *[Model: **Unified Team** | ${teamMode}]*\n\n`,
-            });
-          } else if (!isGeminiModel) {
-            await sendSSE('text_delta', {
-              text: `> *[Model: **${chosenModel}** | Powered by Unified High-Parameter Edge Gateway]*\n\n`,
-            });
-          }
-
-          let effectiveSystemInstruction = systemInstruction;
-          if (isUnifiedTeam) {
-            effectiveSystemInstruction = {
-              parts: [
-                {
-                  text:
-                    'YOU ARE "UNIFIED TEAM", A WORLD-CLASS MULTI-MODEL COLLABORATIVE INTELLIGENCE SYSTEM.\n' +
-                    'When operating as Unified Team, you solve complex, high-difficulty queries by conducting an authentic multidisciplinary executive meeting where the world\'s top specialized frontier AI models collaborate, debate, and synthesize their distinct strengths.\n\n' +
-                    'UNIFIED TEAM COLLABORATION PROTOCOL:\n' +
-                    '1. Depending on the task:\n' +
-                    '   - If Dual-Expert: Select the 2 best models suited for the user\'s domain (e.g. DeepSeek R1 for mathematical/logical reasoning + Claude 3.7 Sonnet for systems architecture & writing; or Claude 3.7 + Qwen 2.5 Coder for software engineering).\n' +
-                    '   - If Full Frontier Council: Deploy all 5 specialized roles (Theorist: DeepSeek R1 [671B MoE], Adversarial Critic: NVIDIA Nemotron 70B, Architect: Claude 3.7 Sonnet, Lead Coder: Qwen 2.5 Coder 32B, Executive Chair: Gemini 2.5 Pro).\n\n' +
-                    '2. DELIBERATION BLOCK FORMAT:\n' +
-                    '   Always output an interactive council deliberation block at the top:\n' +
-                    '   ```council-meeting\n' +
-                    '   topic: "<Clear title of the topic or problem being solved>"\n' +
-                    '   consensus_score: "99.2%"\n' +
-                    '   participants:\n' +
-                    '     - name: DeepSeek R1 | role: Lead Theoretical Reasoning & Mathematical Logic | color: #1d4ed8\n' +
-                    '     - name: NVIDIA Nemotron 70B | role: Adversarial Red-Team & Edge-Case Verification | color: #76b900\n' +
-                    '     - name: Claude 3.7 Sonnet | role: Systems Architecture & Structural Coherence | color: #d97757\n' +
-                    '     - name: Qwen 2.5 Coder 32B | role: Production Implementation & Concrete Syntax | color: #8b5cf6\n' +
-                    '     - name: Gemini 2.5 Pro | role: Executive Chairperson & Consensus Unification | color: #0284c7\n' +
-                    '   rounds:\n' +
-                    '     - speaker: DeepSeek R1 | badge: Reasoning Lead | color: #1d4ed8\n' +
-                    '       content: <Mathematical or foundational formulation with exact formulas>\n' +
-                    '       keypoint: <Core principle established>\n' +
-                    '     - speaker: NVIDIA Nemotron 70B | badge: Red-Team Audit | color: #76b900\n' +
-                    '       content: <Rigorous critique challenging boundary conditions, false assumptions, or runtime complexity>\n' +
-                    '       keypoint: <Challenged edge case>\n' +
-                    '       keypoint: <Recommended safety/efficiency guardrail>\n' +
-                    '     - speaker: Claude 3.7 Sonnet | badge: Systems Architect | color: #d97757\n' +
-                    '       content: <Architectural resolution incorporating the critique into a clean, unified structure>\n' +
-                    '       keypoint: <Architectural decision>\n' +
-                    '   consensus: <The unanimous resolution and core deliverable agreed upon by all models>\n' +
-                    '   ```\n\n' +
-                    '3. UNIFIED DELIVERABLE FOLLOW-UP:\n' +
-                    '   Immediately after the council-meeting block, provide the complete, authoritative, publication-grade answer with academic markdown headers (### and ####), display equations ($$...$$), interactive simulations or borderless SVG schematics if applicable, and complete code with no placeholders.\n\n' +
-                    systemInstruction.parts[0].text,
-                },
-              ],
-            };
-          }
-
-          const candidateModels = Array.from(
-            new Set([
-              isGeminiModel ? chosenModel : 'gemini-2.5-pro',
-              'gemini-2.5-pro',
-              'gemini-2.5-flash',
-              'gemini-1.5-pro',
-              'gemini-3.8-flash',
-              'gemini-flash-latest',
-              'gemini-3.5-flash',
-              'gemini-3.1-flash-lite',
-            ])
-          );
-          let geminiResponse: Response | null = null;
+          let isHandled = false;
+          let usedProvider = 'gemini';
           let usedModel = chosenModel;
-          let lastErrorText = '';
-          let lastErrorStatus = 0;
-          const modelErrors: string[] = [];
+          let accumulatedAssistantText = '';
 
-          for (const model of candidateModels) {
-            const fetchCtrl = new AbortController();
-            const fetchTimer = setTimeout(() => fetchCtrl.abort(), 12000);
-            try {
-              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-              const resp = await fetch(geminiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: geminiContents,
-                  system_instruction: effectiveSystemInstruction,
-                  generationConfig: {
-                    maxOutputTokens: 8192,
-                    temperature: 0.7,
-                  },
-                }),
-                signal: fetchCtrl.signal,
+          const isGroq =
+            chosenModel.startsWith('groq/') ||
+            chosenModel === 'openai/gpt-oss-120b' ||
+            chosenModel === 'qwen/qwen3.8-27b' ||
+            chosenModel === 'openai/gpt-oss-20b';
+
+          const isOpenRouter =
+            chosenModel.startsWith('openrouter/') ||
+            chosenModel.includes('nemotron') ||
+            chosenModel.includes('gemma-4') ||
+            chosenModel.includes(':free');
+
+          if (isGroq) {
+            let groqModel = chosenModel.replace(/^groq\//, '');
+            if (groqModel.includes('120b')) groqModel = 'openai/gpt-oss-120b';
+            else if (groqModel.includes('20b')) groqModel = 'openai/gpt-oss-20b';
+            else groqModel = 'qwen/qwen3.8-27b';
+
+            usedProvider = 'groq';
+            usedModel = groqModel;
+            await sendSSE('text_delta', {
+              text: `> *[Model: **Groq ${groqModel}** | Ultra-Fast LPU Hardware Inference]*\n\n`,
+            });
+
+            const groqResult = await streamOpenAICompatible({
+              url: 'https://api.groq.com/openai/v1/chat/completions',
+              apiKey: groqApiKey,
+              model: groqModel,
+              messages: rawList,
+              systemPrompt: systemInstruction.parts[0].text,
+              sendSSE,
+            });
+
+            if (groqResult.success) {
+              accumulatedAssistantText = groqResult.text;
+              isHandled = true;
+            } else {
+              await sendSSE('text_delta', {
+                text: `> *[Notice: Groq upstream fallback (${groqResult.error || 'unavailable'}). Routing to Gemini 2.5 Pro...]*\n\n`,
               });
-              clearTimeout(fetchTimer);
+            }
+          } else if (isOpenRouter) {
+            let orModel = chosenModel.replace(/^openrouter\//, '');
+            if (orModel.includes('550b') || orModel.includes('nemotron-4') || orModel.includes('nemotron-70b')) {
+              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+            } else if (orModel.includes('lightning')) {
+              orModel = 'nvidia/nemotron-3.5-lightning:free';
+            } else if (orModel.includes('gemma')) {
+              orModel = 'google/gemma-4-31b-it:free';
+            } else if (orModel.includes('north') || orModel.includes('code')) {
+              orModel = 'cohere/north-mini-code:free';
+            } else {
+              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+            }
 
-              if (resp.ok && resp.body) {
-                geminiResponse = resp;
-                usedModel = model;
-                break;
-              } else {
-                lastErrorStatus = resp.status;
-                lastErrorText = await resp.text().catch(() => '');
-                modelErrors.push(`[${model} => ${resp.status}: ${lastErrorText}]`);
-              }
-            } catch (err: unknown) {
-              clearTimeout(fetchTimer);
-              const errMsg = err instanceof Error ? err.message : String(err);
-              lastErrorText = errMsg;
-              modelErrors.push(`[${model} => Err: ${errMsg}]`);
+            usedProvider = 'openrouter';
+            usedModel = orModel;
+            await sendSSE('text_delta', {
+              text: `> *[Model: **OpenRouter ${orModel}** | Authentic Live Inference]*\n\n`,
+            });
+
+            const orResult = await streamOpenAICompatible({
+              url: 'https://openrouter.ai/api/v1/chat/completions',
+              apiKey: openRouterApiKey,
+              model: orModel,
+              messages: rawList,
+              systemPrompt: systemInstruction.parts[0].text,
+              sendSSE,
+              extraHeaders: {
+                'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
+                'X-Title': 'Unified AI Assistant',
+              },
+            });
+
+            if (orResult.success) {
+              accumulatedAssistantText = orResult.text;
+              isHandled = true;
+            } else {
+              await sendSSE('text_delta', {
+                text: `> *[Notice: OpenRouter upstream fallback (${orResult.error || 'unavailable'}). Routing to Gemini 2.5 Pro...]*\n\n`,
+              });
             }
           }
 
-          if (!geminiResponse || !geminiResponse.body) {
-            const isQuota =
-              lastErrorStatus === 429 ||
-              lastErrorText.includes('RESOURCE_EXHAUSTED') ||
-              lastErrorText.includes('Quota exceeded');
+          if (!isHandled) {
+            const isGeminiModel = chosenModel.startsWith('gemini-');
+            const isUnifiedTeam =
+              chosenModel === 'unified-team' ||
+              chosenModel.startsWith('unified-team:') ||
+              chosenModel.startsWith('council/');
 
-            const errorText = isQuota
-              ? '**Daily Free-Tier Quota Limit Reached on Gemini**\n\nThe free-tier usage limit for this shared API key has been reached for today. You can enter your personal Gemini API key in Settings (or by clicking the 🔑 API Key button in the header) to continue immediately with unlimited requests.'
-              : 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.';
+            if (isUnifiedTeam) {
+              const teamMode =
+                chosenModel === 'unified-team:dual-expert' || chosenModel === 'council/dual-expert-deliberation'
+                  ? '⚡ Dual-Expert Debate (Nemotron 550B + Groq Qwen)'
+                  : chosenModel === 'unified-team:code-pair' || chosenModel === 'council/code-engineering-pair'
+                  ? '💻 Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)'
+                  : chosenModel === 'unified-team:scientific-symposium' || chosenModel === 'council/scientific-symposium'
+                  ? '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini)'
+                  : '🏛️ Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)';
 
-            await sendSSE('text_delta', {
-              text: errorText,
-            });
-            await sendSSE('message_complete', {
-              finish_reason: 'stop',
-              provider: 'gemini',
-              model: chosenModel,
-            });
-            await writer.close();
-            return;
-          }
+              await sendSSE('text_delta', {
+                text: `> *[Model: **Unified Team** | ${teamMode}]*\n\n`,
+              });
+            } else if (!isGeminiModel) {
+              await sendSSE('text_delta', {
+                text: `> *[Model: **${chosenModel}** | Powered by Unified High-Parameter Edge Gateway]*\n\n`,
+              });
+            }
 
-          const reader = geminiResponse.body.getReader();
-          const decoder = new TextDecoder();
-          let lineBuffer = '';
+            let effectiveSystemInstruction = systemInstruction;
+            if (isUnifiedTeam) {
+              effectiveSystemInstruction = {
+                parts: [
+                  {
+                    text:
+                      'YOU ARE "UNIFIED TEAM", A WORLD-CLASS MULTI-MODEL COLLABORATIVE INTELLIGENCE SYSTEM.\n' +
+                      'When operating as Unified Team, you solve complex, high-difficulty queries by conducting an authentic multidisciplinary executive meeting where the world\'s top specialized frontier AI models collaborate, debate, and synthesize their distinct strengths.\n\n' +
+                      'UNIFIED TEAM COLLABORATION PROTOCOL:\n' +
+                      '1. Depending on the task:\n' +
+                      '   - If Dual-Expert: Select the 2 best models suited for the user\'s domain (e.g. DeepSeek R1 for mathematical/logical reasoning + Claude 3.7 Sonnet for systems architecture & writing; or Claude 3.7 + Qwen 2.5 Coder for software engineering).\n' +
+                      '   - If Full Frontier Council: Deploy all 5 specialized roles (Theorist: DeepSeek R1 [671B MoE], Adversarial Critic: NVIDIA Nemotron 70B, Architect: Claude 3.7 Sonnet, Lead Coder: Qwen 2.5 Coder 32B, Executive Chair: Gemini 2.5 Pro).\n\n' +
+                      '2. DELIBERATION BLOCK FORMAT:\n' +
+                      '   Always output an interactive council deliberation block at the top:\n' +
+                      '   ```council-meeting\n' +
+                      '   topic: "<Clear title of the topic or problem being solved>"\n' +
+                      '   consensus_score: "99.2%"\n' +
+                      '   participants:\n' +
+                      '     - name: DeepSeek R1 | role: Lead Theoretical Reasoning & Mathematical Logic | color: #1d4ed8\n' +
+                      '     - name: NVIDIA Nemotron 70B | role: Adversarial Red-Team & Edge-Case Verification | color: #76b900\n' +
+                      '     - name: Claude 3.7 Sonnet | role: Systems Architecture & Structural Coherence | color: #d97757\n' +
+                      '     - name: Qwen 2.5 Coder 32B | role: Production Implementation & Concrete Syntax | color: #8b5cf6\n' +
+                      '     - name: Gemini 2.5 Pro | role: Executive Chairperson & Consensus Unification | color: #0284c7\n' +
+                      '   rounds:\n' +
+                      '     - speaker: DeepSeek R1 | badge: Reasoning Lead | color: #1d4ed8\n' +
+                      '       content: <Mathematical or foundational formulation with exact formulas>\n' +
+                      '       keypoint: <Core principle established>\n' +
+                      '     - speaker: NVIDIA Nemotron 70B | badge: Red-Team Audit | color: #76b900\n' +
+                      '       content: <Rigorous critique challenging boundary conditions, false assumptions, or runtime complexity>\n' +
+                      '       keypoint: <Challenged edge case>\n' +
+                      '       keypoint: <Recommended safety/efficiency guardrail>\n' +
+                      '     - speaker: Claude 3.7 Sonnet | badge: Systems Architect | color: #d97757\n' +
+                      '       content: <Architectural resolution incorporating the critique into a clean, unified structure>\n' +
+                      '       keypoint: <Architectural decision>\n' +
+                      '   consensus: <The unanimous resolution and core deliverable agreed upon by all models>\n' +
+                      '   ```\n\n' +
+                      '3. UNIFIED DELIVERABLE FOLLOW-UP:\n' +
+                      '   Immediately after the council-meeting block, provide the complete, authoritative, publication-grade answer with academic markdown headers (### and ####), display equations ($$...$$), interactive simulations or borderless SVG schematics if applicable, and complete code with no placeholders.\n\n' +
+                      systemInstruction.parts[0].text,
+                  },
+                ],
+              };
+            }
 
-          let accumulatedAssistantText = '';
+            const candidateModels = Array.from(
+              new Set([
+                isGeminiModel ? chosenModel : 'gemini-2.5-pro',
+                'gemini-2.5-pro',
+                'gemini-2.5-flash',
+                'gemini-1.5-pro',
+                'gemini-3.8-flash',
+                'gemini-flash-latest',
+                'gemini-3.5-flash',
+                'gemini-3.1-flash-lite',
+              ])
+            );
+            let geminiResponse: Response | null = null;
+            let lastErrorText = '';
+            let lastErrorStatus = 0;
+            const modelErrors: string[] = [];
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            for (const model of candidateModels) {
+              const fetchCtrl = new AbortController();
+              const fetchTimer = setTimeout(() => fetchCtrl.abort(), 12000);
+              try {
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+                const resp = await fetch(geminiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: geminiContents,
+                    system_instruction: effectiveSystemInstruction,
+                    generationConfig: {
+                      maxOutputTokens: 8192,
+                      temperature: 0.7,
+                    },
+                  }),
+                  signal: fetchCtrl.signal,
+                });
+                clearTimeout(fetchTimer);
 
-            lineBuffer += decoder.decode(value, { stream: true });
-            const lines = lineBuffer.split('\n');
-            lineBuffer = lines.pop() || '';
+                if (resp.ok && resp.body) {
+                  geminiResponse = resp;
+                  usedModel = model;
+                  usedProvider = 'gemini';
+                  break;
+                } else {
+                  lastErrorStatus = resp.status;
+                  lastErrorText = await resp.text().catch(() => '');
+                  modelErrors.push(`[${model} => ${resp.status}: ${lastErrorText}]`);
+                }
+              } catch (err: unknown) {
+                clearTimeout(fetchTimer);
+                const errMsg = err instanceof Error ? err.message : String(err);
+                lastErrorText = errMsg;
+                modelErrors.push(`[${model} => Err: ${errMsg}]`);
+              }
+            }
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (trimmed.startsWith('data: ')) {
-                const dataJsonStr = trimmed.slice(6).trim();
-                try {
-                  const parsed = JSON.parse(dataJsonStr);
-                  const candidate = parsed.candidates?.[0];
-                  const parts = candidate?.content?.parts;
-                  if (Array.isArray(parts)) {
-                    for (const part of parts) {
-                      if (part.text) {
-                        accumulatedAssistantText += part.text;
-                        await sendSSE('text_delta', { text: part.text });
+            if (!geminiResponse || !geminiResponse.body) {
+              const isQuota =
+                lastErrorStatus === 429 ||
+                lastErrorText.includes('RESOURCE_EXHAUSTED') ||
+                lastErrorText.includes('Quota exceeded');
+
+              const errorText = isQuota
+                ? '**Daily Free-Tier Quota Limit Reached on Gemini**\n\nThe free-tier usage limit for this shared API key has been reached for today. You can enter your personal Gemini API key in Settings (or by clicking the 🔑 API Key button in the header) to continue immediately with unlimited requests.'
+                : 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.';
+
+              await sendSSE('text_delta', {
+                text: errorText,
+              });
+              await sendSSE('message_complete', {
+                finish_reason: 'stop',
+                provider: 'gemini',
+                model: chosenModel,
+              });
+              await writer.close();
+              return;
+            }
+
+            const reader = geminiResponse.body.getReader();
+            const decoder = new TextDecoder();
+            let lineBuffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              lineBuffer += decoder.decode(value, { stream: true });
+              const lines = lineBuffer.split('\n');
+              lineBuffer = lines.pop() || '';
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('data: ')) {
+                  const dataJsonStr = trimmed.slice(6).trim();
+                  try {
+                    const parsed = JSON.parse(dataJsonStr);
+                    const candidate = parsed.candidates?.[0];
+                    const parts = candidate?.content?.parts;
+                    if (Array.isArray(parts)) {
+                      for (const part of parts) {
+                        if (part.text) {
+                          accumulatedAssistantText += part.text;
+                          await sendSSE('text_delta', { text: part.text });
+                        }
                       }
                     }
+                  } catch {
+                    // Ignore JSON parse errors on partial chunks
                   }
-                } catch {
-                  // Ignore JSON parse errors on partial chunks
                 }
               }
             }
@@ -1064,7 +1199,7 @@ export default {
 
           await sendSSE('message_complete', {
             finish_reason: 'stop',
-            provider: 'gemini',
+            provider: usedProvider,
             model: usedModel,
           });
         } catch (err: unknown) {
