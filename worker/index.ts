@@ -1114,7 +1114,7 @@ export default {
             }
 
             await sendSSE('text_delta', {
-              text: `> ⚡ **Auto-Routed** to **${specialistName}**\n> *Task Domain: **${taskDomain}** · Dynamically selected for peak effectiveness.*\n\n`,
+              text: `> **Auto-Routed** to **${specialistName}**\n> *Task Domain: **${taskDomain}** · Dynamically selected for peak effectiveness.*\n\n`,
             });
 
             chosenModel = autoTarget;

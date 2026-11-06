@@ -13,16 +13,13 @@ interface AgentStepsTrayProps {
   isStreaming: boolean;
   promptText?: string;
   customSteps?: StepItem[];
-  defaultExpanded?: boolean;
 }
 
 export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
   isStreaming,
   promptText = '',
   customSteps,
-  defaultExpanded = false,
 }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
   const [elapsedMs, setElapsedMs] = useState<number>(1200);
   const startTimeRef = useRef<number>(Date.now());
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
@@ -190,12 +187,13 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
 
   const elapsedSec = Math.max(1, Math.round(elapsedMs / 1000));
 
-  // --- STREAMING VIEW (Variant 1: Slim Obsidian Bar - Background #070709 - Single Line In-Place Transition) ---
+  // --- STREAMING VIEW (Slim Animated Obsidian Single Line) ---
   if (isStreaming) {
     const currentStep = steps[Math.min(activeStepIndex, steps.length - 1)];
 
     return (
-      <div className="ghost-single-bar" role="status" aria-live="polite">
+      <div className="ghost-single-bar ghost-single-bar--streaming" role="status" aria-live="polite">
+        <div className="ghost-shimmer-beam" />
         <div className="ghost-single-bar__left">
           <span className="ghost-badge">
             {currentStep.action.toUpperCase()}
@@ -214,55 +212,27 @@ export const AgentStepsTray: React.FC<AgentStepsTrayProps> = ({
     );
   }
 
-  // --- COMPLETED COLLAPSIBLE VIEW (Matching Slim Obsidian Bar #070709) ---
+  // --- COMPLETED SINGLE-LINE VIEW (Zero downward expansion - Sleek & Compact) ---
   return (
     <div className="antigravity-thought-tray">
-      {/* Clickable Header Bar */}
-      <button
-        type="button"
+      <div
         className="ghost-single-bar ghost-single-bar--completed"
-        onClick={() => setIsOpen(!isOpen)}
-        title={isOpen ? 'Collapse thought steps' : 'Expand thought steps'}
+        title={`Neural reasoning completed in ${elapsedSec}s across ${steps.length} cognitive steps`}
       >
         <div className="ghost-single-bar__left">
-          <svg className="ghost-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5">
+          <svg className="ghost-check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.8">
             <polyline points="20 6 9 17 4 12" />
           </svg>
           <span className="ghost-completed-text">
             Thought for {elapsedSec}s · {steps.length} steps completed
           </span>
         </div>
-
-        <div className="ghost-chevron">
-          <svg
-            className={`ghost-chevron-icon ${isOpen ? 'ghost-chevron-icon--open' : ''}`}
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#71717a"
-            strokeWidth="2.2"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+        <div className="ghost-completed-pills">
+          <span className="ghost-completed-chip">ANALYZED</span>
+          <span className="ghost-completed-chip">SYNTHESIZED</span>
+          <span className="ghost-completed-chip">VERIFIED</span>
         </div>
-      </button>
-
-      {/* Expanded Step Rows (Only when user explicitly clicks to expand) */}
-      {isOpen && (
-        <div className="ghost-steps-dropdown">
-          {steps.map((step) => (
-            <div key={step.id} className="ghost-step-row">
-              <span className="ghost-badge ghost-badge--row">{step.action.toUpperCase()}</span>
-              <span className="ghost-row-desc">{step.text}</span>
-              <div className="ghost-row-meta">
-                {step.tag && <span className="ghost-meta-tag">{step.tag}</span>}
-                {step.hasArrow && <span className="ghost-row-arrow">&gt;</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -96,13 +96,52 @@
   }
 }
 
+/* Shimmer Beam Animation for Streaming */
+.ghost-single-bar--streaming {
+  position: relative;
+  background: linear-gradient(90deg, #0a0c13 0%, #111420 50%, #0a0c13 100%);
+  background-size: 200% 100%;
+  animation: ghostBarGlow 2.5s infinite linear;
+  border-color: rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.08);
+}
+
+.ghost-shimmer-beam {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.12), transparent);
+  animation: ghostShimmerSweep 2.2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes ghostBarGlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes ghostShimmerSweep {
+  0% {
+    left: -50%;
+  }
+  100% {
+    left: 150%;
+  }
+}
+
 /* Right Status Counter */
 .ghost-counter {
   display: flex;
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  color: #a1a1aa;
+  color: #38bdf8;
   font-family: var(--font-mono, monospace);
   flex-shrink: 0;
   margin-left: 12px;
@@ -112,7 +151,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1.5px solid #d97757;
+  border: 1.5px solid #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
   animation: ghostRingPulse 1.4s infinite;
 }
 
@@ -128,122 +168,60 @@
 }
 
 /* ==========================================================================
-   Completed State Button
+   Completed State Single-Line Bar (Zero Downward Expansion)
    ========================================================================== */
 .antigravity-thought-tray {
-  margin: 4px 0 12px 0;
+  margin: 4px 0 10px 0;
   width: 100%;
 }
 
 .ghost-single-bar--completed {
-  cursor: pointer;
-  background: #0c0e15;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: #090b10;
+  border-color: rgba(255, 255, 255, 0.07);
   text-align: left;
+  height: 34px;
 }
 
 .ghost-single-bar--completed:hover {
-  background: #111420;
-  border-color: rgba(56, 189, 248, 0.35);
+  background: #0d1017;
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 .ghost-check-icon {
-  color: #ffffff;
+  color: #22c55e;
   flex-shrink: 0;
 }
 
 .ghost-completed-text {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: #ffffff;
+  color: #d4d4d8;
   letter-spacing: -0.01em;
 }
 
-.ghost-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.ghost-chevron-icon {
-  transition: transform 0.2s ease;
-}
-
-.ghost-chevron-icon--open {
-  transform: rotate(180deg);
-}
-
-/* ==========================================================================
-   Expanded Dropdown (Only when clicked)
-   ========================================================================== */
-.ghost-steps-dropdown {
-  margin-top: 6px;
-  background: #070709;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  animation: ghostDropIn 0.16s ease-out;
-}
-
-@keyframes ghostDropIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.ghost-step-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  padding: 2px 0;
-}
-
-.ghost-row-desc {
-  flex: 1;
-  min-width: 0;
-  color: #d4d4d8;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ghost-row-meta {
+.ghost-completed-pills {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
 
-.ghost-meta-tag {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.ghost-completed-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 4px;
   padding: 1.5px 6px;
-  color: #a1a1aa;
-  font-size: 11px;
+  color: #71717a;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   font-family: var(--font-mono, monospace);
 }
 
-.ghost-row-arrow {
-  color: #71717a;
-  font-size: 13px;
-  font-weight: 600;
-}
-
 @media (max-width: 640px) {
-  .ghost-counter {
+  .ghost-counter,
+  .ghost-completed-pills {
     display: none;
   }
 }

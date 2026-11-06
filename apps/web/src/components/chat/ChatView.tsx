@@ -479,7 +479,6 @@ export function ChatView({
                       <AgentStepsTray
                         isStreaming={Boolean(msg.isStreaming)}
                         promptText={promptContext}
-                        defaultExpanded={Boolean(msg.isStreaming && !msg.content)}
                       />
                     )}
 

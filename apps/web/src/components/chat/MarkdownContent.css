@@ -581,3 +581,102 @@
 .md-table tr:hover td {
   background: rgba(240, 237, 230, 0.03);
 }
+
+/* ==========================================================================
+   Auto-Route Brand Logo Banner (Deep Obsidian #090b10)
+   ========================================================================== */
+.md-autoroute-banner {
+  background: #090b10;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid #38bdf8;
+  border-radius: 9px;
+  padding: 8px 14px;
+  margin: 8px 0 14px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+}
+
+.md-autoroute-banner:hover {
+  background: #0d1017;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.md-autoroute-banner__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.md-autoroute-banner__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+.md-autoroute-banner__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.md-autoroute-banner__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: #f4f4f5;
+  flex-wrap: wrap;
+}
+
+.md-autoroute-banner__prefix {
+  color: #a1a1aa;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.md-autoroute-banner__name {
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 13.5px;
+}
+
+.md-autoroute-banner__subtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #71717a;
+  flex-wrap: wrap;
+}
+
+.md-autoroute-banner__tag {
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 600;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.02em;
+}
+
+.md-autoroute-banner__meta {
+  color: #71717a;
+}
+
+@media (max-width: 640px) {
+  .md-autoroute-banner__meta {
+    display: none;
+  }
+}

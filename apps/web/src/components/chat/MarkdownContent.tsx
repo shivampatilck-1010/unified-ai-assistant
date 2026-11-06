@@ -12,6 +12,7 @@ import { UniversalDiagramCard } from './UniversalDiagramCard';
 import { CouncilDeliberationCard, type CouncilParticipant, type CouncilRound } from './CouncilDeliberationCard';
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
+import { CompanyLogo } from '../brand/CompanyLogo';
 import './MarkdownContent.css';
 
 // Initialize Mermaid once with dark theme
@@ -325,6 +326,79 @@ const KaTeXInline: React.FC<{ math: string }> = ({ math }) => {
       className="katex-inline-container"
       dangerouslySetInnerHTML={{ __html: html }}
     />
+  );
+};
+
+interface AutoRouteBannerProps {
+  rawText: string;
+}
+
+const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
+  const clean = rawText.replace(/^>\s?/gm, '').trim();
+  const stripped = clean.replace(/[*_~`⚡]/g, '').trim();
+
+  // Extract model name
+  let targetModel = 'Google Gemini 2.5 Flash';
+  const autoMatch = stripped.match(/(?:Auto-Routed to|Routing to|Model:)\s*([^\n|·]+)/i);
+  if (autoMatch && autoMatch[1]) {
+    targetModel = autoMatch[1].trim();
+  }
+
+  // Extract task domain
+  let taskDomain = '';
+  const domainMatch = stripped.match(/Task Domain:\s*([^\n·]+)/i);
+  if (domainMatch && domainMatch[1]) {
+    taskDomain = domainMatch[1].trim();
+  }
+
+  // Determine provider for vector logo
+  const lower = (targetModel + ' ' + stripped).toLowerCase();
+  let provider = 'google';
+  let modelId = 'gemini-2.5-flash';
+
+  if (lower.includes('nemotron') || lower.includes('nvidia')) {
+    provider = 'nvidia';
+    modelId = 'nemotron';
+  } else if (lower.includes('groq') || lower.includes('gpt-oss') || lower.includes('lpu')) {
+    provider = 'groq';
+    modelId = lower.includes('qwen') ? 'qwen' : 'gpt-oss-120b';
+  } else if (lower.includes('qwen')) {
+    provider = 'qwen';
+    modelId = 'qwen';
+  } else if (lower.includes('cohere') || lower.includes('north')) {
+    provider = 'cohere';
+    modelId = 'north-mini-code';
+  } else if (lower.includes('openai') || lower.includes('gpt-4') || lower.includes('gpt-5') || lower.includes('o3-mini')) {
+    provider = 'openai';
+    modelId = 'gpt-4o';
+  } else if (lower.includes('anthropic') || lower.includes('claude')) {
+    provider = 'anthropic';
+    modelId = 'claude';
+  } else if (lower.includes('gemini') || lower.includes('google')) {
+    provider = 'google';
+    modelId = lower.includes('pro') ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+  }
+
+  return (
+    <div className="md-autoroute-banner">
+      <div className="md-autoroute-banner__left">
+        <div className="md-autoroute-banner__logo">
+          <CompanyLogo provider={provider} modelId={modelId} size={18} />
+        </div>
+        <div className="md-autoroute-banner__info">
+          <div className="md-autoroute-banner__title">
+            <span className="md-autoroute-banner__prefix">Auto-Routed to</span>
+            <strong className="md-autoroute-banner__name">{targetModel}</strong>
+          </div>
+          {taskDomain && (
+            <div className="md-autoroute-banner__subtitle">
+              <span className="md-autoroute-banner__tag">{taskDomain}</span>
+              <span className="md-autoroute-banner__meta">· Dynamically selected for peak effectiveness</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -1425,6 +1499,18 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
             <ThoughtAccordion
               key={`thought-${nodes.length}`}
               rawThought={fullBq.replace(/🧠\s*\*?\[Model Reasoning & Chain of Thought\]\*?/g, '').trim()}
+            />
+          );
+        } else if (
+          fullBq.includes('Auto-Routed') ||
+          fullBq.includes('Task Domain:') ||
+          (fullBq.includes('Model:') && (fullBq.includes('Inference') || fullBq.includes('API'))) ||
+          (fullBq.includes('Routing') && fullBq.includes('to'))
+        ) {
+          nodes.push(
+            <AutoRouteBanner
+              key={`autoroute-${nodes.length}`}
+              rawText={fullBq}
             />
           );
         } else {
