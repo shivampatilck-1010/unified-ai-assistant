@@ -99,16 +99,29 @@
   right: 0;
   width: 380px;
   max-width: 90vw;
-  max-height: 480px;
+  max-height: min(480px, calc(100vh - 120px));
   background: #1f1e1c;
   border: 1px solid #383734;
   border-radius: 12px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
-  z-index: 1000;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: dropdown-fade 0.15s ease-out;
+}
+
+@media (max-width: 600px) {
+  .model-dropdown__menu {
+    position: fixed;
+    top: 56px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100vh - 80px);
+    z-index: 10000;
+  }
 }
 
 @keyframes dropdown-fade {
@@ -130,6 +143,7 @@
   padding: 10px 14px;
   border-bottom: 1px solid #383734;
   background: #252421;
+  flex-shrink: 0;
 }
 
 .model-dropdown__search-icon {
@@ -174,6 +188,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .model-dropdown__team-info {
@@ -229,6 +244,7 @@
   background: #191816;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
 }
 
 .model-dropdown__categories::-webkit-scrollbar {

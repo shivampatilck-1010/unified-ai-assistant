@@ -205,7 +205,11 @@ export default function App() {
                 <span className="app-header__provider-dot" aria-hidden="true" />
                 <span>
                   {effectiveProviderStatus.configured
-                    ? `AI: ${effectiveProviderStatus.active_provider || effectiveProviderStatus.provider}`
+                    ? selectedModelId
+                      ? selectedModelId.startsWith('unified-team') || selectedModelId.startsWith('council/')
+                        ? 'AI: Unified Team'
+                        : `AI: ${selectedModelId.split('/')[selectedModelId.includes('/') ? 1 : 0].split(':')[0]}`
+                      : `AI: ${effectiveProviderStatus.active_provider || effectiveProviderStatus.provider}`
                     : 'AI Provider Not Configured'}
                 </span>
               </div>

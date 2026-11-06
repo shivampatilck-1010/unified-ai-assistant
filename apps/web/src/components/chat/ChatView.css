@@ -10,17 +10,14 @@
 .chat-view__topbar {
   display: flex;
   align-items: center;
-  padding: 10px 18px;
+  padding: 8px 18px;
   border-bottom: 1px solid var(--border);
   min-height: 48px;
   gap: 10px;
   flex-shrink: 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.chat-view__topbar::-webkit-scrollbar {
-  display: none;
+  position: relative;
+  z-index: 50;
+  overflow: visible;
 }
 
 .chat-view__new-btn {
@@ -76,6 +73,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 320px;
+}
+
+.chat-view__topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: visible;
+  z-index: 60;
 }
 
 .chat-view__model-selector {

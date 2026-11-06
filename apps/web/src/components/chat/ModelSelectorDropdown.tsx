@@ -57,7 +57,7 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
-        searchInputRef.current?.focus();
+        searchInputRef.current?.focus({ preventScroll: true });
       }, 50);
     } else {
       setSearchQuery('');
