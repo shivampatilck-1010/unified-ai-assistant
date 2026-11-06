@@ -377,10 +377,21 @@ export function ChatView({
                 onChange={(e) => onSelectModel?.(e.target.value)}
                 aria-label="Select AI Model"
               >
-                {availableModels.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.provider})
-                  </option>
+                {Object.entries(
+                  availableModels.reduce((acc, m) => {
+                    const group = m.provider || 'Other';
+                    if (!acc[group]) acc[group] = [];
+                    acc[group].push(m);
+                    return acc;
+                  }, {} as Record<string, typeof availableModels>)
+                ).map(([providerName, groupModels]) => (
+                  <optgroup key={providerName} label={`── ${providerName.toUpperCase()} ──`}>
+                    {groupModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

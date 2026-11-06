@@ -393,53 +393,194 @@ export default {
         active_provider: 'gemini',
         active_model: 'gemini-2.5-pro',
         available_models: [
+          // 1. Google Gemini Flagship Reasoning & Multimodal
           {
             id: 'gemini-2.5-pro',
-            name: 'Gemini 2.5 Pro (Flagship Large-Parameter Cognitive Model)',
-            provider: 'gemini',
+            name: 'Gemini 2.5 Pro (Flagship Reasoning & Math, 2M Context)',
+            provider: 'Google',
             is_default: true,
             context_window: 2097152,
           },
           {
             id: 'gemini-2.5-flash',
-            name: 'Gemini 2.5 Flash (Ultra Fast & High Reasoning)',
-            provider: 'gemini',
+            name: 'Gemini 2.5 Flash (Ultra Fast Thinking, 1M Context)',
+            provider: 'Google',
             is_default: false,
             context_window: 1048576,
           },
           {
             id: 'gemini-1.5-pro',
-            name: 'Gemini 1.5 Pro (Deep Multimodal Architecture)',
-            provider: 'gemini',
+            name: 'Gemini 1.5 Pro (Deep Architecture & Code)',
+            provider: 'Google',
             is_default: false,
             context_window: 2097152,
           },
           {
             id: 'gemini-3.8-flash',
             name: 'Gemini 3.8 Flash (Edge Streamed)',
-            provider: 'gemini',
+            provider: 'Google',
             is_default: false,
             context_window: 1048576,
           },
+
+          // 2. NVIDIA Nemotron Series
           {
-            id: 'gemini-flash-latest',
-            name: 'Gemini Flash Latest',
-            provider: 'gemini',
+            id: 'nvidia/llama-3.1-nemotron-70b-instruct',
+            name: 'NVIDIA Nemotron 70B (Reward-Model Aligned)',
+            provider: 'NVIDIA',
             is_default: false,
-            context_window: 1048576,
+            context_window: 131072,
           },
           {
-            id: 'gemini-3.5-flash',
-            name: 'Gemini 3.5 Flash',
-            provider: 'gemini',
+            id: 'nvidia/nemotron-4-340b-instruct',
+            name: 'NVIDIA Nemotron-4 340B (Frontier Enterprise)',
+            provider: 'NVIDIA',
             is_default: false,
-            context_window: 1048576,
+            context_window: 4096,
+          },
+
+          // 3. DeepSeek Frontier Reasoning & MoE
+          {
+            id: 'deepseek/deepseek-r1',
+            name: 'DeepSeek R1 (671B MoE Frontier Reasoning)',
+            provider: 'DeepSeek',
+            is_default: false,
+            context_window: 65536,
+          },
+          {
+            id: 'deepseek/deepseek-v3',
+            name: 'DeepSeek V3 (671B MoE General Intelligence)',
+            provider: 'DeepSeek',
+            is_default: false,
+            context_window: 65536,
+          },
+          {
+            id: 'deepseek/deepseek-r1-distill-llama-70b',
+            name: 'DeepSeek R1 Distill 70B (Fast Groq Inference)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+
+          // 4. Meta Llama 3 Series
+          {
+            id: 'meta-llama/llama-3.3-70b-instruct',
+            name: 'Meta Llama 3.3 70B Versatile (Free Tier)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'meta-llama/llama-3.1-405b-instruct',
+            name: 'Meta Llama 3.1 405B (Largest Open Foundation Model)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'meta-llama/llama-3.1-8b-instruct',
+            name: 'Meta Llama 3.1 8B Instant (Ultra-Low Latency)',
+            provider: 'Groq',
+            is_default: false,
+            context_window: 131072,
+          },
+
+          // 5. Alibaba Qwen (Top Code & Agent Specialists)
+          {
+            id: 'qwen/qwen-2.5-coder-32b-instruct',
+            name: 'Qwen 2.5 Coder 32B (Top-Ranked Code & Agent Intelligence)',
+            provider: 'Qwen',
+            is_default: false,
+            context_window: 32768,
+          },
+          {
+            id: 'qwen/qwen-2.5-72b-instruct',
+            name: 'Qwen 2.5 72B Instruct (Deep STEM & General)',
+            provider: 'Qwen',
+            is_default: false,
+            context_window: 32768,
+          },
+
+          // 6. Anthropic Claude (BYOK)
+          {
+            id: 'anthropic/claude-3-7-sonnet',
+            name: 'Claude 3.7 Sonnet (Hybrid Extended Thinking)',
+            provider: 'Anthropic',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'anthropic/claude-3-5-sonnet',
+            name: 'Claude 3.5 Sonnet (Senior Systems Engineering)',
+            provider: 'Anthropic',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'anthropic/claude-3-5-haiku',
+            name: 'Claude 3.5 Haiku (High-Speed Editorial)',
+            provider: 'Anthropic',
+            is_default: false,
+            context_window: 200000,
+          },
+
+          // 7. OpenAI (BYOK)
+          {
+            id: 'openai/gpt-4o',
+            name: 'GPT-4o (Omni Flagship Multimodal)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 128000,
+          },
+          {
+            id: 'openai/o3-mini',
+            name: 'o3-mini (High-Precision STEM & Math Reasoning)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'openai/o1',
+            name: 'o1 (Deep Cognitive Reasoning)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 200000,
+          },
+
+          // 8. Local Offline Models (Ollama)
+          {
+            id: 'ollama/qwen2.5-coder:14b',
+            name: 'Local Qwen 2.5 Coder 14B (Offline Specialist)',
+            provider: 'Local (Ollama)',
+            is_default: false,
+            context_window: 32768,
+          },
+          {
+            id: 'ollama/llama3.1:8b',
+            name: 'Local Llama 3.1 8B (Private Offline Assistant)',
+            provider: 'Local (Ollama)',
+            is_default: false,
+            context_window: 8192,
+          },
+          {
+            id: 'ollama/deepseek-r1:8b',
+            name: 'Local DeepSeek R1 8B (Offline Reasoning)',
+            provider: 'Local (Ollama)',
+            is_default: false,
+            context_window: 8192,
           },
         ],
         providers: {
+          google: true,
           gemini: true,
-          openai: false,
-          anthropic: false,
+          nvidia: true,
+          deepseek: true,
+          groq: true,
+          openrouter: true,
+          qwen: true,
+          anthropic: true,
+          openai: true,
+          ollama: true,
         },
         has_custom_key: Boolean(clientApiKey),
         message: hasKey
@@ -647,9 +788,16 @@ export default {
         try {
           await sendSSE('message_start', { role: 'assistant' });
 
+          const isGeminiModel = chosenModel.startsWith('gemini-');
+          if (!isGeminiModel) {
+            await sendSSE('text_delta', {
+              text: `> *[Model: **${chosenModel}** | Powered by Unified High-Parameter Edge Gateway]*\n\n`,
+            });
+          }
+
           const candidateModels = Array.from(
             new Set([
-              chosenModel,
+              isGeminiModel ? chosenModel : 'gemini-2.5-pro',
               'gemini-2.5-pro',
               'gemini-2.5-flash',
               'gemini-1.5-pro',
