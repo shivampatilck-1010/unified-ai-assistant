@@ -138,10 +138,28 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buffer = '';
 
+  const onAbort = () => {
+    try {
+      void reader.cancel();
+    } catch {}
+  };
+
+  if (signal) {
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
   try {
     while (true) {
+      if (signal?.aborted) {
+        onAbort();
+        break;
+      }
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done || signal?.aborted) break;
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -229,6 +247,11 @@ export async function streamChat(
       err instanceof Error ? err : new Error('Stream reading failed')
     );
   } finally {
-    reader.releaseLock();
+    if (signal) {
+      signal.removeEventListener('abort', onAbort);
+    }
+    try {
+      reader.releaseLock();
+    } catch {}
   }
 }

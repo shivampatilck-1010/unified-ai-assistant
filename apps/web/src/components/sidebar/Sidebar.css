@@ -228,9 +228,15 @@
 }
 
 .sidebar__history-item--active {
-  background: #121218;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #161822;
+  border: 1px solid rgba(56, 189, 248, 0.25);
   color: #ffffff;
+  box-shadow: inset 3px 0 0 #38bdf8;
+  font-weight: 500;
+}
+
+.sidebar__history-item:active {
+  transform: scale(0.99);
 }
 
 .sidebar__history-item:focus-visible {

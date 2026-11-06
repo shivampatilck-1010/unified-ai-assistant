@@ -1,6 +1,6 @@
 import { AgentStepsTray } from './AgentStepsTray';
 import type { QueuedMessage } from '../composer/QueuedMessagesTray';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import type { ChatMessage, ModelInfo, ChatAttachment } from '../../types';
 import { Composer } from '../composer/Composer';
 import { MarkdownContent } from './MarkdownContent';
@@ -146,27 +146,46 @@ export function ChatView({
     };
   }, []);
 
-  // Continuous auto-scroll follow-up during streaming and on new messages
-  useEffect(() => {
-    if (!isUserScrolledUp.current && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [messages, isStreaming]);
+  const scrollRafRef = useRef<number | null>(null);
 
-  // ResizeObserver to track dynamic formula/KaTeX/image expansions
+  const requestSmoothScrollToBottom = useCallback(() => {
+    if (isUserScrolledUp.current || !containerRef.current) return;
+    if (scrollRafRef.current !== null) return;
+
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const el = containerRef.current;
+      if (!el || isUserScrolledUp.current) return;
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distFromBottom > 1) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+  }, []);
+
+  // Continuous smooth auto-scroll synchronized to 60fps frame rate
+  useEffect(() => {
+    requestSmoothScrollToBottom();
+  }, [messages, isStreaming, requestSmoothScrollToBottom]);
+
+  // ResizeObserver to track dynamic formula/KaTeX/image expansions smoothly
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const observer = new ResizeObserver(() => {
-      if (!isUserScrolledUp.current && el) {
-        el.scrollTop = el.scrollHeight;
-      }
+      requestSmoothScrollToBottom();
     });
 
     observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      observer.disconnect();
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    };
+  }, [requestSmoothScrollToBottom]);
 
   // Clean up speech synthesis on unmount
   useEffect(() => {

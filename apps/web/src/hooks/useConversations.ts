@@ -47,10 +47,48 @@ function loadStoredMessages(convId: string): ChatMessage[] {
   return [];
 }
 
+function sanitizeMessagesForStorage(msgs: ChatMessage[]): ChatMessage[] {
+  return msgs.map((m) => {
+    if (!m.attachments || m.attachments.length === 0) return m;
+    return {
+      ...m,
+      attachments: m.attachments.map((a) => {
+        // Strip large base64 data (>30KB) to prevent hitting browser 5MB localStorage limit
+        if (a.data && a.data.length > 30000) {
+          return {
+            ...a,
+            data: a.previewUrl || '',
+          };
+        }
+        return a;
+      }),
+    };
+  });
+}
+
 function saveStoredMessages(convId: string, msgs: ChatMessage[]) {
+  if (!convId) return;
   try {
-    localStorage.setItem(`${STORAGE_PREFIX_MSGS}${convId}`, JSON.stringify(msgs));
-  } catch {}
+    const sanitized = sanitizeMessagesForStorage(msgs);
+    localStorage.setItem(`${STORAGE_PREFIX_MSGS}${convId}`, JSON.stringify(sanitized));
+  } catch (err) {
+    console.warn('LocalStorage save failed, recovering quota:', err);
+    try {
+      const convs = loadStoredConversations();
+      if (convs.length > 3) {
+        const oldest = [...convs].reverse().slice(0, 3);
+        oldest.forEach((c) => {
+          if (c.id !== convId) {
+            localStorage.removeItem(`${STORAGE_PREFIX_MSGS}${c.id}`);
+          }
+        });
+        localStorage.setItem(
+          `${STORAGE_PREFIX_MSGS}${convId}`,
+          JSON.stringify(sanitizeMessagesForStorage(msgs))
+        );
+      }
+    } catch {}
+  }
 }
 
 export function useConversations(backendConnected: boolean = true) {
@@ -93,6 +131,36 @@ export function useConversations(backendConnected: boolean = true) {
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const deltaBufferRef = useRef<string>('');
+  const streamRafIdRef = useRef<number | null>(null);
+  const streamSaveTimerRef = useRef<number | null>(null);
+
+  const flushPendingDeltas = useCallback((targetAssistantId?: string) => {
+    if (streamRafIdRef.current !== null) {
+      cancelAnimationFrame(streamRafIdRef.current);
+      streamRafIdRef.current = null;
+    }
+    if (streamSaveTimerRef.current !== null) {
+      clearTimeout(streamSaveTimerRef.current);
+      streamSaveTimerRef.current = null;
+    }
+    const remaining = deltaBufferRef.current;
+    if (!remaining) return;
+    deltaBufferRef.current = '';
+
+    setActiveConversation((prev) => {
+      if (!prev) return null;
+      const updatedMessages = prev.messages.map((m) =>
+        (targetAssistantId ? m.id === targetAssistantId : m.isStreaming)
+          ? { ...m, content: m.content + remaining }
+          : m
+      );
+      saveStoredMessages(prev.id, updatedMessages);
+      const nextConv = { ...prev, messages: updatedMessages };
+      activeConversationRef.current = nextConv;
+      return nextConv;
+    });
+  }, []);
 
   // Sync activeId to localStorage
   useEffect(() => {
@@ -145,7 +213,17 @@ export function useConversations(backendConnected: boolean = true) {
   // Select active conversation: Instant restore from localStorage, then verify with backend
   const selectConversation = useCallback(
     async (id: string) => {
-      // 1. If currently on a conversation, finalize and flush messages to prevent data loss
+      if (!id) return;
+
+      // 1. Immediately abort active stream so it cannot pollute the new conversation
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      setIsStreaming(false);
+
+      // 2. Flush and persist previous conversation state
+      flushPendingDeltas();
       if (activeConversationRef.current) {
         const cur = activeConversationRef.current;
         const finalized = cur.messages.map((m) =>
@@ -154,29 +232,35 @@ export function useConversations(backendConnected: boolean = true) {
         saveStoredMessages(cur.id, finalized);
       }
 
-      abortRef.current?.abort();
-      setIsStreaming(false);
+      // 3. Immediately set active ID
       setActiveId(id);
+      try {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_ID, id);
+      } catch {}
 
-      // 2. Synchronous unconditional UI switch to the selected chat
+      // 4. Synchronously load and render selected chat from localStorage (instant 0ms switch)
       const cachedMsgs = loadStoredMessages(id);
       const summary = conversations.find((c) => c.id === id);
+      const resolvedTitle =
+        summary?.title && summary.title !== 'Conversation' ? summary.title : 'Conversation';
+
       const initialDetail: ConversationDetail = {
         id,
         owner_id: summary?.owner_id || 'default_user',
-        title: summary?.title || 'Conversation',
+        title: resolvedTitle,
         project_id: summary?.project_id || undefined,
         created_at: summary?.created_at || new Date().toISOString(),
         updated_at: summary?.updated_at || new Date().toISOString(),
         messages: cachedMsgs || [],
       };
       setActiveConversation(initialDetail);
+      activeConversationRef.current = initialDetail;
 
-      // 3. Background server reconciliation
+      // 5. Non-destructive background server reconciliation
       try {
         setIsLoading(true);
         const detail = await fetchConversation(id);
-        if (detail) {
+        if (detail && detail.id === id) {
           const freshLocalMsgs = loadStoredMessages(id);
           const serverMsgs = Array.isArray(detail.messages) ? detail.messages : [];
           // Preserve whichever source has richer message history
@@ -184,28 +268,45 @@ export function useConversations(backendConnected: boolean = true) {
             serverMsgs.length > freshLocalMsgs.length ? serverMsgs : freshLocalMsgs;
 
           setActiveConversation((prev) => {
+            // Guard: ensure user hasn't switched away to another chat while fetching
             if (!prev || prev.id !== id) return prev;
-            return {
+            const finalTitle =
+              (detail.title && detail.title !== 'Conversation' && detail.title !== 'New Chat'
+                ? detail.title
+                : null) ||
+              (summary?.title && summary.title !== 'Conversation' ? summary.title : null) ||
+              prev.title;
+
+            const nextDetail = {
               ...detail,
-              title: detail.title || summary?.title || prev.title,
+              title: finalTitle,
               messages: chosenMsgs,
             };
+            activeConversationRef.current = nextDetail;
+            return nextDetail;
           });
 
           if (chosenMsgs.length > 0) {
             saveStoredMessages(id, chosenMsgs);
           }
         }
-      } catch (err) {
+      } catch {
         // Local cache remains intact
       } finally {
         setIsLoading(false);
       }
     },
-    [conversations]
+    [conversations, flushPendingDeltas]
   );
 
   const startNewChat = useCallback((projectId?: string | null) => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setIsStreaming(false);
+    flushPendingDeltas();
+
     if (activeConversationRef.current) {
       const cur = activeConversationRef.current;
       const finalized = cur.messages.map((m) =>
@@ -214,11 +315,12 @@ export function useConversations(backendConnected: boolean = true) {
       saveStoredMessages(cur.id, finalized);
     }
 
-    abortRef.current?.abort();
-    setIsStreaming(false);
-
     const newDraftId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setActiveId(newDraftId);
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_ID, newDraftId);
+    } catch {}
+
     const initialDetail: ConversationDetail = {
       id: newDraftId,
       owner_id: 'default_user',
@@ -229,6 +331,7 @@ export function useConversations(backendConnected: boolean = true) {
       messages: [],
     };
     setActiveConversation(initialDetail);
+    activeConversationRef.current = initialDetail;
     saveStoredMessages(newDraftId, []);
 
     setConversations((prev) => {
@@ -249,7 +352,7 @@ export function useConversations(backendConnected: boolean = true) {
     });
 
     return newDraftId;
-  }, []);
+  }, [flushPendingDeltas]);
 
   const rename = useCallback(async (id: string, newTitle: string) => {
     try {
@@ -377,7 +480,16 @@ export function useConversations(backendConnected: boolean = true) {
           const nextTitle = content.slice(0, 32).trim() || 'New Chat';
           if (prev.some((c) => c.id === effectiveConvId)) {
             const nextList = prev.map((c) =>
-              c.id === effectiveConvId ? { ...c, updated_at: new Date().toISOString() } : c
+              c.id === effectiveConvId
+                ? {
+                    ...c,
+                    title:
+                      c.title === 'New conversation' || c.title === 'Conversation'
+                        ? nextTitle
+                        : c.title,
+                    updated_at: new Date().toISOString(),
+                  }
+                : c
             );
             saveStoredConversations(nextList);
             return nextList;
@@ -444,76 +556,74 @@ export function useConversations(backendConnected: boolean = true) {
           },
           {
             onMessageStart: (conversationId: string) => {
+              if (controller.signal.aborted) return;
               if (activeId !== conversationId) {
                 setActiveId(conversationId);
               }
             },
             onTextDelta: (text: string) => {
-              setActiveConversation((prev) => {
-                if (!prev) {
-                  const initial = {
-                    id: effectiveConvId,
-                    owner_id: 'default_user',
-                    title: content.slice(0, 32).trim() || 'New Chat',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    messages: [userMsg, { ...assistantMsg, content: text }],
-                  };
-                  saveStoredMessages(effectiveConvId, initial.messages);
-                  return initial;
-                }
-                const hasAssistantMsg = prev.messages.some((m) => m.id === assistantMsgId);
-                const updatedMessages = hasAssistantMsg
-                  ? prev.messages.map((m) =>
-                      m.id === assistantMsgId ? { ...m, content: m.content + text } : m
-                    )
-                  : [...prev.messages, { ...assistantMsg, content: text }];
-                saveStoredMessages(prev.id, updatedMessages);
-                return {
-                  ...prev,
-                  messages: updatedMessages,
-                };
-              });
+              if (controller.signal.aborted) return;
+              deltaBufferRef.current += text;
+
+              // Schedule 60fps render update
+              if (streamRafIdRef.current === null) {
+                streamRafIdRef.current = requestAnimationFrame(() => {
+                  streamRafIdRef.current = null;
+                  if (controller.signal.aborted) return;
+                  const chunk = deltaBufferRef.current;
+                  if (!chunk) return;
+                  deltaBufferRef.current = '';
+
+                  setActiveConversation((prev) => {
+                    if (!prev || prev.id !== effectiveConvId) return prev;
+                    const hasAssistantMsg = prev.messages.some((m) => m.id === assistantMsgId);
+                    const updatedMessages = hasAssistantMsg
+                      ? prev.messages.map((m) =>
+                          m.id === assistantMsgId ? { ...m, content: m.content + chunk } : m
+                        )
+                      : [...prev.messages, { ...assistantMsg, content: chunk }];
+
+                    const nextConv = { ...prev, messages: updatedMessages };
+                    activeConversationRef.current = nextConv;
+                    return nextConv;
+                  });
+                });
+              }
+
+              // Throttled background persistence to localStorage (at most once every 1200ms)
+              if (streamSaveTimerRef.current === null) {
+                streamSaveTimerRef.current = window.setTimeout(() => {
+                  streamSaveTimerRef.current = null;
+                  if (controller.signal.aborted) return;
+                  if (
+                    activeConversationRef.current &&
+                    activeConversationRef.current.id === effectiveConvId
+                  ) {
+                    saveStoredMessages(effectiveConvId, activeConversationRef.current.messages);
+                  }
+                }, 1200);
+              }
             },
             onMessageComplete: (_finishReason: string, citations?: ChunkCitation[]) => {
+              if (controller.signal.aborted) return;
+              flushPendingDeltas(assistantMsgId);
               setActiveConversation((prev) => {
-                if (!prev) return null;
+                if (!prev || prev.id !== effectiveConvId) return prev;
                 const nextMessages = prev.messages.map((m) =>
                   m.id === assistantMsgId ? { ...m, isStreaming: false, citations } : m
                 );
-                saveStoredMessages(prev.id, nextMessages);
-                return {
-                  ...prev,
-                  messages: nextMessages,
-                };
+                saveStoredMessages(effectiveConvId, nextMessages);
+                const nextConv = { ...prev, messages: nextMessages };
+                activeConversationRef.current = nextConv;
+                return nextConv;
               });
               setIsStreaming(false);
             },
             onError: (errData: ErrorData) => {
+              if (controller.signal.aborted) return;
+              flushPendingDeltas(assistantMsgId);
               setActiveConversation((prev) => {
-                if (!prev) {
-                  return {
-                    id: effectiveConvId,
-                    owner_id: 'default_user',
-                    title: content.slice(0, 32).trim() || 'New Chat',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    messages: [
-                      userMsg,
-                      {
-                        ...assistantMsg,
-                        content: errData.message,
-                        isStreaming: false,
-                        isError: true,
-                        error_code: errData.code,
-                        error_category: errData.category,
-                        retry_after: errData.retry_after,
-                        retryable: errData.retryable,
-                        routed_model: errData.routed_model,
-                      },
-                    ],
-                  };
-                }
+                if (!prev || prev.id !== effectiveConvId) return prev;
                 const nextMessages = prev.messages.map((m) =>
                   m.id === assistantMsgId
                     ? {
@@ -529,34 +639,17 @@ export function useConversations(backendConnected: boolean = true) {
                       }
                     : m
                 );
-                saveStoredMessages(prev.id, nextMessages);
-                return {
-                  ...prev,
-                  messages: nextMessages,
-                };
+                saveStoredMessages(effectiveConvId, nextMessages);
+                const nextConv = { ...prev, messages: nextMessages };
+                activeConversationRef.current = nextConv;
+                return nextConv;
               });
               setIsStreaming(false);
             },
             onStreamError: (streamErr: Error) => {
+              if (controller.signal.aborted) return;
               setActiveConversation((prev) => {
-                if (!prev) {
-                  return {
-                    id: effectiveConvId,
-                    owner_id: 'default_user',
-                    title: content.slice(0, 32).trim() || 'New Chat',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    messages: [
-                      userMsg,
-                      {
-                        ...assistantMsg,
-                        content: `Connection error: ${streamErr.message}`,
-                        isStreaming: false,
-                        isError: true,
-                      },
-                    ],
-                  };
-                }
+                if (!prev || prev.id !== effectiveConvId) return prev;
                 const nextMessages = prev.messages.map((m) =>
                   m.id === assistantMsgId
                     ? {
@@ -567,11 +660,10 @@ export function useConversations(backendConnected: boolean = true) {
                       }
                     : m
                 );
-                saveStoredMessages(prev.id, nextMessages);
-                return {
-                  ...prev,
-                  messages: nextMessages,
-                };
+                saveStoredMessages(effectiveConvId, nextMessages);
+                const nextConv = { ...prev, messages: nextMessages };
+                activeConversationRef.current = nextConv;
+                return nextConv;
               });
               setIsStreaming(false);
             },
@@ -610,6 +702,7 @@ export function useConversations(backendConnected: boolean = true) {
   );
 
   const cancelStream = useCallback(() => {
+    flushPendingDeltas();
     abortRef.current?.abort();
     setIsStreaming(false);
     setActiveConversation((prev) => {
@@ -623,7 +716,7 @@ export function useConversations(backendConnected: boolean = true) {
         messages: nextMessages,
       };
     });
-  }, []);
+  }, [flushPendingDeltas]);
 
   return {
     conversations,

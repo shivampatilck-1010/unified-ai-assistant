@@ -328,7 +328,7 @@ const KaTeXInline: React.FC<{ math: string }> = ({ math }) => {
   );
 };
 
-export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isError, onSelectChoice }) => {
+export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ content, isError, onSelectChoice }) => {
   // Clean raw quota errors
   const cleanContent = React.useMemo(() => {
     if (!content) return '';
@@ -1585,4 +1585,4 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, isErr
       {parseBlocks(cleanContent)}
     </div>
   );
-};
+});

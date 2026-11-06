@@ -484,14 +484,22 @@
   width: 7px;
   height: 15px;
   background: #38bdf8;
-  vertical-align: middle;
-  margin-left: 3px;
-  animation: blink 0.8s infinite;
+  vertical-align: -1px;
+  margin-left: 4px;
+  border-radius: 1.5px;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+  animation: cursor-pulse 0.85s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
+@keyframes cursor-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.15;
+    transform: scaleY(0.85);
+  }
 }
 
 /* Floating Scroll To Bottom Button */
