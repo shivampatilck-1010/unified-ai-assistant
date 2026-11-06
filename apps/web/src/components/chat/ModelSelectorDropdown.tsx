@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import type { ModelInfo } from '../../types';
 import './ModelSelectorDropdown.css';
 
@@ -19,9 +18,8 @@ function getProviderColor(provider: string): string {
   if (p.includes('nvidia')) return '#84cc16'; // NVIDIA Lime
   if (p.includes('deepseek')) return '#6366f1'; // Indigo
   if (p.includes('qwen')) return '#a855f7'; // Purple
-  if (p.includes('groq') || p.includes('meta')) return '#ec4899'; // Pink/Magenta
+  if (p.includes('groq') || p.includes('meta')) return '#ec4899'; // Magenta
   if (p.includes('openrouter')) return '#3b82f6'; // OpenRouter Blue
-  if (p.includes('local') || p.includes('ollama')) return '#eab308'; // Amber
   return '#94a3b8';
 }
 
@@ -41,79 +39,30 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [coords, setCoords] = useState<{
-    top: number;
-    right?: number;
-    left?: number;
-    width?: number | string;
-    maxHeight: number;
-  }>({
-    top: 56,
-    right: 16,
-    width: 380,
-    maxHeight: 480,
-  });
-
-  const updatePosition = () => {
-    if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const isMobile = window.innerWidth <= 640;
-
-    if (isMobile) {
-      setCoords({
-        top: Math.max(52, rect.bottom + 6),
-        left: 12,
-        right: 12,
-        width: 'auto',
-        maxHeight: Math.max(240, window.innerHeight - (rect.bottom + 20)),
-      });
-    } else {
-      const rightOffset = Math.max(16, window.innerWidth - rect.right);
-      const topOffset = rect.bottom + 6;
-      const availableHeight = Math.min(520, Math.max(260, window.innerHeight - topOffset - 16));
-      setCoords({
-        top: topOffset,
-        right: rightOffset,
-        width: 380,
-        maxHeight: availableHeight,
-      });
-    }
-  };
-
+  // Close when clicking outside or pressing Escape
   useEffect(() => {
-    if (isOpen) {
-      updatePosition();
-      const onResizeOrScroll = () => updatePosition();
-      window.addEventListener('resize', onResizeOrScroll);
-      window.addEventListener('scroll', onResizeOrScroll, true);
-      return () => {
-        window.removeEventListener('resize', onResizeOrScroll);
-        window.removeEventListener('scroll', onResizeOrScroll, true);
-      };
-    }
-  }, [isOpen]);
-
-  // Close when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        triggerRef.current &&
-        !triggerRef.current.contains(target) &&
-        menuRef.current &&
-        !menuRef.current.contains(target)
-      ) {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener('mousedown', handleDocumentClick);
+      document.addEventListener('keydown', handleKeyDown);
     }
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   // Focus search input when dropdown opens
@@ -173,10 +122,9 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   );
 
   return (
-    <div className="model-dropdown">
+    <div className="model-dropdown" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
-        ref={triggerRef}
         type="button"
         className={`model-dropdown__trigger ${isOpen ? 'model-dropdown__trigger--open' : ''} ${
           isUnifiedTeam ? 'model-dropdown__trigger--team' : ''
@@ -220,172 +168,154 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
         </svg>
       </button>
 
-      {/* Portaled Dropdown Popup Menu */}
-      {isOpen &&
-        createPortal(
-          <>
-            <div
-              className="model-dropdown__backdrop"
-              onClick={() => setIsOpen(false)}
+      {/* Dropdown Menu Popup - Anchored directly to trigger container */}
+      {isOpen && (
+        <div className="model-dropdown__menu" role="listbox">
+          {/* Search Header */}
+          <div className="model-dropdown__search-bar">
+            <svg
+              className="model-dropdown__search-icon"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
               aria-hidden="true"
-            />
-            <div
-              ref={menuRef}
-              className="model-dropdown__menu"
-              style={{
-                position: 'fixed',
-                top: `${coords.top}px`,
-                ...(coords.left !== undefined ? { left: `${coords.left}px` } : {}),
-                ...(coords.right !== undefined ? { right: `${coords.right}px` } : {}),
-                width: typeof coords.width === 'number' ? `${coords.width}px` : coords.width,
-                maxHeight: `${coords.maxHeight}px`,
-              }}
-              role="listbox"
             >
-              {/* Search Header */}
-              <div className="model-dropdown__search-bar">
-                <svg
-                  className="model-dropdown__search-icon"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  className="model-dropdown__search-input"
-                  placeholder="Search 26+ AI models (Nemotron, Qwen, GPT-OSS, Claude, Gemini...)"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    className="model-dropdown__search-clear"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="model-dropdown__search-input"
+              placeholder="Search real models (Nemotron, Qwen, Gemini, Claude, GPT-4o)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="model-dropdown__search-clear"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-              {/* Unified Team Banner Shortcut */}
-              <div className="model-dropdown__team-banner">
-                <div className="model-dropdown__team-info">
-                  <span className="model-dropdown__team-badge">COLLABORATIVE INTELLIGENCE</span>
-                  <strong className="model-dropdown__team-title">Unified Team Meeting Room</strong>
-                  <p className="model-dropdown__team-desc">
-                    Deploy NVIDIA Nemotron 550B, Groq Qwen 27B, GPT-OSS 120B, Claude, and Gemini together as a coordinated council.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="model-dropdown__team-btn"
-                  onClick={() => {
-                    setIsOpen(false);
-                    onOpenTeamModal?.();
-                  }}
-                >
-                  Configure Team ⚙
-                </button>
-              </div>
+          {/* Unified Team Banner Shortcut */}
+          <div className="model-dropdown__team-banner">
+            <div className="model-dropdown__team-info">
+              <span className="model-dropdown__team-badge">AUTHENTIC MULTI-MODEL TEAM</span>
+              <strong className="model-dropdown__team-title">Unified Collaborative Council</strong>
+              <p className="model-dropdown__team-desc">
+                Executes Nemotron 550B, Groq Qwen 27B, and Gemini 2.5 Pro together via their real APIs.
+              </p>
+            </div>
+            {onOpenTeamModal && (
+              <button
+                type="button"
+                className="model-dropdown__team-btn"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenTeamModal();
+                }}
+              >
+                Configure ⚙
+              </button>
+            )}
+          </div>
 
-              {/* Category Filter Chips */}
-              <div className="model-dropdown__categories">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    className={`model-dropdown__cat-chip ${
-                      selectedCategory.toLowerCase() === cat.toLowerCase()
-                        ? 'model-dropdown__cat-chip--active'
-                        : ''
-                    }`}
-                    onClick={() => setSelectedCategory(cat)}
-                  >
-                    {cat === 'all' ? 'All Models' : cat}
-                  </button>
-                ))}
-              </div>
+          {/* Category Filter Chips */}
+          <div className="model-dropdown__categories">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`model-dropdown__cat-chip ${
+                  selectedCategory.toLowerCase() === cat.toLowerCase()
+                    ? 'model-dropdown__cat-chip--active'
+                    : ''
+                }`}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat === 'all' ? 'All Models' : cat}
+              </button>
+            ))}
+          </div>
 
-              {/* Models List */}
-              <div className="model-dropdown__list">
-                {Object.keys(groupedModels).length === 0 ? (
-                  <div className="model-dropdown__empty">
-                    No models found matching "{searchQuery}"
+          {/* Models List */}
+          <div className="model-dropdown__list">
+            {Object.keys(groupedModels).length === 0 ? (
+              <div className="model-dropdown__empty">
+                No models found matching "{searchQuery}"
+              </div>
+            ) : (
+              Object.entries(groupedModels).map(([providerName, models]) => (
+                <div key={providerName} className="model-dropdown__group">
+                  <div className="model-dropdown__group-header">
+                    <span
+                      className="model-dropdown__group-dot"
+                      style={{ backgroundColor: getProviderColor(providerName) }}
+                    />
+                    <span>{providerName}</span>
+                    <span className="model-dropdown__group-count">({models.length})</span>
                   </div>
-                ) : (
-                  Object.entries(groupedModels).map(([providerName, models]) => (
-                    <div key={providerName} className="model-dropdown__group">
-                      <div className="model-dropdown__group-header">
-                        <span
-                          className="model-dropdown__group-dot"
-                          style={{ backgroundColor: getProviderColor(providerName) }}
-                        />
-                        <span>{providerName}</span>
-                        <span className="model-dropdown__group-count">({models.length})</span>
-                      </div>
 
-                      <div className="model-dropdown__group-items">
-                        {models.map((m) => {
-                          const isSelected = selectedModelId === m.id;
-                          const hasSubtext = m.name.includes('(');
-                          const primaryName = hasSubtext ? m.name.split('(')[0].trim() : m.name;
-                          const detailText = hasSubtext
-                            ? m.name.slice(m.name.indexOf('(') + 1, m.name.lastIndexOf(')'))
-                            : '';
+                  <div className="model-dropdown__group-items">
+                    {models.map((m) => {
+                      const isSelected = selectedModelId === m.id;
+                      const hasSubtext = m.name.includes('(');
+                      const primaryName = hasSubtext ? m.name.split('(')[0].trim() : m.name;
+                      const detailText = hasSubtext
+                        ? m.name.slice(m.name.indexOf('(') + 1, m.name.lastIndexOf(')'))
+                        : '';
 
-                          return (
-                            <div
-                              key={m.id}
-                              className={`model-dropdown__item ${
-                                isSelected ? 'model-dropdown__item--selected' : ''
-                              }`}
-                              onClick={() => {
-                                onSelectModel(m.id);
-                                setIsOpen(false);
-                              }}
-                              role="option"
-                              aria-selected={isSelected}
-                            >
-                              <div className="model-dropdown__item-main">
-                                <div className="model-dropdown__item-title-row">
-                                  <span className="model-dropdown__item-name">{primaryName}</span>
-                                  {m.context_window && (
-                                    <span className="model-dropdown__item-ctx">
-                                      {formatContextWindow(m.context_window)}
-                                    </span>
-                                  )}
-                                </div>
-                                {detailText && (
-                                  <div className="model-dropdown__item-sub">{detailText}</div>
-                                )}
-                              </div>
-
-                              {isSelected && (
-                                <span className="model-dropdown__item-check" aria-hidden="true">
-                                  ✓
+                      return (
+                        <div
+                          key={m.id}
+                          className={`model-dropdown__item ${
+                            isSelected ? 'model-dropdown__item--selected' : ''
+                          }`}
+                          onClick={() => {
+                            onSelectModel(m.id);
+                            setIsOpen(false);
+                          }}
+                          role="option"
+                          aria-selected={isSelected}
+                        >
+                          <div className="model-dropdown__item-main">
+                            <div className="model-dropdown__item-title-row">
+                              <span className="model-dropdown__item-name">{primaryName}</span>
+                              {m.context_window && (
+                                <span className="model-dropdown__item-ctx">
+                                  {formatContextWindow(m.context_window)}
                                 </span>
                               )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </>,
-          document.body
-        )}
+                            {detailText && (
+                              <div className="model-dropdown__item-sub">{detailText}</div>
+                            )}
+                          </div>
+
+                          {isSelected && (
+                            <span className="model-dropdown__item-check" aria-hidden="true">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

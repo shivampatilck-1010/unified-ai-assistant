@@ -148,6 +148,21 @@ export function setCustomOpenRouterKey(key: string | null): void {
   }
 }
 
+export function getCustomOpenAIKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  const key = localStorage.getItem('unified_ai_custom_openai_key');
+  return key && key.trim() ? key.trim() : null;
+}
+
+export function setCustomOpenAIKey(key: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (key && key.trim()) {
+    localStorage.setItem('unified_ai_custom_openai_key', key.trim());
+  } else {
+    localStorage.removeItem('unified_ai_custom_openai_key');
+  }
+}
+
 export async function validateGeminiApiKey(
   key: string
 ): Promise<{ valid: boolean; message: string; models?: string[] }> {

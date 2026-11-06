@@ -7,6 +7,8 @@ import {
   setCustomGroqKey,
   getCustomOpenRouterKey,
   setCustomOpenRouterKey,
+  getCustomOpenAIKey,
+  setCustomOpenAIKey,
 } from '../../lib/api';
 import './ApiKeyModal.css';
 
@@ -20,6 +22,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
   const [geminiKeyInput, setGeminiKeyInput] = useState(getCustomApiKey() || '');
   const [groqKeyInput, setGroqKeyInput] = useState(getCustomGroqKey() || '');
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState(getCustomOpenRouterKey() || '');
+  const [openAIKeyInput, setOpenAIKeyInput] = useState(getCustomOpenAIKey() || '');
 
   const [showKeys, setShowKeys] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -64,9 +67,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     if (openRouterKeyInput.trim()) setCustomOpenRouterKey(openRouterKeyInput.trim());
     else setCustomOpenRouterKey(null);
 
+    if (openAIKeyInput.trim()) setCustomOpenAIKey(openAIKeyInput.trim());
+    else setCustomOpenAIKey(null);
+
     setStatusMessage({
       type: 'success',
-      text: '✓ All API keys saved! Groq, OpenRouter, and Gemini are live.',
+      text: '✓ All API keys saved! Groq, OpenRouter, OpenAI, and Gemini are live.',
     });
     if (onKeyChange) onKeyChange(true);
     setTimeout(() => {
@@ -79,6 +85,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     setCustomApiKey(null);
     setGroqKeyInput(getCustomGroqKey() || '');
     setOpenRouterKeyInput(getCustomOpenRouterKey() || '');
+    setOpenAIKeyInput(getCustomOpenAIKey() || '');
     setStatusMessage({
       type: 'success',
       text: 'Reverted to verified cloud edge keys (Groq + OpenRouter + Gemini).',
@@ -176,6 +183,25 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
                 placeholder="sk-or-v1-..."
                 value={openRouterKeyInput}
                 onChange={(e) => setOpenRouterKeyInput(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+
+          {/* OpenAI API Key */}
+          <div className="apikey-modal__input-group">
+            <label className="apikey-modal__label" htmlFor="openai-key-input">
+              🤖 OpenAI API Key (GPT-4o, GPT-4o Mini, o3-mini):
+            </label>
+            <div className="apikey-modal__input-wrapper">
+              <input
+                id="openai-key-input"
+                type={showKeys ? 'text' : 'password'}
+                className="apikey-modal__input"
+                placeholder="sk-proj-..."
+                value={openAIKeyInput}
+                onChange={(e) => setOpenAIKeyInput(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
               />

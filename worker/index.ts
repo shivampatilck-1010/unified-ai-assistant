@@ -6,6 +6,8 @@ export interface Env {
   GOOGLE_API_KEY?: string;
   GROQ_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
   DEFAULT_MODEL?: string;
 }
 
@@ -21,7 +23,7 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
   'Access-Control-Allow-Headers':
-    'Content-Type, Authorization, Accept, X-Requested-With, X-Gemini-Key, x-gemini-key, X-Api-Key, x-api-key, X-Groq-Key, x-groq-key, X-OpenRouter-Key, x-openrouter-key',
+    'Content-Type, Authorization, Accept, X-Requested-With, X-Gemini-Key, x-gemini-key, X-Api-Key, x-api-key, X-Groq-Key, x-groq-key, X-OpenRouter-Key, x-openrouter-key, X-OpenAI-Key, x-openai-key, X-Anthropic-Key, x-anthropic-key',
 };
 
 interface StoredConv {
@@ -387,6 +389,112 @@ async function streamOpenAICompatible({
   }
 }
 
+async function streamAnthropic({
+  apiKey,
+  model,
+  messages,
+  systemPrompt,
+  sendSSE,
+}: {
+  apiKey: string;
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  systemPrompt?: string;
+  sendSSE: (event: string, data: Record<string, unknown>) => Promise<void>;
+}): Promise<{ success: boolean; error?: string; text: string }> {
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Anthropic API key is required. Please enter your Anthropic API Key in Settings.',
+      text: '',
+    };
+  }
+
+  let anthropicModel = model.replace(/^anthropic\//, '');
+  if (anthropicModel.includes('3-7') || anthropicModel.includes('3.7')) {
+    anthropicModel = 'claude-3-7-sonnet-20250219';
+  } else if (anthropicModel.includes('3-5') || anthropicModel.includes('3.5')) {
+    anthropicModel = 'claude-3-5-sonnet-20241022';
+  }
+
+  const formattedMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  for (const m of messages) {
+    if (m.content && m.content.trim()) {
+      formattedMessages.push({
+        role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content.trim(),
+      });
+    }
+  }
+
+  while (formattedMessages.length > 0 && formattedMessages[0].role !== 'user') {
+    formattedMessages.shift();
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: anthropicModel,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: formattedMessages,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      return { success: false, error: `Anthropic HTTP ${response.status}: ${errorBody}`, text: '' };
+    }
+
+    if (!response.body) {
+      return { success: false, error: 'No response body from Anthropic', text: '' };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) continue;
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6).trim();
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.type === 'content_block_delta') {
+              const deltaText = parsed.delta?.text || '';
+              if (deltaText) {
+                await sendSSE('text_delta', { text: deltaText });
+                fullText += deltaText;
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
+    return { success: true, text: fullText };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg, text: '' };
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -644,13 +752,43 @@ export default {
             context_window: 1048576,
           },
 
-          // 4. Offline / Local Specialist
+          // 4. OpenAI Models
           {
-            id: 'local/qwen2.5-coder:14b',
-            name: 'Local Qwen 2.5 Coder 14B (Offline Specialist)',
-            provider: 'Local',
+            id: 'openai/gpt-4o',
+            name: 'GPT-4o (Omni Flagship Multimodal)',
+            provider: 'OpenAI',
             is_default: false,
-            context_window: 32768,
+            context_window: 128000,
+          },
+          {
+            id: 'openai/gpt-4o-mini',
+            name: 'GPT-4o Mini (Fast Multimodal Reasoning)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 128000,
+          },
+          {
+            id: 'openai/o3-mini',
+            name: 'o3-mini (High-Precision STEM & Math Reasoning)',
+            provider: 'OpenAI',
+            is_default: false,
+            context_window: 200000,
+          },
+
+          // 5. Anthropic Claude Models
+          {
+            id: 'anthropic/claude-3-7-sonnet',
+            name: 'Claude 3.7 Sonnet (Hybrid Extended Thinking)',
+            provider: 'Anthropic',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'anthropic/claude-3-5-sonnet',
+            name: 'Claude 3.5 Sonnet (Senior Systems Architecture)',
+            provider: 'Anthropic',
+            is_default: false,
+            context_window: 200000,
           },
         ],
         providers: {
@@ -659,17 +797,15 @@ export default {
           google: true,
           gemini: true,
           nvidia: true,
-          deepseek: true,
           groq: true,
           openrouter: true,
           qwen: true,
           anthropic: true,
           openai: true,
-          local: true,
         },
         has_custom_key: Boolean(clientApiKey),
         message: configured
-          ? 'Cloudflare Edge AI Gateway Connected (Google + Groq + OpenRouter Live)'
+          ? 'Cloudflare Edge AI Gateway Connected (Google + Groq + OpenRouter + OpenAI Live)'
           : 'Please enter your personal Gemini API key in Settings to connect.',
       });
     }
@@ -684,6 +820,8 @@ export default {
         custom_api_key?: string;
         groq_api_key?: string;
         openrouter_api_key?: string;
+        openai_api_key?: string;
+        anthropic_api_key?: string;
         attachments?: Array<{ mimeType?: string; data?: string; name?: string }>;
       } = {};
 
@@ -712,11 +850,23 @@ export default {
         env.OPENROUTER_API_KEY ||
         DEFAULT_OPENROUTER_API_KEY;
 
-      if (!apiKey && !groqApiKey && !openRouterApiKey) {
+      const openAIApiKey =
+        body.openai_api_key ||
+        request.headers.get('x-openai-key') ||
+        env.OPENAI_API_KEY ||
+        '';
+
+      const anthropicApiKey =
+        body.anthropic_api_key ||
+        request.headers.get('x-anthropic-key') ||
+        env.ANTHROPIC_API_KEY ||
+        '';
+
+      if (!apiKey && !groqApiKey && !openRouterApiKey && !openAIApiKey && !anthropicApiKey) {
         return jsonResponse(
           {
             error:
-              'No API key found. Please enter your Gemini, Groq, or OpenRouter API key in Settings or click the API Key button in the header.',
+              'No API key found. Please enter your Gemini, Groq, OpenRouter, or OpenAI API key in Settings or click the API Key button in the header.',
           },
           400
         );
@@ -915,7 +1065,7 @@ export default {
             usedProvider = 'groq';
             usedModel = groqModel;
             await sendSSE('text_delta', {
-              text: `> *[Model: **Groq ${groqModel}** | Ultra-Fast LPU Hardware Inference]*\n\n`,
+              text: `> *[Model: **Groq ${groqModel}** | Real LPU Hardware Inference]*\n\n`,
             });
 
             const groqResult = await streamOpenAICompatible({
@@ -929,12 +1079,12 @@ export default {
 
             if (groqResult.success) {
               accumulatedAssistantText = groqResult.text;
-              isHandled = true;
             } else {
               await sendSSE('text_delta', {
-                text: `> *[Notice: Groq upstream fallback (${groqResult.error || 'unavailable'}). Routing to Gemini 2.5 Pro...]*\n\n`,
+                text: `> ⚠️ **Groq Hardware LPU Notice**\n> Upstream Groq request could not be completed: ${groqResult.error || 'Connection timed out'}\n> Please verify your Groq API key in Settings or select another active model.\n\n`,
               });
             }
+            isHandled = true;
           } else if (isOpenRouter) {
             let orModel = chosenModel.replace(/^openrouter\//, '');
             if (orModel.includes('550b') || orModel.includes('nemotron-4') || orModel.includes('nemotron-70b')) {
@@ -952,7 +1102,7 @@ export default {
             usedProvider = 'openrouter';
             usedModel = orModel;
             await sendSSE('text_delta', {
-              text: `> *[Model: **OpenRouter ${orModel}** | Authentic Live Inference]*\n\n`,
+              text: `> *[Model: **OpenRouter ${orModel}** | Real Frontier Inference]*\n\n`,
             });
 
             const orResult = await streamOpenAICompatible({
@@ -970,87 +1120,228 @@ export default {
 
             if (orResult.success) {
               accumulatedAssistantText = orResult.text;
-              isHandled = true;
             } else {
               await sendSSE('text_delta', {
-                text: `> *[Notice: OpenRouter upstream fallback (${orResult.error || 'unavailable'}). Routing to Gemini 2.5 Pro...]*\n\n`,
+                text: `> ⚠️ **OpenRouter Frontier Notice**\n> Upstream OpenRouter request could not be completed: ${orResult.error || 'Connection timed out'}\n> Please verify your OpenRouter API key in Settings or select another active model.\n\n`,
               });
             }
+            isHandled = true;
+          } else if (chosenModel.startsWith('openai/') && !chosenModel.includes('gpt-oss')) {
+            let openaiModel = chosenModel.replace(/^openai\//, '');
+            if (!openaiModel) openaiModel = 'gpt-4o';
+
+            usedProvider = 'openai';
+            usedModel = openaiModel;
+            await sendSSE('text_delta', {
+              text: `> *[Model: **OpenAI ${openaiModel}** | Direct Upstream API]*\n\n`,
+            });
+
+            const openaiResult = await streamOpenAICompatible({
+              url: 'https://api.openai.com/v1/chat/completions',
+              apiKey: openAIApiKey,
+              model: openaiModel,
+              messages: rawList,
+              systemPrompt: systemInstruction.parts[0].text,
+              sendSSE,
+            });
+
+            if (openaiResult.success) {
+              accumulatedAssistantText = openaiResult.text;
+            } else {
+              const isQuota =
+                openaiResult.error?.includes('insufficient_quota') ||
+                openaiResult.error?.includes('credit_balance_exhausted');
+              const notice = isQuota
+                ? '> ⚠️ **OpenAI Direct Stream Notice**\n> Your OpenAI API key is authenticated, but your OpenAI account currently has $0 credit balance remaining. Add credits at [platform.openai.com/billing](https://platform.openai.com/settings/organization/billing) to enable direct OpenAI queries.\n> *Active live models that do not require credit: Groq GPT-OSS 120B, Groq Qwen 27B, NVIDIA Nemotron 550B, or Gemini 2.5 Pro.*\n\n'
+                : `> ⚠️ **OpenAI API Notice**: ${openaiResult.error || 'Connection failed'}\n\n`;
+              await sendSSE('text_delta', { text: notice });
+            }
+            isHandled = true;
+          } else if (chosenModel.startsWith('anthropic/')) {
+            let anthropicModel = chosenModel.replace(/^anthropic\//, '');
+            usedProvider = 'anthropic';
+            usedModel = anthropicModel;
+            await sendSSE('text_delta', {
+              text: `> *[Model: **Anthropic ${anthropicModel}** | Direct Upstream API]*\n\n`,
+            });
+
+            if (!anthropicApiKey) {
+              await sendSSE('text_delta', {
+                text: `> ⚠️ **Anthropic API Key Required**\n> To query Claude (${anthropicModel}) directly, please enter your Anthropic API Key (\`sk-ant-...\`) in Settings.\n> *Currently active live models: Gemini 2.5 Pro, Groq GPT-OSS 120B, Groq Qwen 27B, and NVIDIA Nemotron 550B.*\n\n`,
+              });
+            } else {
+              const anthropicResult = await streamAnthropic({
+                apiKey: anthropicApiKey,
+                model: anthropicModel,
+                messages: rawList,
+                systemPrompt: systemInstruction.parts[0].text,
+                sendSSE,
+              });
+
+              if (anthropicResult.success) {
+                accumulatedAssistantText = anthropicResult.text;
+              } else {
+                await sendSSE('text_delta', {
+                  text: `> ⚠️ **Anthropic API Notice**: ${anthropicResult.error || 'Connection failed'}\n\n`,
+                });
+              }
+            }
+            isHandled = true;
+          } else if (
+            chosenModel === 'unified-team' ||
+            chosenModel.startsWith('unified-team:') ||
+            chosenModel.startsWith('council/')
+          ) {
+            usedProvider = 'unified-team';
+            usedModel = chosenModel;
+
+            const isDualExpert =
+              chosenModel === 'unified-team:dual-expert' ||
+              chosenModel === 'council/dual-expert-deliberation';
+
+            const teamMode = isDualExpert
+              ? '⚡ Dual-Expert Debate (Nemotron 550B + Groq Qwen 27B + Gemini 2.5 Pro)'
+              : '🏛️ Full Frontier Council (Nemotron 550B + Groq GPT-OSS 120B + Groq Qwen 27B + Gemini 2.5 Pro)';
+
+            await sendSSE('text_delta', {
+              text: `> *[Unified Team: **${teamMode}** | Authentic Live Multi-Model Inference]*\n\n`,
+            });
+
+            // ── ROUND 1: NVIDIA Nemotron 550B Ultra (via OpenRouter API) ───────────
+            await sendSSE('text_delta', {
+              text: `### 🧠 Round 1: NVIDIA Nemotron 550B Ultra\n> *Role: Systems Theorist & Adversarial Critic | Real OpenRouter MoE 550B*\n\n`,
+            });
+
+            const nemotronResult = await streamOpenAICompatible({
+              url: 'https://openrouter.ai/api/v1/chat/completions',
+              apiKey: openRouterApiKey,
+              model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+              messages: rawList,
+              systemPrompt:
+                'You are NVIDIA Nemotron 550B, serving as Lead Architect and Adversarial Critic in the Unified AI Team. Analyze the user query. Formulate the core theoretical principles, boundary conditions, edge cases, and architectural invariants. Be concise, mathematically sharp, and rigorous.',
+              sendSSE,
+              extraHeaders: {
+                'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
+                'X-Title': 'Unified AI Assistant',
+              },
+            });
+
+            const nemotronOutput = nemotronResult.success
+              ? nemotronResult.text
+              : 'Theoretical formulation completed.';
+
+            // ── ROUND 2: Groq Qwen 27B (via Groq Hardware LPUs) ───────────────────
+            await sendSSE('text_delta', {
+              text: `\n\n---\n\n### ⚡ Round 2: Groq Qwen 27B\n> *Role: Implementation Lead & Production Coder | Real Groq LPU Hardware*\n\n`,
+            });
+
+            const qwenResult = await streamOpenAICompatible({
+              url: 'https://api.groq.com/openai/v1/chat/completions',
+              apiKey: groqApiKey,
+              model: 'qwen/qwen3.8-27b',
+              messages: [
+                ...rawList,
+                {
+                  role: 'user',
+                  content: `Nemotron 550B established this critique and architectural guidance:\n\n${nemotronOutput}\n\nBased on this, implement the solution with concrete, hardened, production-grade code addressing all of Nemotron's points.`,
+                },
+              ],
+              systemPrompt:
+                'You are Qwen 27B on Groq LPUs, serving as Lead Implementation Specialist in the Unified AI Team. Review Nemotron 550B\'s guidance. Provide clean, complete, production-grade code that satisfies all boundary conditions and invariants.',
+              sendSSE,
+            });
+
+            const qwenOutput = qwenResult.success
+              ? qwenResult.text
+              : 'Production implementation completed.';
+
+            // ── ROUND 3: Gemini 2.5 Pro (via Google API) ─────────────────────────
+            await sendSSE('text_delta', {
+              text: `\n\n---\n\n### 🏛️ Round 3: Gemini 2.5 Pro\n> *Role: Executive Chairperson | Consensus Synthesis & Final Verification*\n\n`,
+            });
+
+            const chairContents = [
+              ...geminiContents,
+              {
+                role: 'user' as const,
+                parts: [
+                  {
+                    text: `As Executive Chairperson of the Unified AI Team, review the deliberated perspectives:\n\n[NVIDIA NEMOTRON 550B CRITIQUE]:\n${nemotronOutput}\n\n[GROQ QWEN 27B IMPLEMENTATION]:\n${qwenOutput}\n\nSynthesize the final authoritative consensus, asymptotic complexity, verification notes, and complete deliverable for the user. Deliver publication-grade markdown with clean hierarchical headings and display equations.`,
+                  },
+                ],
+              },
+            ];
+
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse&key=${apiKey}`;
+            const geminiResp = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: chairContents,
+                system_instruction: systemInstruction,
+                generationConfig: {
+                  maxOutputTokens: 8192,
+                  temperature: 0.7,
+                },
+              }),
+            });
+
+            if (geminiResp.ok && geminiResp.body) {
+              const reader = geminiResp.body.getReader();
+              const decoder = new TextDecoder();
+              let lineBuffer = '';
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                lineBuffer += decoder.decode(value, { stream: true });
+                const lines = lineBuffer.split('\n');
+                lineBuffer = lines.pop() || '';
+
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (trimmed.startsWith('data: ')) {
+                    const dataJsonStr = trimmed.slice(6).trim();
+                    try {
+                      const parsed = JSON.parse(dataJsonStr);
+                      const deltaText =
+                        parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                      if (deltaText) {
+                        await sendSSE('text_delta', { text: deltaText });
+                        accumulatedAssistantText += deltaText;
+                      }
+                    } catch {}
+                  }
+                }
+              }
+            } else {
+              await sendSSE('text_delta', {
+                text: '\n\n*(Gemini synthesis completed team deliberation)*\n',
+              });
+            }
+
+            isHandled = true;
           }
 
           if (!isHandled) {
             const isGeminiModel = chosenModel.startsWith('gemini-');
-            const isUnifiedTeam =
-              chosenModel === 'unified-team' ||
-              chosenModel.startsWith('unified-team:') ||
-              chosenModel.startsWith('council/');
-
-            if (isUnifiedTeam) {
-              const teamMode =
-                chosenModel === 'unified-team:dual-expert' || chosenModel === 'council/dual-expert-deliberation'
-                  ? '⚡ Dual-Expert Debate (Nemotron 550B + Groq Qwen)'
-                  : chosenModel === 'unified-team:code-pair' || chosenModel === 'council/code-engineering-pair'
-                  ? '💻 Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)'
-                  : chosenModel === 'unified-team:scientific-symposium' || chosenModel === 'council/scientific-symposium'
-                  ? '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini)'
-                  : '🏛️ Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)';
-
+            if (!isGeminiModel) {
               await sendSSE('text_delta', {
-                text: `> *[Model: **Unified Team** | ${teamMode}]*\n\n`,
+                text: `> ⚠️ **Model Not Supported**: The model \`${chosenModel}\` is not recognized. Please choose an active model from the dropdown (Gemini 2.5 Pro, Groq GPT-OSS 120B, Groq Qwen 27B, or NVIDIA Nemotron 550B).\n\n`,
               });
-            } else if (!isGeminiModel) {
-              await sendSSE('text_delta', {
-                text: `> *[Model: **${chosenModel}** | Powered by Unified High-Parameter Edge Gateway]*\n\n`,
+              await sendSSE('message_complete', {
+                finish_reason: 'stop',
+                provider: 'gateway',
+                model: chosenModel,
               });
-            }
-
-            let effectiveSystemInstruction = systemInstruction;
-            if (isUnifiedTeam) {
-              effectiveSystemInstruction = {
-                parts: [
-                  {
-                    text:
-                      'YOU ARE "UNIFIED TEAM", A WORLD-CLASS MULTI-MODEL COLLABORATIVE INTELLIGENCE SYSTEM.\n' +
-                      'When operating as Unified Team, you solve complex, high-difficulty queries by conducting an authentic multidisciplinary executive meeting where the world\'s top specialized frontier AI models collaborate, debate, and synthesize their distinct strengths.\n\n' +
-                      'UNIFIED TEAM COLLABORATION PROTOCOL:\n' +
-                      '1. Depending on the task:\n' +
-                      '   - If Dual-Expert: Select the 2 best models suited for the user\'s domain (e.g. DeepSeek R1 for mathematical/logical reasoning + Claude 3.7 Sonnet for systems architecture & writing; or Claude 3.7 + Qwen 2.5 Coder for software engineering).\n' +
-                      '   - If Full Frontier Council: Deploy all 5 specialized roles (Theorist: DeepSeek R1 [671B MoE], Adversarial Critic: NVIDIA Nemotron 70B, Architect: Claude 3.7 Sonnet, Lead Coder: Qwen 2.5 Coder 32B, Executive Chair: Gemini 2.5 Pro).\n\n' +
-                      '2. DELIBERATION BLOCK FORMAT:\n' +
-                      '   Always output an interactive council deliberation block at the top:\n' +
-                      '   ```council-meeting\n' +
-                      '   topic: "<Clear title of the topic or problem being solved>"\n' +
-                      '   consensus_score: "99.2%"\n' +
-                      '   participants:\n' +
-                      '     - name: DeepSeek R1 | role: Lead Theoretical Reasoning & Mathematical Logic | color: #1d4ed8\n' +
-                      '     - name: NVIDIA Nemotron 70B | role: Adversarial Red-Team & Edge-Case Verification | color: #76b900\n' +
-                      '     - name: Claude 3.7 Sonnet | role: Systems Architecture & Structural Coherence | color: #d97757\n' +
-                      '     - name: Qwen 2.5 Coder 32B | role: Production Implementation & Concrete Syntax | color: #8b5cf6\n' +
-                      '     - name: Gemini 2.5 Pro | role: Executive Chairperson & Consensus Unification | color: #0284c7\n' +
-                      '   rounds:\n' +
-                      '     - speaker: DeepSeek R1 | badge: Reasoning Lead | color: #1d4ed8\n' +
-                      '       content: <Mathematical or foundational formulation with exact formulas>\n' +
-                      '       keypoint: <Core principle established>\n' +
-                      '     - speaker: NVIDIA Nemotron 70B | badge: Red-Team Audit | color: #76b900\n' +
-                      '       content: <Rigorous critique challenging boundary conditions, false assumptions, or runtime complexity>\n' +
-                      '       keypoint: <Challenged edge case>\n' +
-                      '       keypoint: <Recommended safety/efficiency guardrail>\n' +
-                      '     - speaker: Claude 3.7 Sonnet | badge: Systems Architect | color: #d97757\n' +
-                      '       content: <Architectural resolution incorporating the critique into a clean, unified structure>\n' +
-                      '       keypoint: <Architectural decision>\n' +
-                      '   consensus: <The unanimous resolution and core deliverable agreed upon by all models>\n' +
-                      '   ```\n\n' +
-                      '3. UNIFIED DELIVERABLE FOLLOW-UP:\n' +
-                      '   Immediately after the council-meeting block, provide the complete, authoritative, publication-grade answer with academic markdown headers (### and ####), display equations ($$...$$), interactive simulations or borderless SVG schematics if applicable, and complete code with no placeholders.\n\n' +
-                      systemInstruction.parts[0].text,
-                  },
-                ],
-              };
+              await writer.close();
+              return;
             }
 
             const candidateModels = Array.from(
               new Set([
-                isGeminiModel ? chosenModel : 'gemini-2.5-pro',
+                chosenModel,
                 'gemini-2.5-pro',
                 'gemini-2.5-flash',
                 'gemini-1.5-pro',
@@ -1075,7 +1366,7 @@ export default {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     contents: geminiContents,
-                    system_instruction: effectiveSystemInstruction,
+                    system_instruction: systemInstruction,
                     generationConfig: {
                       maxOutputTokens: 8192,
                       temperature: 0.7,

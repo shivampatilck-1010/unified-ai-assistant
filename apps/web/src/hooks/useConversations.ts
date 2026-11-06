@@ -182,38 +182,34 @@ export function useConversations(backendConnected: boolean = true) {
     abortRef.current?.abort();
     setIsStreaming(false);
 
+    // Instant synchronous draft state to completely isolate new chat with zero bleed
+    const newDraftId = `conv-${Date.now()}`;
+    setActiveId(newDraftId);
+    setActiveConversation({
+      id: newDraftId,
+      owner_id: 'default_user',
+      title: 'New conversation',
+      project_id: projectId || undefined,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      messages: [],
+    });
+    saveStoredMessages(newDraftId, []);
+
     try {
       const created = await createConversation('New conversation', projectId);
-      setConversations((prev) => [created, ...prev]);
-      setActiveId(created.id);
-      setActiveConversation({
-        id: created.id,
-        owner_id: created.owner_id,
-        title: created.title,
-        project_id: created.project_id,
-        created_at: created.created_at,
-        updated_at: created.updated_at,
-        messages: [],
-      });
-      saveStoredMessages(created.id, []);
+      if (created.id !== newDraftId) {
+        setActiveId(created.id);
+        setActiveConversation((prev) => (prev ? { ...prev, id: created.id } : prev));
+        saveStoredMessages(created.id, []);
+      }
+      setConversations((prev) => [created, ...prev.filter((c) => c.id !== newDraftId)]);
       return created.id;
     } catch {
-      // Offline fallback
-      const tempId = `conv-${Date.now()}`;
-      setActiveId(tempId);
-      const newDraft: ConversationDetail = {
-        id: tempId,
-        owner_id: 'default_user',
-        title: 'New conversation',
-        project_id: projectId || undefined,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        messages: [],
-      };
-      setActiveConversation(newDraft);
+      // Local draft fallback already active
       setConversations((prev) => [
         {
-          id: tempId,
+          id: newDraftId,
           owner_id: 'default_user',
           title: 'New conversation',
           created_at: new Date().toISOString(),
@@ -222,8 +218,7 @@ export function useConversations(backendConnected: boolean = true) {
         },
         ...prev,
       ]);
-      saveStoredMessages(tempId, []);
-      return tempId;
+      return newDraftId;
     }
   }, []);
 
@@ -379,9 +374,11 @@ export function useConversations(backendConnected: boolean = true) {
       abortRef.current = controller;
       setIsStreaming(true);
 
-      // Build complete conversation history so the model follows prior context
+      // Build strictly isolated conversation history for this conversation only
       const priorHistory: Array<{ role: string; content: string }> = (
-        activeConversation?.messages || []
+        activeConversation && activeConversation.id === effectiveConvId
+          ? activeConversation.messages
+          : []
       )
         .filter(
           (m) =>
@@ -395,7 +392,10 @@ export function useConversations(backendConnected: boolean = true) {
           content: m.content.trim(),
         }));
 
-      const fullHistory = [...priorHistory, { role: 'user', content: content.trim() }];
+      // Sliding context window: limit to the last 14 messages (7 dialogue turns)
+      // to keep recent context fresh and prevent cross-topic or old-chat conflicts
+      const boundedPriorHistory = priorHistory.slice(-14);
+      const fullHistory = [...boundedPriorHistory, { role: 'user', content: content.trim() }];
 
       try {
         await streamChat(

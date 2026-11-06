@@ -59,10 +59,9 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
   });
 
   const [customModelIds, setCustomModelIds] = useState<string[]>([
-    'deepseek/deepseek-r1',
-    'anthropic/claude-3-7-sonnet',
-    'nvidia/llama-3.1-nemotron-70b-instruct',
-    'qwen/qwen-2.5-coder-32b-instruct',
+    'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
+    'groq/openai/gpt-oss-120b',
+    'groq/qwen/qwen3.8-27b',
     'gemini-2.5-pro',
   ]);
 
@@ -228,20 +227,17 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                 </div>
 
                 <div className="council-modal__preset-members">
-                  <span className="council-modal__member-pill" style={{ borderColor: '#6366f1' }}>
-                    DeepSeek R1 (Theorist)
-                  </span>
                   <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
-                    Nemotron 70B (Red-Team)
+                    Nemotron 550B (Theorist & Critic)
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#f97316' }}>
-                    Claude 3.7 (Architect)
+                  <span className="council-modal__member-pill" style={{ borderColor: '#ec4899' }}>
+                    Groq GPT-OSS 120B (Deep Reasoning)
                   </span>
                   <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
-                    Qwen Coder 32B (Coder)
+                    Groq Qwen 27B (Implementation)
                   </span>
                   <span className="council-modal__member-pill" style={{ borderColor: '#38bdf8' }}>
-                    Gemini 2.5 Pro (Chair)
+                    Gemini 2.5 Pro (Executive Chair)
                   </span>
                 </div>
               </div>
@@ -263,18 +259,17 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
                       <span className="council-modal__preset-tag">Top 2 Specialists</span>
                     </div>
                     <p className="council-modal__preset-desc">
-                      Fast 2-model debate: The domain's top mathematical/logical reasoner debates with a
-                      lead systems architect before converging.
+                      High-velocity debate: NVIDIA Nemotron 550B critiques assumptions and bounds, while Groq Qwen 27B solves the concrete implementation.
                     </p>
                   </div>
                 </div>
 
                 <div className="council-modal__preset-members">
-                  <span className="council-modal__member-pill" style={{ borderColor: '#6366f1' }}>
-                    DeepSeek R1 (Reasoning Lead)
+                  <span className="council-modal__member-pill" style={{ borderColor: '#84cc16' }}>
+                    Nemotron 550B (Architectural Critic)
                   </span>
-                  <span className="council-modal__member-pill" style={{ borderColor: '#f97316' }}>
-                    Claude 3.7 Sonnet (Peer Review)
+                  <span className="council-modal__member-pill" style={{ borderColor: '#a855f7' }}>
+                    Groq Qwen 27B (LPU Code Lead)
                   </span>
                 </div>
               </div>
