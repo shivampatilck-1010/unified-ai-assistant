@@ -10,6 +10,7 @@ import { CompanyLogo } from '../brand/CompanyLogo';
 import { FollowupEmailModal } from './FollowupEmailModal';
 import { ApiKeyModal } from '../auth/ApiKeyModal';
 import { CouncilSetupModal } from './CouncilSetupModal';
+import { VoiceModeModal } from '../voice/VoiceModeModal';
 import { CalendarReminderCard, type CalendarReminderData } from '../calendar/CalendarReminderCard';
 import { detectCalendarIntent } from '../../utils/calendarIntentDetector';
 import { exportMarkdownToPdf } from '../../utils/pdfExporter';
@@ -220,6 +221,7 @@ export function ChatView({
   const [pendingCalendarData, setPendingCalendarData] = useState<CalendarReminderData | null>(null);
   const [showCalendarCard, setShowCalendarCard] = useState(false);
   const [showCouncilModal, setShowCouncilModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
   // Queued Messages System (sends after agent finishes working)
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
   const [editPayload, setEditPayload] = useState<{ content: string; attachments?: ChatAttachment[] } | null>(null);
@@ -766,6 +768,17 @@ export function ChatView({
         onEditQueuedMessage={handleEditQueuedMessage}
         editPayload={editPayload}
         onClearEditPayload={() => setEditPayload(null)}
+        onOpenVoiceMode={() => setShowVoiceModal(true)}
+      />
+
+      {/* Live Interactive Voice Assistant Modal */}
+      <VoiceModeModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onSendMessage={(text) => handleSend(text)}
+        isStreaming={isStreaming}
+        messages={messages}
+        currentModelName={currentModel?.name || 'Unified AI Assistant'}
       />
 
       {/* Follow-up Email Modal */}

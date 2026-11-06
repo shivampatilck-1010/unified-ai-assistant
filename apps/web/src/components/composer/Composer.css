@@ -124,7 +124,8 @@
 
 .composer__attach-btn,
 .composer__send-btn,
-.composer__stop-btn {
+.composer__stop-btn,
+.composer__mic-btn {
   background: none;
   border: none;
   color: var(--text-tertiary);
@@ -136,6 +137,62 @@
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
+}
+
+/* Voice Dictation Microphone Button */
+.composer__mic-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.composer__mic-btn--active {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+  animation: micPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes micPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
+  }
+}
+
+/* Interactive Live Voice Mode Button (Solid White Circle with Waveform & Sparkle) */
+.composer__live-voice-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #070709;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease, background-color 0.16s;
+}
+
+.composer__live-voice-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.5);
+  background: #f4f4f5;
+}
+
+.composer__live-voice-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.composer__live-voice-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .composer__attach-btn:disabled {

@@ -15,6 +15,7 @@ export interface ComposerProps {
   onEditQueuedMessage?: (id: string) => void;
   editPayload?: { content: string; attachments?: ChatAttachment[] } | null;
   onClearEditPayload?: () => void;
+  onOpenVoiceMode?: () => void;
 }
 
 export function Composer({
@@ -29,12 +30,101 @@ export function Composer({
   onEditQueuedMessage,
   editPayload,
   onClearEditPayload,
+  onOpenVoiceMode,
 }: ComposerProps) {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Toggle voice dictation directly into textarea
+  const toggleDictation = () => {
+    if (isDictating) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // Ignore
+        }
+        recognitionRef.current = null;
+      }
+      setIsDictating(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsDictating(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+
+        const spoken = final || interim;
+        if (spoken) {
+          setValue((prev) => {
+            const base = prev.trim();
+            return base ? `${base} ${spoken}` : spoken;
+          });
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+          }
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsDictating(false);
+      };
+
+      recognition.onend = () => {
+        setIsDictating(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (err) {
+      console.warn('Speech dictation start failed:', err);
+      setIsDictating(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // Ignore
+        }
+      }
+    };
+  }, []);
 
   // Can submit if there is text or attachment, and composer is not disabled
   const canSubmit = (value.trim().length > 0 || attachments.length > 0) && !disabled;
@@ -299,6 +389,44 @@ export function Composer({
 
           {/* Action buttons on the right */}
           <div className="composer__actions-group" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* 1. Speech-to-Text Microphone Dictation Button */}
+            <button
+              className={`composer__mic-btn ${isDictating ? 'composer__mic-btn--active' : ''}`}
+              type="button"
+              onClick={toggleDictation}
+              disabled={disabled}
+              aria-label={isDictating ? 'Stop listening' : 'Dictate with voice'}
+              title={isDictating ? 'Listening... click to stop' : 'Voice typing / Dictation'}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+                <line x1="8" y1="22" x2="16" y2="22" />
+              </svg>
+            </button>
+
+            {/* 2. Interactive Live Voice Assistant Button (Solid White Circle with Waveform & Sparkle) */}
+            {onOpenVoiceMode && (
+              <button
+                className="composer__live-voice-btn"
+                type="button"
+                onClick={onOpenVoiceMode}
+                disabled={disabled}
+                aria-label="Start Live Voice Mode"
+                title="Unified AI Live Voice Mode"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  {/* 3 waveform bars */}
+                  <rect x="5" y="8" width="2.5" height="8" rx="1.25" />
+                  <rect x="10.5" y="4" width="2.5" height="16" rx="1.25" />
+                  <rect x="16" y="9" width="2.5" height="6" rx="1.25" />
+                  {/* 4-point sparkle on top right */}
+                  <path d="M19 1.5C19.3 3 20.5 4.2 22 4.5C20.5 4.8 19.3 6 19 7.5C18.7 6 17.5 4.8 16 4.5C17.5 4.2 18.7 3 19 1.5Z" />
+                </svg>
+              </button>
+            )}
+
             {isStreaming && (
               <button
                 className="composer__stop-btn"
