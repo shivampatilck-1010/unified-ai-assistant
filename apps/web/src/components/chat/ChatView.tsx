@@ -6,11 +6,10 @@ import { Composer } from '../composer/Composer';
 import { MarkdownContent } from './MarkdownContent';
 import { BrowserLivePreviewCard } from '../browser/BrowserLivePreviewCard';
 import { UnifiedLogo } from '../brand/UnifiedLogo';
-import { ModelBrandLogo } from '../brand/ModelBrandLogo';
+import { CompanyLogo } from '../brand/CompanyLogo';
 import { FollowupEmailModal } from './FollowupEmailModal';
 import { ApiKeyModal } from '../auth/ApiKeyModal';
 import { CouncilSetupModal } from './CouncilSetupModal';
-import { ModelSelectorDropdown } from './ModelSelectorDropdown';
 import { CalendarReminderCard, type CalendarReminderData } from '../calendar/CalendarReminderCard';
 import { detectCalendarIntent } from '../../utils/calendarIntentDetector';
 import { exportMarkdownToPdf } from '../../utils/pdfExporter';
@@ -47,7 +46,7 @@ export function ChatView({
   onRetry,
   isStreaming,
   onCancel,
-  onNewChat,
+  onNewChat: _onNewChat,
   availableModels = [],
   selectedModelId,
   onSelectModel,
@@ -351,64 +350,6 @@ export function ChatView({
 
   return (
     <div className="chat-view">
-      {/* Top bar */}
-      <div className="chat-view__topbar">
-        <button
-          className="chat-view__new-btn"
-          onClick={onNewChat}
-          aria-label="New conversation"
-          title="New conversation"
-          type="button"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <span>New Chat</span>
-        </button>
-
-        <div className="chat-view__topbar-title">
-          <span className="chat-view__topbar-brand">Unified AI</span>
-          <span className="chat-view__topbar-slash">/</span>
-          <span className="chat-view__topbar-conv-title">{conversationTitle || 'Chat Workspace'}</span>
-        </div>
-
-        <div className="chat-view__topbar-right" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Unified Team Multi-Model Intelligence Button */}
-          {(() => {
-            const isUnifiedTeamActive = Boolean(
-              selectedModelId &&
-                (selectedModelId === 'unified-team' ||
-                  selectedModelId.startsWith('unified-team:') ||
-                  selectedModelId.startsWith('council/'))
-            );
-            return (
-              <button
-                type="button"
-                className={`chat-view__council-btn ${isUnifiedTeamActive ? 'chat-view__council-btn--active' : ''}`}
-                onClick={() => setShowCouncilModal(true)}
-                title="Configure Unified Team (Dual-Expert Debate or Full Multi-Model Frontier Meeting)"
-              >
-                <ModelBrandLogo modelId="unified-team" provider="unified-team" size={16} />
-                <span>{isUnifiedTeamActive ? 'Unified Team Active' : 'Unified Team'}</span>
-              </button>
-            );
-          })()}
-
-          {availableModels.length > 0 ? (
-            <ModelSelectorDropdown
-              availableModels={availableModels}
-              selectedModelId={selectedModelId ?? null}
-              onSelectModel={(id) => onSelectModel?.(id)}
-              onOpenTeamModal={() => setShowCouncilModal(true)}
-            />
-          ) : (
-            <div className="chat-view__model-unconfigured">
-              <span>Connecting to AI gateway...</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Messages area */}
       <div
         className="chat-view__messages"
@@ -573,6 +514,43 @@ export function ChatView({
                           content={cleanContent}
                           onSelectChoice={(choice) => onSend(choice, currentModel?.provider, selectedModelId)}
                         />
+                        {(cleanContent.includes('Anthropic API Key Required') ||
+                          cleanContent.includes('Anthropic API key is required') ||
+                          cleanContent.includes('OpenAI Direct Stream Notice')) && (
+                          <div style={{ marginTop: '12px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowApiKeyModal(true)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '7px',
+                                background: 'linear-gradient(135deg, #d97757, #b85d3f)',
+                                color: '#ffffff',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                padding: '7px 16px',
+                                fontSize: '12.5px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(217, 119, 87, 0.3)',
+                                transition: 'transform 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1.0)')}
+                            >
+                              <CompanyLogo
+                                provider={cleanContent.includes('Anthropic') ? 'anthropic' : 'openai'}
+                                size={14}
+                              />
+                              <span>
+                                {cleanContent.includes('Anthropic')
+                                  ? 'Configure Anthropic API Key in Settings'
+                                  : 'Configure OpenAI API Key in Settings'}
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="chat-message__user-body">

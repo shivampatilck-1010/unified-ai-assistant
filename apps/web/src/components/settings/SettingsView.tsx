@@ -9,9 +9,19 @@ import {
   getCustomApiKey,
   setCustomApiKey,
   validateGeminiApiKey,
+  getCustomAnthropicKey,
+  setCustomAnthropicKey,
+  getCustomOpenAIKey,
+  setCustomOpenAIKey,
+  getCustomGroqKey,
+  setCustomGroqKey,
+  getCustomOpenRouterKey,
+  setCustomOpenRouterKey,
 } from '../../lib/api';
 import type { UnifiedProviderStatusResponse, RetentionStatusResponse, ModelInfo } from '../../types';
 import { FollowupEmailModal } from '../chat/FollowupEmailModal';
+import { CompanyLogo } from '../brand/CompanyLogo';
+import { ApiKeyModal } from '../auth/ApiKeyModal';
 import './SettingsView.css';
 
 interface SettingsViewProps {
@@ -34,9 +44,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
 
   // Custom Gemini API Key Configuration
   const [apiKeyInput, setApiKeyInput] = useState<string>(getCustomApiKey() || '');
+  const [anthropicKeyInput, setAnthropicKeyInput] = useState<string>(getCustomAnthropicKey() || '');
+  const [openAIKeyInput, setOpenAIKeyInput] = useState<string>(getCustomOpenAIKey() || '');
+  const [groqKeyInput, setGroqKeyInput] = useState<string>(getCustomGroqKey() || '');
+  const [openRouterKeyInput, setOpenRouterKeyInput] = useState<string>(getCustomOpenRouterKey() || '');
   const [showKey, setShowKey] = useState<boolean>(false);
   const [testingKey, setTestingKey] = useState<boolean>(false);
   const [keyResult, setKeyResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
 
   // Chat Capabilities (Shifted from Chat view)
   const [prefOrchestration, setPrefOrchestration] = useState<boolean>(() => {
@@ -67,21 +82,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
     });
   };
 
-  const handleSaveApiKey = () => {
-    const trimmed = apiKeyInput.trim();
-    if (trimmed) {
-      setCustomApiKey(trimmed);
-      setNotification({
-        type: 'success',
-        message: 'Personal Google Gemini API key saved! Chat queries will now connect using your key.',
-      });
-    } else {
-      setCustomApiKey(null);
-      setNotification({
-        type: 'success',
-        message: 'Personal API key cleared. Reverted to default credentials.',
-      });
-    }
+  const handleClearAllKeys = () => {
+    setApiKeyInput('');
+    setCustomApiKey(null);
+    setAnthropicKeyInput('');
+    setCustomAnthropicKey(null);
+    setOpenAIKeyInput('');
+    setCustomOpenAIKey(null);
+    setGroqKeyInput('');
+    setCustomGroqKey(null);
+    setOpenRouterKeyInput('');
+    setCustomOpenRouterKey(null);
+    setKeyResult(null);
+    setNotification({
+      type: 'success',
+      message: 'Personal API keys cleared. Reverted to default edge credentials.',
+    });
+  };
+
+  const handleSaveAllProviderKeys = () => {
+    if (apiKeyInput.trim()) setCustomApiKey(apiKeyInput.trim());
+    else setCustomApiKey(null);
+
+    if (anthropicKeyInput.trim()) setCustomAnthropicKey(anthropicKeyInput.trim());
+    else setCustomAnthropicKey(null);
+
+    if (openAIKeyInput.trim()) setCustomOpenAIKey(openAIKeyInput.trim());
+    else setCustomOpenAIKey(null);
+
+    if (groqKeyInput.trim()) setCustomGroqKey(groqKeyInput.trim());
+    else setCustomGroqKey(null);
+
+    if (openRouterKeyInput.trim()) setCustomOpenRouterKey(openRouterKeyInput.trim());
+    else setCustomOpenRouterKey(null);
+
+    setNotification({
+      type: 'success',
+      message: 'All multi-provider API keys (Anthropic Claude, OpenAI, Google Gemini, Groq, OpenRouter) saved locally!',
+    });
   };
 
   const handleTestApiKey = async () => {
@@ -107,16 +145,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
     } finally {
       setTestingKey(false);
     }
-  };
-
-  const handleResetApiKey = () => {
-    setApiKeyInput('');
-    setCustomApiKey(null);
-    setKeyResult(null);
-    setNotification({
-      type: 'success',
-      message: 'Personal API key removed. Reverted to default edge credentials.',
-    });
   };
 
   const handleSaveBackendUrl = () => {
@@ -450,96 +478,188 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
           </div>
         </section>
 
-        {/* Custom Gemini API Key Configuration */}
+        {/* Multi-Provider AI Model Keys Configuration */}
         <section className="settings-section">
           <div className="settings-section__header">
             <div className="settings-section__title-group">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="settings-icon">
-                <path d="M21 2l-2 2m-1-1l-3 3 2 2 3-3-2-2z" />
-                <path d="M15 5l4 4-11 11H4v-4l11-11z" />
-              </svg>
+              <CompanyLogo provider="unified-team" size={22} />
               <div>
-                <h3 className="settings-section__title">Custom Gemini API Key</h3>
+                <h3 className="settings-section__title">AI Provider API Keys (Live Multi-Gateway)</h3>
                 <span
                   className="privacy-active-badge"
                   style={{
-                    background: getCustomApiKey() ? '#064e3b' : '#1e3a5f',
-                    color: getCustomApiKey() ? '#6ee7b7' : '#93c5fd',
+                    background: getCustomAnthropicKey() || getCustomOpenAIKey() || getCustomApiKey() ? '#064e3b' : '#1e3a5f',
+                    color: getCustomAnthropicKey() || getCustomOpenAIKey() || getCustomApiKey() ? '#6ee7b7' : '#93c5fd',
                   }}
                 >
-                  {getCustomApiKey() ? 'Personal Key Active' : 'Default Gateway Active'}
+                  {getCustomAnthropicKey() || getCustomOpenAIKey() || getCustomApiKey() ? 'Custom Provider Keys Active' : 'Edge Verified Gateway Active'}
                 </span>
               </div>
             </div>
             <p className="settings-section__desc">
-              Connect your personal Google Gemini API key to query models directly with your own quota. Keys are stored locally in your browser. Get a key free at{' '}
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#38bdf8', textDecoration: 'underline' }}
-              >
-                Google AI Studio ↗
-              </a>
-              .
+              Connect your personal API keys for Anthropic Claude, OpenAI, Google Gemini, Groq, and OpenRouter. Keys are stored locally in your browser and used directly for upstream model queries.
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+            {/* Anthropic Claude API Key */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CompanyLogo provider="anthropic" size={16} /> Anthropic Claude API Key (Claude 3.7 Sonnet & 3.5 Sonnet):
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={anthropicKeyInput}
+                  onChange={(e) => setAnthropicKeyInput(e.target.value)}
+                  placeholder="Paste your Anthropic key (sk-ant-api03-...)"
+                  style={{
+                    flex: 1,
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* OpenAI API Key */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CompanyLogo provider="openai" size={16} /> OpenAI API Key (GPT-4o, GPT-4o Mini, o3-mini):
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={openAIKeyInput}
+                  onChange={(e) => setOpenAIKeyInput(e.target.value)}
+                  placeholder="Paste your OpenAI key (sk-proj-...)"
+                  style={{
+                    flex: 1,
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Google Gemini API Key */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CompanyLogo provider="google" size={16} /> Google Gemini API Key (Flagship 2.5 Pro & Multimodal):
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type={showKey ? 'text' : 'password'}
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder="Paste your Gemini API key (AIzaSy... or AQ.Ab8...)"
                   style={{
-                    width: '100%',
+                    flex: 1,
                     background: '#1a1a1a',
                     border: '1px solid #333',
                     borderRadius: '6px',
-                    padding: '8px 56px 8px 12px',
+                    padding: '8px 12px',
                     color: '#fff',
                     fontSize: '13px',
                     fontFamily: 'monospace',
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowKey((v) => !v)}
-                  style={{
-                    position: 'absolute',
-                    right: '6px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: '#262626',
-                    border: '1px solid #3d3d3d',
-                    color: '#a3a3a3',
-                    borderRadius: '4px',
-                    padding: '2px 8px',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {showKey ? 'Hide' : 'Show'}
-                </button>
               </div>
+            </div>
+
+            {/* Groq API Key */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CompanyLogo provider="groq" size={16} /> Groq Hardware LPU Key (Qwen 27B & GPT-OSS 120B):
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={groqKeyInput}
+                  onChange={(e) => setGroqKeyInput(e.target.value)}
+                  placeholder="Paste your Groq key (gsk_...)"
+                  style={{
+                    flex: 1,
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* OpenRouter API Key */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CompanyLogo provider="openrouter" size={16} /> OpenRouter Key (NVIDIA Nemotron 550B & Open Weights):
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={openRouterKeyInput}
+                  onChange={(e) => setOpenRouterKeyInput(e.target.value)}
+                  placeholder="Paste your OpenRouter key (sk-or-v1-...)"
+                  style={{
+                    flex: 1,
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                style={{
+                  background: '#262626',
+                  border: '1px solid #3d3d3d',
+                  color: '#a3a3a3',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontSize: '12.5px',
+                  cursor: 'pointer',
+                }}
+              >
+                {showKey ? '👁️ Hide Keys' : '👁️ Show Keys'}
+              </button>
 
               <button
                 type="button"
-                onClick={handleSaveApiKey}
+                onClick={handleSaveAllProviderKeys}
                 style={{
                   background: '#2563eb',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '8px 14px',
+                  padding: '8px 16px',
                   fontSize: '13px',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
-                Save Key
+                Save All Keys
               </button>
 
               <button
@@ -557,12 +677,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
                   opacity: testingKey || !apiKeyInput.trim() ? 0.6 : 1,
                 }}
               >
-                {testingKey ? 'Testing…' : 'Test Key'}
+                {testingKey ? 'Testing Gemini…' : 'Test Gemini Key'}
               </button>
 
               <button
                 type="button"
-                onClick={handleResetApiKey}
+                onClick={handleClearAllKeys}
                 style={{
                   background: 'transparent',
                   color: '#a3a3a3',
@@ -573,7 +693,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
                   cursor: 'pointer',
                 }}
               >
-                Clear
+                Clear All Keys
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(true)}
+                style={{
+                  background: 'rgba(217, 119, 87, 0.15)',
+                  color: '#d97757',
+                  border: '1px solid rgba(217, 119, 87, 0.3)',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+              >
+                ⚙️ Open Full Keys Modal
               </button>
             </div>
 
@@ -809,6 +947,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ providerStatus, onRe
         isOpen={showEmailModal}
         onClose={() => setShowEmailModal(false)}
         conversationId={null}
+      />
+
+      {/* API Key Modal */}
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+        onKeyChange={() => {
+          setApiKeyInput(getCustomApiKey() || '');
+          setAnthropicKeyInput(getCustomAnthropicKey() || '');
+          setOpenAIKeyInput(getCustomOpenAIKey() || '');
+          setGroqKeyInput(getCustomGroqKey() || '');
+          setOpenRouterKeyInput(getCustomOpenRouterKey() || '');
+        }}
       />
     </div>
   );

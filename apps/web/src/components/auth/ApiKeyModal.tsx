@@ -9,6 +9,8 @@ import {
   setCustomOpenRouterKey,
   getCustomOpenAIKey,
   setCustomOpenAIKey,
+  getCustomAnthropicKey,
+  setCustomAnthropicKey,
 } from '../../lib/api';
 import { CompanyLogo } from '../brand/CompanyLogo';
 import './ApiKeyModal.css';
@@ -24,6 +26,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
   const [groqKeyInput, setGroqKeyInput] = useState(getCustomGroqKey() || '');
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState(getCustomOpenRouterKey() || '');
   const [openAIKeyInput, setOpenAIKeyInput] = useState(getCustomOpenAIKey() || '');
+  const [anthropicKeyInput, setAnthropicKeyInput] = useState(getCustomAnthropicKey() || '');
 
   const [showKeys, setShowKeys] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -71,9 +74,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     if (openAIKeyInput.trim()) setCustomOpenAIKey(openAIKeyInput.trim());
     else setCustomOpenAIKey(null);
 
+    if (anthropicKeyInput.trim()) setCustomAnthropicKey(anthropicKeyInput.trim());
+    else setCustomAnthropicKey(null);
+
     setStatusMessage({
       type: 'success',
-      text: '✓ All API keys saved! Groq, OpenRouter, OpenAI, and Gemini are live.',
+      text: '✓ All API keys saved! Anthropic Claude, OpenAI, Groq, OpenRouter, and Gemini are live.',
     });
     if (onKeyChange) onKeyChange(true);
     setTimeout(() => {
@@ -87,6 +93,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
     setGroqKeyInput(getCustomGroqKey() || '');
     setOpenRouterKeyInput(getCustomOpenRouterKey() || '');
     setOpenAIKeyInput(getCustomOpenAIKey() || '');
+    setAnthropicKeyInput(getCustomAnthropicKey() || '');
     setStatusMessage({
       type: 'success',
       text: 'Reverted to verified cloud edge keys (Groq + OpenRouter + Gemini).',
@@ -104,7 +111,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
             <div>
               <h3 className="apikey-modal__title">AI Provider API Keys (Live Multi-Gateway)</h3>
               <p className="apikey-modal__subtitle">
-                Connected to Groq LPUs, OpenRouter Frontier Models, and Google Gemini
+                Configure Anthropic Claude, OpenAI, Google Gemini, Groq, and OpenRouter
               </p>
             </div>
           </div>
@@ -116,6 +123,36 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
         <div className="apikey-modal__body">
           {/* Provider status pills */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '3px 8px',
+                borderRadius: 12,
+                background: 'rgba(217, 119, 87, 0.15)',
+                border: '1px solid rgba(217, 119, 87, 0.3)',
+                color: '#d97757',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <CompanyLogo provider="anthropic" size={12} /> Anthropic: Claude 3.7 & 3.5 Sonnet
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '3px 8px',
+                borderRadius: 12,
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                color: '#34d399',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <CompanyLogo provider="openai" size={12} /> OpenAI: GPT-4o & o3-mini
+            </span>
             <span
               style={{
                 fontSize: 11,
@@ -195,6 +232,25 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onKey
                 placeholder="sk-or-v1-..."
                 value={openRouterKeyInput}
                 onChange={(e) => setOpenRouterKeyInput(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+
+          {/* Anthropic API Key */}
+          <div className="apikey-modal__input-group">
+            <label className="apikey-modal__label" htmlFor="anthropic-key-input" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CompanyLogo provider="anthropic" size={15} /> Anthropic Claude API Key (Claude 3.7 Sonnet & 3.5 Sonnet):
+            </label>
+            <div className="apikey-modal__input-wrapper">
+              <input
+                id="anthropic-key-input"
+                type={showKeys ? 'text' : 'password'}
+                className="apikey-modal__input"
+                placeholder="sk-ant-..."
+                value={anthropicKeyInput}
+                onChange={(e) => setAnthropicKeyInput(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
               />

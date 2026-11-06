@@ -617,12 +617,14 @@ export default {
       const hasGemini = Boolean(clientApiKey || env.GOOGLE_API_KEY || env.GEMINI_API_KEY);
       const hasGroq = Boolean(request.headers.get('x-groq-key') || env.GROQ_API_KEY || DEFAULT_GROQ_API_KEY);
       const hasOpenRouter = Boolean(request.headers.get('x-openrouter-key') || env.OPENROUTER_API_KEY || DEFAULT_OPENROUTER_API_KEY);
-      const configured = hasGemini || hasGroq || hasOpenRouter;
+      const hasOpenAI = Boolean(request.headers.get('x-openai-key') || env.OPENAI_API_KEY);
+      const hasAnthropic = Boolean(request.headers.get('x-anthropic-key') || env.ANTHROPIC_API_KEY);
+      const configured = hasGemini || hasGroq || hasOpenRouter || hasOpenAI || hasAnthropic;
 
       return jsonResponse({
         configured,
         provider: 'unified-team',
-        active_provider: 'Unified Gateway (Google + Groq + OpenRouter)',
+        active_provider: 'Unified Gateway (Google + Groq + OpenRouter + Anthropic + OpenAI)',
         active_model: 'gemini-2.5-pro',
         available_models: [
           // 0. Unified Team Flagship Multi-Model Intelligence
@@ -1166,9 +1168,27 @@ export default {
             });
 
             if (!anthropicApiKey) {
-              await sendSSE('text_delta', {
-                text: `> ⚠️ **Anthropic API Key Required**\n> To query Claude (${anthropicModel}) directly, please enter your Anthropic API Key (\`sk-ant-...\`) in Settings.\n> *Currently active live models: Gemini 2.5 Pro, Groq GPT-OSS 120B, Groq Qwen 27B, and NVIDIA Nemotron 550B.*\n\n`,
-              });
+              let handledViaOpenRouter = false;
+              if (openRouterApiKey) {
+                const orResult = await streamOpenAICompatible({
+                  url: 'https://openrouter.ai/api/v1/chat/completions',
+                  apiKey: openRouterApiKey,
+                  model: `anthropic/${anthropicModel}`,
+                  messages: rawList,
+                  systemPrompt: systemInstruction.parts[0].text,
+                  sendSSE,
+                });
+                if (orResult.success) {
+                  accumulatedAssistantText = orResult.text;
+                  handledViaOpenRouter = true;
+                }
+              }
+
+              if (!handledViaOpenRouter) {
+                await sendSSE('text_delta', {
+                  text: `> ⚠️ **Anthropic API Key Required**\n> To query Claude (${anthropicModel}) directly, please enter your Anthropic API Key (\`sk-ant-...\`) in Settings.\n> *Currently active live models: Gemini 2.5 Pro, Groq GPT-OSS 120B, Groq Qwen 27B, and NVIDIA Nemotron 550B.*\n\n`,
+                });
+              }
             } else {
               const anthropicResult = await streamAnthropic({
                 apiKey: anthropicApiKey,

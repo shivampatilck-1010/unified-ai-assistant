@@ -26,7 +26,9 @@
   border-bottom: 1px solid var(--border);
   background-color: var(--bg-main);
   flex-shrink: 0;
-  z-index: 10;
+  z-index: 100;
+  position: relative;
+  overflow: visible;
 }
 
 .app-header__left {
@@ -92,7 +94,10 @@
 .app-header__right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  position: relative;
+  overflow: visible;
+  z-index: 100;
 }
 
 .app-header__provider-badge {

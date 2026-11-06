@@ -163,6 +163,21 @@ export function setCustomOpenAIKey(key: string | null): void {
   }
 }
 
+export function getCustomAnthropicKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  const key = localStorage.getItem('unified_ai_custom_anthropic_key');
+  return key && key.trim() ? key.trim() : null;
+}
+
+export function setCustomAnthropicKey(key: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (key && key.trim()) {
+    localStorage.setItem('unified_ai_custom_anthropic_key', key.trim());
+  } else {
+    localStorage.removeItem('unified_ai_custom_anthropic_key');
+  }
+}
+
 export async function validateGeminiApiKey(
   key: string
 ): Promise<{ valid: boolean; message: string; models?: string[] }> {
@@ -356,6 +371,10 @@ export async function sendFollowupEmail(
 export function getBaseHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getAuthToken();
   const customKey = getCustomApiKey();
+  const groqKey = getCustomGroqKey();
+  const openRouterKey = getCustomOpenRouterKey();
+  const openAIKey = getCustomOpenAIKey();
+  const anthropicKey = getCustomAnthropicKey();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...extra,
@@ -365,6 +384,18 @@ export function getBaseHeaders(extra: Record<string, string> = {}): Record<strin
   }
   if (customKey) {
     headers['X-Gemini-Key'] = customKey;
+  }
+  if (groqKey) {
+    headers['X-Groq-Key'] = groqKey;
+  }
+  if (openRouterKey) {
+    headers['X-OpenRouter-Key'] = openRouterKey;
+  }
+  if (openAIKey) {
+    headers['X-OpenAI-Key'] = openAIKey;
+  }
+  if (anthropicKey) {
+    headers['X-Anthropic-Key'] = anthropicKey;
   }
   return headers;
 }

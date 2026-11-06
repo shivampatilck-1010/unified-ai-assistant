@@ -8,6 +8,8 @@ import { ChatView } from './components/chat/ChatView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
 import { StatusIndicator } from './components/status/StatusIndicator';
 import { ModelBrandLogo } from './components/brand/ModelBrandLogo';
+import { ModelSelectorDropdown } from './components/chat/ModelSelectorDropdown';
+import { CouncilSetupModal } from './components/chat/CouncilSetupModal';
 import './App.css';
 
 // Code-split heavy views to reduce initial bundle payload
@@ -42,6 +44,7 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [providerStatus, setProviderStatus] = useState<UnifiedProviderStatusResponse | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [showCouncilModal, setShowCouncilModal] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Sync fullscreen state
@@ -196,33 +199,70 @@ export default function App() {
           </div>
 
           <div className="app-header__right">
-            {effectiveProviderStatus && (
-              <div
-                className={`app-header__provider-badge ${
-                  effectiveProviderStatus.configured ? '' : 'app-header__provider-badge--unconfigured'
-                }`}
-                title={effectiveProviderStatus.message}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <ModelBrandLogo
-                  provider={
-                    selectedModelId?.startsWith('unified-team') || selectedModelId?.startsWith('council/')
-                      ? 'unified-team'
-                      : (selectedModelId?.split('/')[0] || effectiveProviderStatus.active_provider || effectiveProviderStatus.provider || undefined)
-                  }
-                  modelId={selectedModelId || undefined}
-                  size={14}
-                />
-                <span>
-                  {effectiveProviderStatus.configured
-                    ? selectedModelId
-                      ? selectedModelId.startsWith('unified-team') || selectedModelId.startsWith('council/')
-                        ? 'AI: Unified Team'
-                        : `AI: ${selectedModelId.split('/')[selectedModelId.includes('/') ? 1 : 0].split(':')[0]}`
-                      : `AI: ${effectiveProviderStatus.active_provider || effectiveProviderStatus.provider}`
-                    : 'AI Provider Not Configured'}
-                </span>
+            {activeSection === 'chat' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {(() => {
+                  const isUnifiedTeamActive = Boolean(
+                    selectedModelId &&
+                      (selectedModelId === 'unified-team' ||
+                        selectedModelId.startsWith('unified-team:') ||
+                        selectedModelId.startsWith('council/'))
+                  );
+                  return (
+                    <button
+                      type="button"
+                      className={`chat-view__council-btn ${isUnifiedTeamActive ? 'chat-view__council-btn--active' : ''}`}
+                      onClick={() => setShowCouncilModal(true)}
+                      title="Configure Unified Team (Dual-Expert Debate or Full Multi-Model Frontier Meeting)"
+                    >
+                      <ModelBrandLogo modelId="unified-team" provider="unified-team" size={16} />
+                      <span>{isUnifiedTeamActive ? 'Unified Team Active' : 'Unified Team'}</span>
+                    </button>
+                  );
+                })()}
+
+                {effectiveProviderStatus?.available_models && effectiveProviderStatus.available_models.length > 0 ? (
+                  <ModelSelectorDropdown
+                    availableModels={effectiveProviderStatus.available_models}
+                    selectedModelId={selectedModelId ?? effectiveProviderStatus.active_model ?? null}
+                    onSelectModel={(id) => setSelectedModelId(id)}
+                    onOpenTeamModal={() => setShowCouncilModal(true)}
+                  />
+                ) : (
+                  <div className="chat-view__model-unconfigured">
+                    <span>Connecting to AI gateway...</span>
+                  </div>
+                )}
               </div>
+            ) : (
+              effectiveProviderStatus && (
+                <div
+                  className={`app-header__provider-badge ${
+                    effectiveProviderStatus.configured ? '' : 'app-header__provider-badge--unconfigured'
+                  }`}
+                  title={effectiveProviderStatus.message}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <ModelBrandLogo
+                    provider={
+                      selectedModelId?.startsWith('unified-team') || selectedModelId?.startsWith('council/')
+                        ? 'unified-team'
+                        : (selectedModelId?.split('/')[0] || effectiveProviderStatus.active_provider || effectiveProviderStatus.provider || undefined)
+                    }
+                    modelId={selectedModelId || undefined}
+                    size={14}
+                  />
+                  <span>
+                    {effectiveProviderStatus.configured
+                      ? selectedModelId
+                        ? selectedModelId.startsWith('unified-team') || selectedModelId.startsWith('council/')
+                          ? 'AI: Unified Team'
+                          : `AI: ${selectedModelId.split('/')[selectedModelId.includes('/') ? 1 : 0].split(':')[0]}`
+                        : `AI: ${effectiveProviderStatus.active_provider || effectiveProviderStatus.provider}`
+                      : 'AI Provider Not Configured'}
+                  </span>
+                </div>
+              )
             )}
 
             <button
@@ -329,6 +369,14 @@ export default function App() {
           </Suspense>
         </div>
       </main>
+
+      <CouncilSetupModal
+        isOpen={showCouncilModal}
+        onClose={() => setShowCouncilModal(false)}
+        availableModels={effectiveProviderStatus?.available_models ?? []}
+        selectedModelId={selectedModelId ?? effectiveProviderStatus?.active_model ?? null}
+        onSelectModel={(id) => setSelectedModelId(id)}
+      />
     </div>
   );
 }

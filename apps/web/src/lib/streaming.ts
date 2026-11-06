@@ -7,6 +7,7 @@ import {
   getCustomGroqKey,
   getCustomOpenRouterKey,
   getCustomOpenAIKey,
+  getCustomAnthropicKey,
   getAuthToken,
 } from './api';
 
@@ -66,6 +67,7 @@ export async function streamChat(
     const groqKey = getCustomGroqKey();
     const openRouterKey = getCustomOpenRouterKey();
     const openAIKey = getCustomOpenAIKey();
+    const anthropicKey = getCustomAnthropicKey();
     const token = getAuthToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -83,6 +85,9 @@ export async function streamChat(
     if (openAIKey) {
       headers['X-OpenAI-Key'] = openAIKey;
     }
+    if (anthropicKey) {
+      headers['X-Anthropic-Key'] = anthropicKey;
+    }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -96,6 +101,7 @@ export async function streamChat(
         groq_api_key: groqKey || undefined,
         openrouter_api_key: openRouterKey || undefined,
         openai_api_key: openAIKey || undefined,
+        anthropic_api_key: anthropicKey || undefined,
       }),
       signal,
     });
