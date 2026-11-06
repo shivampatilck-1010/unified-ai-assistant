@@ -10,7 +10,6 @@ import type {
 import {
   fetchConversations,
   fetchConversation,
-  createConversation,
   renameConversation as apiRenameConversation,
   deleteConversation as apiDeleteConversation,
 } from '../lib/api';
@@ -86,6 +85,9 @@ export function useConversations(backendConnected: boolean = true) {
     return null;
   });
 
+  const activeConversationRef = useRef(activeConversation);
+  activeConversationRef.current = activeConversation;
+
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,34 +145,59 @@ export function useConversations(backendConnected: boolean = true) {
   // Select active conversation: Instant restore from localStorage, then verify with backend
   const selectConversation = useCallback(
     async (id: string) => {
+      // 1. If currently on a conversation, finalize and flush messages to prevent data loss
+      if (activeConversationRef.current) {
+        const cur = activeConversationRef.current;
+        const finalized = cur.messages.map((m) =>
+          m.isStreaming ? { ...m, isStreaming: false } : m
+        );
+        saveStoredMessages(cur.id, finalized);
+      }
+
       abortRef.current?.abort();
       setIsStreaming(false);
       setActiveId(id);
 
-      // Instant local cache restoration
+      // 2. Synchronous unconditional UI switch to the selected chat
       const cachedMsgs = loadStoredMessages(id);
       const summary = conversations.find((c) => c.id === id);
-      if (cachedMsgs && cachedMsgs.length > 0) {
-        setActiveConversation({
-          id,
-          owner_id: summary?.owner_id || 'default_user',
-          title: summary?.title || 'Conversation',
-          created_at: summary?.created_at || new Date().toISOString(),
-          updated_at: summary?.updated_at || new Date().toISOString(),
-          messages: cachedMsgs,
-        });
-      }
+      const initialDetail: ConversationDetail = {
+        id,
+        owner_id: summary?.owner_id || 'default_user',
+        title: summary?.title || 'Conversation',
+        project_id: summary?.project_id || undefined,
+        created_at: summary?.created_at || new Date().toISOString(),
+        updated_at: summary?.updated_at || new Date().toISOString(),
+        messages: cachedMsgs || [],
+      };
+      setActiveConversation(initialDetail);
 
+      // 3. Background server reconciliation
       try {
         setIsLoading(true);
         const detail = await fetchConversation(id);
-        if (detail && detail.messages && detail.messages.length > 0) {
-          setActiveConversation(detail);
-          saveStoredMessages(id, detail.messages);
+        if (detail) {
+          const freshLocalMsgs = loadStoredMessages(id);
+          const serverMsgs = Array.isArray(detail.messages) ? detail.messages : [];
+          // Preserve whichever source has richer message history
+          const chosenMsgs =
+            serverMsgs.length > freshLocalMsgs.length ? serverMsgs : freshLocalMsgs;
+
+          setActiveConversation((prev) => {
+            if (!prev || prev.id !== id) return prev;
+            return {
+              ...detail,
+              title: detail.title || summary?.title || prev.title,
+              messages: chosenMsgs,
+            };
+          });
+
+          if (chosenMsgs.length > 0) {
+            saveStoredMessages(id, chosenMsgs);
+          }
         }
       } catch (err) {
-        // If server returns error, local cache remains displayed safely
-        setError(err instanceof Error ? err.message : 'Failed to load conversation');
+        // Local cache remains intact
       } finally {
         setIsLoading(false);
       }
@@ -178,14 +205,21 @@ export function useConversations(backendConnected: boolean = true) {
     [conversations]
   );
 
-  const startNewChat = useCallback(async (projectId?: string | null) => {
+  const startNewChat = useCallback((projectId?: string | null) => {
+    if (activeConversationRef.current) {
+      const cur = activeConversationRef.current;
+      const finalized = cur.messages.map((m) =>
+        m.isStreaming ? { ...m, isStreaming: false } : m
+      );
+      saveStoredMessages(cur.id, finalized);
+    }
+
     abortRef.current?.abort();
     setIsStreaming(false);
 
-    // Instant synchronous draft state to completely isolate new chat with zero bleed
-    const newDraftId = `conv-${Date.now()}`;
+    const newDraftId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setActiveId(newDraftId);
-    setActiveConversation({
+    const initialDetail: ConversationDetail = {
       id: newDraftId,
       owner_id: 'default_user',
       title: 'New conversation',
@@ -193,33 +227,28 @@ export function useConversations(backendConnected: boolean = true) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       messages: [],
-    });
+    };
+    setActiveConversation(initialDetail);
     saveStoredMessages(newDraftId, []);
 
-    try {
-      const created = await createConversation('New conversation', projectId);
-      if (created.id !== newDraftId) {
-        setActiveId(created.id);
-        setActiveConversation((prev) => (prev ? { ...prev, id: created.id } : prev));
-        saveStoredMessages(created.id, []);
-      }
-      setConversations((prev) => [created, ...prev.filter((c) => c.id !== newDraftId)]);
-      return created.id;
-    } catch {
-      // Local draft fallback already active
-      setConversations((prev) => [
+    setConversations((prev) => {
+      const nextList = [
         {
           id: newDraftId,
           owner_id: 'default_user',
           title: 'New conversation',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          project_id: projectId || undefined,
+          created_at: initialDetail.created_at,
+          updated_at: initialDetail.updated_at,
           message_count: 0,
         },
-        ...prev,
-      ]);
-      return newDraftId;
-    }
+        ...prev.filter((c) => c.id !== newDraftId),
+      ];
+      saveStoredConversations(nextList);
+      return nextList;
+    });
+
+    return newDraftId;
   }, []);
 
   const rename = useCallback(async (id: string, newTitle: string) => {
@@ -422,7 +451,7 @@ export function useConversations(backendConnected: boolean = true) {
             onTextDelta: (text: string) => {
               setActiveConversation((prev) => {
                 if (!prev) {
-                  return {
+                  const initial = {
                     id: effectiveConvId,
                     owner_id: 'default_user',
                     title: content.slice(0, 32).trim() || 'New Chat',
@@ -430,6 +459,8 @@ export function useConversations(backendConnected: boolean = true) {
                     updated_at: new Date().toISOString(),
                     messages: [userMsg, { ...assistantMsg, content: text }],
                   };
+                  saveStoredMessages(effectiveConvId, initial.messages);
+                  return initial;
                 }
                 const hasAssistantMsg = prev.messages.some((m) => m.id === assistantMsgId);
                 const updatedMessages = hasAssistantMsg
@@ -437,6 +468,7 @@ export function useConversations(backendConnected: boolean = true) {
                       m.id === assistantMsgId ? { ...m, content: m.content + text } : m
                     )
                   : [...prev.messages, { ...assistantMsg, content: text }];
+                saveStoredMessages(prev.id, updatedMessages);
                 return {
                   ...prev,
                   messages: updatedMessages,

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import type { NavigationSection, UnifiedProviderStatusResponse } from './types';
 import { useConversations } from './hooks/useConversations';
 import { useHealthCheck } from './hooks/useHealthCheck';
@@ -6,37 +6,19 @@ import { fetchProviderStatus } from './lib/api';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
-import { StatusIndicator } from './components/status/StatusIndicator';
+import { BrowserAgentView } from './components/browser/BrowserAgentView';
+import { CalendarTasksView } from './components/calendar/CalendarTasksView';
+import { FilesKnowledgeView } from './components/files/FilesKnowledgeView';
+import { WifiSensingView } from './components/sensing/WifiSensingView';
+import { OrchestrationView } from './components/orchestration/OrchestrationView';
+import { SettingsView } from './components/settings/SettingsView';
+import { SearchView } from './components/search/SearchView';
+import { ProjectsView } from './components/projects/ProjectsView';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ModelBrandLogo } from './components/brand/ModelBrandLogo';
 import { ModelSelectorDropdown } from './components/chat/ModelSelectorDropdown';
 import { CouncilSetupModal } from './components/chat/CouncilSetupModal';
 import './App.css';
-
-// Code-split heavy views to reduce initial bundle payload
-const BrowserAgentView = lazy(() =>
-  import('./components/browser/BrowserAgentView').then((m) => ({ default: m.BrowserAgentView }))
-);
-const CalendarTasksView = lazy(() =>
-  import('./components/calendar/CalendarTasksView').then((m) => ({ default: m.CalendarTasksView }))
-);
-const FilesKnowledgeView = lazy(() =>
-  import('./components/files/FilesKnowledgeView').then((m) => ({ default: m.FilesKnowledgeView }))
-);
-const WifiSensingView = lazy(() =>
-  import('./components/sensing/WifiSensingView').then((m) => ({ default: m.WifiSensingView }))
-);
-const OrchestrationView = lazy(() =>
-  import('./components/orchestration/OrchestrationView').then((m) => ({ default: m.OrchestrationView }))
-);
-const SettingsView = lazy(() =>
-  import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView }))
-);
-const SearchView = lazy(() =>
-  import('./components/search/SearchView').then((m) => ({ default: m.SearchView }))
-);
-const ProjectsView = lazy(() =>
-  import('./components/projects/ProjectsView').then((m) => ({ default: m.ProjectsView }))
-);
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<NavigationSection>('chat');
@@ -91,7 +73,7 @@ export default function App() {
     refreshList,
   } = useConversations();
 
-  const { status: healthStatus, health, error: healthError, recheck } = useHealthCheck();
+  const { status: healthStatus } = useHealthCheck();
 
   // Check server-side provider status when health connects
   useEffect(() => {
@@ -281,34 +263,12 @@ export default function App() {
                 </svg>
               )}
             </button>
-
-            <StatusIndicator
-              status={healthStatus}
-              version={health?.version}
-              error={healthError}
-              onRetry={recheck}
-            />
           </div>
         </header>
 
         {/* Dynamic Content */}
         <div className="app-content">
-          <Suspense
-            fallback={
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: '#888',
-                  fontSize: '13px',
-                }}
-              >
-                <span>Loading view...</span>
-              </div>
-            }
-          >
+          <ErrorBoundary fallbackTitle="View unavailable" onReset={() => setActiveSection('chat')}>
             {activeSection === 'chat' ? (
               <ChatView
                 messages={activeConversation?.messages ?? []}
@@ -366,7 +326,7 @@ export default function App() {
                 onSelectConversation={handleSelectConversation}
               />
             )}
-          </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 

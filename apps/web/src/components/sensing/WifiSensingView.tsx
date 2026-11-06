@@ -61,7 +61,8 @@ export const WifiSensingView: React.FC = () => {
   const [newRoomRetention, setNewRoomRetention] = useState<number>(7);
 
   // Selected config
-  const activeConfig = configs.find((c) => c.room_id === selectedRoomId);
+  const safeConfigs = Array.isArray(configs) ? configs : [];
+  const activeConfig = safeConfigs.find((c) => c.room_id === selectedRoomId);
 
   // Initial load
   const loadInitialData = useCallback(async () => {
@@ -75,10 +76,11 @@ export const WifiSensingView: React.FC = () => {
       ]);
       setStatusData(statusRes);
       setCapabilities(capsRes);
-      setConfigs(configsRes);
+      const safeList = Array.isArray(configsRes) ? configsRes : (configsRes as any)?.configs || [];
+      setConfigs(safeList);
 
-      if (configsRes.length > 0 && !selectedRoomId) {
-        setSelectedRoomId(configsRes[0].room_id);
+      if (safeList.length > 0 && !selectedRoomId) {
+        setSelectedRoomId(safeList[0].room_id);
       }
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to load sensing data.');
@@ -434,12 +436,12 @@ export const WifiSensingView: React.FC = () => {
                 className="room-select"
                 value={selectedRoomId}
                 onChange={(e) => setSelectedRoomId(e.target.value)}
-                disabled={configs.length === 0}
+                disabled={safeConfigs.length === 0}
               >
-                {configs.length === 0 ? (
+                {safeConfigs.length === 0 ? (
                   <option value="">No zones configured</option>
                 ) : (
-                  configs.map((c) => (
+                  safeConfigs.map((c) => (
                     <option key={c.id} value={c.room_id}>
                       {c.room_name} ({c.room_id}) {c.is_active ? '[Running]' : '[Stopped]'}
                     </option>
@@ -538,7 +540,7 @@ export const WifiSensingView: React.FC = () => {
             <div className="sensing-empty-state">
               <span className="sensing-loading-spinner" /> Loading simulation telemetry...
             </div>
-          ) : configs.length === 0 ? (
+          ) : safeConfigs.length === 0 ? (
             <div className="sensing-empty-state">
               <p>No sensing zones configured.</p>
               <button className="btn-sensing btn-sensing-primary" onClick={() => setShowCreateModal(true)}>

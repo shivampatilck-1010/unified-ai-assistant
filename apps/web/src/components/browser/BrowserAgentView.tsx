@@ -81,7 +81,7 @@ export function BrowserAgentView() {
     // Load initial persisted events
     void fetchBrowserTaskEvents(activeTaskId)
       .then((evs) => {
-        setEvents(evs);
+        setEvents(Array.isArray(evs) ? evs : []);
       })
       .catch(() => {});
 

@@ -91,7 +91,7 @@ export function CalendarTasksView() {
     try {
       setAutomationsLoading(true);
       const res = await fetchAutomations();
-      setAutomations(res);
+      setAutomations(Array.isArray(res) ? res : Array.isArray((res as any)?.automations) ? (res as any).automations : []);
     } catch (err: unknown) {
       console.error('Failed to load automations:', err);
     } finally {

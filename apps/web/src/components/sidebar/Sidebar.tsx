@@ -206,6 +206,7 @@ export function Sidebar({
             {navItems.map((item) => (
               <li key={item.id}>
                 <button
+                  type="button"
                   className={`sidebar__nav-item ${
                     activeSection === item.id ? 'sidebar__nav-item--active' : ''
                   }`}
@@ -228,20 +229,29 @@ export function Sidebar({
           <div className="sidebar__history">
             <div className="sidebar__history-label">Recent conversations</div>
             <ul className="sidebar__history-list" role="list">
-              {conversations.slice(0, 20).map((conv) => (
+              {conversations.slice(0, 30).map((conv) => (
                 <li key={conv.id}>
-                  <button
+                  <div
                     className={`sidebar__history-item ${
                       activeConversationId === conv.id
                         ? 'sidebar__history-item--active'
                         : ''
                     }`}
                     onClick={() => onSelectConversation(conv.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelectConversation(conv.id);
+                      }
+                    }}
                     title={conv.title}
                   >
                     <span className="sidebar__history-title">{conv.title}</span>
-                    <div className="sidebar__history-actions">
+                    <div className="sidebar__history-actions" onClick={(e) => e.stopPropagation()}>
                       <button
+                        type="button"
                         className="sidebar__history-action"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -258,6 +268,7 @@ export function Sidebar({
                         </svg>
                       </button>
                       <button
+                        type="button"
                         className="sidebar__history-action sidebar__history-delete"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -271,7 +282,7 @@ export function Sidebar({
                         </svg>
                       </button>
                     </div>
-                  </button>
+                  </div>
                 </li>
               ))}
             </ul>

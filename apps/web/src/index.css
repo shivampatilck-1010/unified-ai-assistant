@@ -1,12 +1,12 @@
 :root {
-  /* Claude Editorial Color Tokens (Warm Charcoal, Sand & Terracotta) */
-  --bg-main: #191817;
-  --surface-sidebar: #131211;
-  --surface-card: #201f1d;
-  --surface-elevated: #282725;
-  --surface-hover: #302f2b;
-  --border: rgba(240, 237, 230, 0.09);
-  --border-subtle: rgba(240, 237, 230, 0.05);
+  /* Obsidian Theme (#070709) */
+  --bg-main: #070709;
+  --surface-sidebar: #09090c;
+  --surface-card: #0e0e13;
+  --surface-elevated: #14141a;
+  --surface-hover: #1c1c24;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
 
   /* Typography Colors */
   --text-primary: #FAF9F5;

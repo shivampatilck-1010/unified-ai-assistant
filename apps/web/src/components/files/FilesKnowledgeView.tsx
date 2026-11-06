@@ -60,11 +60,11 @@ export const FilesKnowledgeView: React.FC = () => {
     try {
       setIsLoading(true);
       const res = await fetchFiles(statusFilter || undefined, searchQuery || undefined);
-      setFiles(res.items);
-      setTotalStorageBytes(res.total_storage_bytes);
-      setMaxStorageBytes(res.max_storage_bytes);
-      setFileCount(res.file_count);
-      setMaxFileCount(res.max_file_count);
+      setFiles(Array.isArray(res?.items) ? res.items : []);
+      setTotalStorageBytes(res?.total_storage_bytes || 0);
+      setMaxStorageBytes(res?.max_storage_bytes || 104857600);
+      setFileCount(res?.file_count || (Array.isArray(res?.items) ? res.items.length : 0));
+      setMaxFileCount(res?.max_file_count || 50);
     } catch (err) {
       console.error('Failed to load files:', err);
     } finally {

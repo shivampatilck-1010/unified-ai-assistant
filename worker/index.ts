@@ -1976,7 +1976,17 @@ export default {
 
     if (path === '/api/files' && request.method === 'GET') {
       const items = Array.from(filesStore.values());
-      return jsonResponse({ items, total: items.length, limit: 50, offset: 0 });
+      return jsonResponse({
+        items,
+        files: items,
+        total: items.length,
+        total_storage_bytes: 0,
+        max_storage_bytes: 104857600,
+        file_count: items.length,
+        max_file_count: 50,
+        limit: 50,
+        offset: 0,
+      });
     }
 
     if (path.startsWith('/api/files/')) {
@@ -2104,6 +2114,9 @@ export default {
     if (path.startsWith('/api/browser/tasks/')) {
       const parts = path.split('/');
       const taskId = parts[3];
+      if (path.endsWith('/events')) {
+        return jsonResponse([]);
+      }
       const task = browserTasksStore.get(taskId);
       if (task) {
         return jsonResponse(task);
@@ -2137,22 +2150,24 @@ export default {
     }
 
     if (path.startsWith('/api/orchestration/workflows')) {
+      const sampleWorkflows = [
+        {
+          id: 'wf-1',
+          title: 'Algorithmic Peer Review & KaTeX Verification',
+          status: 'completed',
+          stages: [
+            { name: 'Plan', status: 'completed' },
+            { name: 'Synthesize', status: 'completed' },
+            { name: 'KaTeX Check', status: 'completed' },
+            { name: 'Render Visualizer', status: 'completed' },
+          ],
+          created_at: new Date(Date.now() - 7200000).toISOString(),
+        },
+      ];
       return jsonResponse({
-        workflows: [
-          {
-            id: 'wf-1',
-            title: 'Algorithmic Peer Review & KaTeX Verification',
-            status: 'completed',
-            stages: [
-              { name: 'Plan', status: 'completed' },
-              { name: 'Synthesize', status: 'completed' },
-              { name: 'KaTeX Check', status: 'completed' },
-              { name: 'Render Visualizer', status: 'completed' },
-            ],
-            created_at: new Date(Date.now() - 7200000).toISOString(),
-          },
-        ],
-        total: 1,
+        items: sampleWorkflows,
+        workflows: sampleWorkflows,
+        total: sampleWorkflows.length,
       });
     }
 
@@ -2164,13 +2179,58 @@ export default {
       return jsonResponse({ supported_modes: ['presence', 'motion', 'respiration'] });
     }
     if (path === '/api/sensing/configs' || path.startsWith('/api/sensing/configs/')) {
-      return jsonResponse({ configs: [] });
+      const configs = [
+        {
+          id: 'cfg-1',
+          room_id: 'living-room',
+          room_name: 'Living Room Sensor (ESP32-S3)',
+          authorized: true,
+          simulation_speed: 1.0,
+          retention_days: 7,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      return jsonResponse(configs);
+    }
+    if (path === '/api/sensing/summary') {
+      return jsonResponse({
+        room_id: 'living-room',
+        occupancy_state: 'present',
+        person_count: 1,
+        confidence: 0.94,
+        respiration_rate: 16.2,
+        last_motion_time: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+      });
+    }
+    if (path === '/api/sensing/audits') {
+      return jsonResponse({ audits: [], items: [] });
     }
     if (path === '/api/sensing/events') {
-      return jsonResponse({ events: [] });
+      const evts = [
+        {
+          id: 'evt-1',
+          room_id: 'living-room',
+          timestamp: new Date().toISOString(),
+          occupancy_state: 'present',
+          person_count: 1,
+          confidence: 0.96,
+          activity: 'active',
+          respiration_rate: 16.4,
+          x: 2.4,
+          y: 1.8,
+        },
+      ];
+      return jsonResponse({ events: evts, items: evts, total: evts.length });
     }
     if (path === '/api/retention/status' || path === '/api/retention/cleanup' || path === '/api/retention/purge-my-data') {
       return jsonResponse({ status: 'ok', retention_days: 30, policy: 'Automated privacy retention active' });
+    }
+
+    if (path === '/api/search') {
+      const q = url.searchParams.get('q') || '';
+      return jsonResponse({ query: q, results: [] });
     }
 
     // Followup email endpoint
@@ -2187,7 +2247,7 @@ export default {
       return jsonResponse({ status: 'ok', files: [], result: 'Ready' });
     }
     if (path.startsWith('/api/intelligence/automations')) {
-      return jsonResponse({ automations: [] });
+      return jsonResponse([]);
     }
 
     // Default fallback: Serve frontend static assets from env.ASSETS

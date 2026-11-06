@@ -219,6 +219,7 @@
   transition: background 0.12s, border-color 0.12s;
   text-align: left;
   gap: 4px;
+  user-select: none;
 }
 
 .sidebar__history-item:hover {

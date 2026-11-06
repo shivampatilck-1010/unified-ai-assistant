@@ -32,9 +32,10 @@ export const OrchestrationView: React.FC = () => {
       setLoading(true);
       setError(null);
       const res = await listWorkflows();
-      setWorkflows(res.items);
-      if (res.items.length > 0 && !selectedWorkflowId) {
-        setSelectedWorkflowId(res.items[0].id);
+      const items = Array.isArray(res?.items) ? res.items : Array.isArray((res as any)?.workflows) ? (res as any).workflows : [];
+      setWorkflows(items);
+      if (items.length > 0 && !selectedWorkflowId) {
+        setSelectedWorkflowId(items[0].id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load workflows.');
