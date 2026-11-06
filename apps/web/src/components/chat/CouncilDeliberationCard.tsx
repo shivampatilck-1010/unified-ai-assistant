@@ -63,20 +63,20 @@ export const CouncilDeliberationCard: React.FC<CouncilDeliberationCardProps> = (
     : rounds;
 
   return (
-    <div className="council-card" role="region" aria-label="AI Council Deliberation">
+    <div className="council-card" role="region" aria-label="Unified Team Deliberation">
       {/* Council Header */}
       <div className="council-card__header">
         <div className="council-card__title-row">
           <div className="council-card__badge-group">
             <span className="council-card__badge council-card__badge--chamber">
               <span className="council-card__dot-live" aria-hidden="true" />
-              AI Council In Session
+              Unified Team In Session
             </span>
             <span className="council-card__badge council-card__badge--score">
               Consensus: {consensusScore}
             </span>
           </div>
-          <span className="council-card__mode-tag">Roundtable Deliberation</span>
+          <span className="council-card__mode-tag">Multi-Model Collaboration</span>
         </div>
 
         <h3 className="council-card__topic">{topic}</h3>

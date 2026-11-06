@@ -35,11 +35,11 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
 
   const handleApply = (mode: CouncilModeType) => {
     if (mode === 'dual') {
-      onSelectModel('council/dual-expert-deliberation');
+      onSelectModel('unified-team:dual-expert');
     } else if (mode === 'full') {
-      onSelectModel('council/executive-roundtable');
+      onSelectModel('unified-team:frontier-council');
     } else {
-      onSelectModel('council/executive-roundtable');
+      onSelectModel('unified-team');
     }
     onClose();
   };
@@ -59,8 +59,8 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
         {/* Header */}
         <div className="council-modal__header">
           <div className="council-modal__title-group">
-            <span className="council-modal__badge">Multi-Model Collaboration</span>
-            <h2 className="council-modal__title">AI Council Meeting Room</h2>
+            <span className="council-modal__badge">Multi-Model Collaborative Intelligence</span>
+            <h2 className="council-modal__title">Unified Team: AI Meeting Room</h2>
           </div>
           <button
             type="button"
@@ -223,7 +223,7 @@ export const CouncilSetupModal: React.FC<CouncilSetupModalProps> = ({
               className="council-modal__apply-btn"
               onClick={() => handleApply(councilMode)}
             >
-              Activate Council Mode
+              Activate Unified Team
             </button>
           </div>
         </div>

@@ -393,32 +393,55 @@ export default {
         active_provider: 'gemini',
         active_model: 'gemini-2.5-pro',
         available_models: [
-          // 0. AI Council & Multi-Model Deliberation (Executive Meeting Room)
+          // 0. Unified Team: Multi-Model Collaborative Intelligence (All Frontier Models in One)
+          {
+            id: 'unified-team',
+            name: '✨ Unified Team (Multi-Model Collaborative Intelligence)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:dual-expert',
+            name: '⚡ Unified Team: Dual-Expert Debate (Top 2 Domain Specialists)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:frontier-council',
+            name: '🏛️ Unified Team: Full Frontier Council (DeepSeek R1 + Claude 3.7 + Nemotron + Qwen + Gemini)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:code-pair',
+            name: '💻 Unified Team: Elite Engineering Pair (Qwen 2.5 Coder + Claude Architect + Audit)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:scientific-symposium',
+            name: '🔬 Unified Team: Scientific Symposium (DeepSeek R1 + Gemini Pro + o3-mini)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+
+          // Aliases for council routes
           {
             id: 'council/dual-expert-deliberation',
-            name: '⚡ Dual-Expert Debate (Top 2 Domain Specialists Peer Review)',
-            provider: 'AI Council',
+            name: '⚡ Dual-Expert Debate (Alias: Top 2 Domain Specialists)',
+            provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'council/executive-roundtable',
-            name: '🏛️ Full Frontier Council (R1 Reasoning + Claude Architecture + Nemotron Audit + Qwen Code)',
-            provider: 'AI Council',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'council/code-engineering-pair',
-            name: '💻 Elite Engineering Pair (Qwen 2.5 Coder + Claude 3.5 Architect + Nemotron Audit)',
-            provider: 'AI Council',
-            is_default: false,
-            context_window: 200000,
-          },
-          {
-            id: 'council/scientific-symposium',
-            name: '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini Proofs)',
-            provider: 'AI Council',
+            name: '🏛️ Full Frontier Council (Alias: R1 + Claude + Nemotron + Qwen)',
+            provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
@@ -601,6 +624,7 @@ export default {
           },
         ],
         providers: {
+          'unified-team': true,
           council: true,
           google: true,
           gemini: true,
@@ -820,20 +844,23 @@ export default {
           await sendSSE('message_start', { role: 'assistant' });
 
           const isGeminiModel = chosenModel.startsWith('gemini-');
-          const isCouncilModel = chosenModel.startsWith('council/');
+          const isUnifiedTeam =
+            chosenModel === 'unified-team' ||
+            chosenModel.startsWith('unified-team:') ||
+            chosenModel.startsWith('council/');
 
-          if (isCouncilModel) {
-            const councilName =
-              chosenModel === 'council/dual-expert-deliberation'
+          if (isUnifiedTeam) {
+            const teamMode =
+              chosenModel === 'unified-team:dual-expert' || chosenModel === 'council/dual-expert-deliberation'
                 ? '⚡ Dual-Expert Debate (Top 2 Domain Specialists)'
-                : chosenModel === 'council/code-engineering-pair'
+                : chosenModel === 'unified-team:code-pair' || chosenModel === 'council/code-engineering-pair'
                 ? '💻 Elite Engineering Pair (Qwen 2.5 Coder + Claude 3.5 + Nemotron Audit)'
-                : chosenModel === 'council/scientific-symposium'
+                : chosenModel === 'unified-team:scientific-symposium' || chosenModel === 'council/scientific-symposium'
                 ? '🔬 Scientific Symposium (Gemini 2.5 Pro + DeepSeek R1 + o3-mini)'
-                : '🏛️ Full Frontier Council (R1 + Claude 3.7 + Nemotron 70B + Qwen + Gemini Pro)';
+                : '🏛️ Full Frontier Council (DeepSeek R1 + Claude 3.7 + Nemotron 70B + Qwen + Gemini Pro)';
 
             await sendSSE('text_delta', {
-              text: `> *[🏛️ AI Council Deliberation Active: **${councilName}** | Multi-Model Meeting in Session]*\n\n`,
+              text: `> *[Model: **Unified Team** | ${teamMode}]*\n\n`,
             });
           } else if (!isGeminiModel) {
             await sendSSE('text_delta', {
@@ -842,14 +869,14 @@ export default {
           }
 
           let effectiveSystemInstruction = systemInstruction;
-          if (isCouncilModel) {
+          if (isUnifiedTeam) {
             effectiveSystemInstruction = {
               parts: [
                 {
                   text:
-                    'YOU ARE THE UNIFIED AI MULTI-MODEL COUNCIL ORCHESTRATOR.\n' +
-                    'The user has engaged the collaborative meeting room of the world\'s top specialized models.\n\n' +
-                    'COUNCIL COLLABORATION PROTOCOL:\n' +
+                    'YOU ARE "UNIFIED TEAM", A WORLD-CLASS MULTI-MODEL COLLABORATIVE INTELLIGENCE SYSTEM.\n' +
+                    'When operating as Unified Team, you solve complex, high-difficulty queries by conducting an authentic multidisciplinary executive meeting where the world\'s top specialized frontier AI models collaborate, debate, and synthesize their distinct strengths.\n\n' +
+                    'UNIFIED TEAM COLLABORATION PROTOCOL:\n' +
                     '1. Depending on the task:\n' +
                     '   - If Dual-Expert: Select the 2 best models suited for the user\'s domain (e.g. DeepSeek R1 for mathematical/logical reasoning + Claude 3.7 Sonnet for systems architecture & writing; or Claude 3.7 + Qwen 2.5 Coder for software engineering).\n' +
                     '   - If Full Frontier Council: Deploy all 5 specialized roles (Theorist: DeepSeek R1 [671B MoE], Adversarial Critic: NVIDIA Nemotron 70B, Architect: Claude 3.7 Sonnet, Lead Coder: Qwen 2.5 Coder 32B, Executive Chair: Gemini 2.5 Pro).\n\n' +
