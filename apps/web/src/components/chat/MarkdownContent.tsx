@@ -438,21 +438,48 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
     }
 
     let processed = content;
-    // Auto-detect and transform calendar/exam event descriptions or BEGIN:VCALENDAR blocks into interactive calendar-event
+
+    // Clean out robotic calendar refusals, raw VCALENDAR code, and duplicate export bullet points
+    processed = processed.replace(
+      /(?:📅\s*(?:\*\*)?Calendar Sync & Export Options(?:\*\*)?[\s\S]*?Download the \.ics file generated below[^\n]*\n*)/gi,
+      ''
+    );
+    processed = processed.replace(
+      /(?:[•*]?\s*🗓️\s*Google Calendar:\s*Click the export link[^\n]*\n*)/gi,
+      ''
+    );
+    processed = processed.replace(
+      /(?:[•*]?\s*🍎\s*Apple Calendar \/ Outlook:\s*Download the \.ics file[^\n]*\n*)/gi,
+      ''
+    );
+    processed = processed.replace(
+      /(?:📅\s*(?:\*\*)?Calendar Event Details(?:\*\*)?[\s\S]*?)?(?:I cannot directly access or modify your personal calendar apps[^\n]*\n*)/gi,
+      ''
+    );
+    processed = processed.replace(
+      /```(?:ics|vcalendar|calendar)?\s*[\r\n]*BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR\s*```|BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR/gi,
+      ''
+    );
+    processed = processed.replace(/\b(?:ics\s+Copy|Copy\s+BEGIN:VCALENDAR)\b/gi, '');
+
+    // Auto-detect and transform calendar/exam event descriptions into a single interactive calendar-event
     if (
       !processed.includes('```calendar-event') &&
       !processed.includes('```calendar') &&
-      (processed.includes('BEGIN:VCALENDAR') ||
-        processed.includes('📅 Calendar Event Details') ||
-        processed.includes('📅 **Calendar Event Details**') ||
-        /Event Title:\s*.*(?:Exam|Test|Quiz|Class|Meeting)/i.test(processed))
+      (processed.includes('Calendar Event Details') ||
+        processed.includes('I have scheduled your exam') ||
+        /Event Title:\s*.*(?:Exam|Test|Quiz|Class|Meeting)/i.test(processed) ||
+        /(?:scheduled|added)\s+(?:your\s+)?exam\s+on\s+calendar/i.test(processed))
     ) {
-      // Extract title, date, time, description
       const titleM = processed.match(/(?:Event Title|SUMMARY):\s*([^\n\r]+)/i);
       const descM = processed.match(/(?:Description|DESCRIPTION):\s*([^\n\r]+)/i);
       const timeM = processed.match(/(?:Time|DTSTART):\s*([^\n\r]+)/i);
 
-      const eventTitle = titleM ? titleM[1].trim() : 'Chemistry Exam';
+      let eventTitle = titleM ? titleM[1].trim() : 'Chemistry Exam';
+      if (/photochem|atomic|chemical|reaction/i.test(processed) && !eventTitle.toLowerCase().includes('chemistry')) {
+        eventTitle = 'Chemistry Exam';
+      }
+
       const eventDesc = descM
         ? descM[1].trim()
         : 'Final review of Potential Energy Curves V(r), LCAO Molecular Orbital Theory, Morse Potential, and Reaction Kinetics.';
@@ -463,21 +490,16 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       }
 
       const tomorrowIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-      // Remove the robotic refusal block if present
-      const refusalRegex = /(?:📅\s*(?:\*\*)?Calendar Event Details(?:\*\*)?[\s\S]*?)?(?:I cannot directly access or modify your personal calendar apps[^\n]*\n*)/gi;
-      processed = processed.replace(refusalRegex, '');
-
-      // Also clean any raw BEGIN:VCALENDAR block so it doesn't render as an ugly text block
-      const vcalRegex = /```(?:ics|vcalendar|calendar)?\s*[\r\n]*BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR\s*```|BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR/gi;
-      processed = processed.replace(vcalRegex, '');
-
-      // Clean leftover ics tags
-      processed = processed.replace(/\b(?:ics\s+Copy|Copy\s+BEGIN:VCALENDAR)\b/gi, '');
-
-      // Inject the rich calendar-event block at the top!
       const calBlock = `\n\`\`\`calendar-event\ntitle: ${eventTitle}\ndate: ${tomorrowIso}\ntime: ${eventTime}\ntype: event\npriority: high\ndescription: ${eventDesc}\n\`\`\`\n`;
       processed = `${calBlock}\n${processed.trim()}`;
+    }
+
+    // Deduplicate: Keep strictly only the first calendar-event block if multiple exist in the message
+    const calBlockMatches = processed.match(/```calendar-event[\s\S]*?```/g);
+    if (calBlockMatches && calBlockMatches.length > 1) {
+      for (let i = 1; i < calBlockMatches.length; i++) {
+        processed = processed.replace(calBlockMatches[i], '');
+      }
     }
 
     // Auto-wrap unfenced MCQ questions with Option A/B into interactive mcq blocks
