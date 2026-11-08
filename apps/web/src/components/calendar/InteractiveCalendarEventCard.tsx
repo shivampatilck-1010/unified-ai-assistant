@@ -278,17 +278,17 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
       <div className="sched-header">
         <div className="sched-header-left">
           <div className="sched-icon-pill">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            <span>Smart Exam & Calendar Scheduler</span>
+            <span>Calendar Event</span>
           </div>
           <span className="sched-sync-badge">
             <span className="sched-live-dot" />
-            {isSavedToUnified ? 'Synced to Calendar' : 'Drafting'}
+            {isSavedToUnified ? 'Saved to Calendar' : 'Draft'}
           </span>
         </div>
 
@@ -296,10 +296,10 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
           type="button"
           className="sched-view-cal-link"
           onClick={handleOpenCalendarView}
-          title="Open Calendar & Tasks tab"
+          title="Open Calendar tab"
         >
-          <span>View in Calendar View</span>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+          <span>Open Calendar</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -447,23 +447,23 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
             type="button"
             className={`sched-save-btn ${isSavedToUnified ? 'saved' : ''}`}
             onClick={handleSaveToUnifiedCalendar}
-            title="Save customized event into Unified AI Calendar"
+            title="Save event to Calendar"
           >
             {isSavedToUnified ? (
               <>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span>✓ Saved to Unified Calendar</span>
+                <span>Saved to Calendar</span>
               </>
             ) : (
               <>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                   <polyline points="17 21 17 13 7 13 7 21" />
                   <polyline points="7 3 7 8 15 8" />
                 </svg>
-                <span>Save Changes to Calendar</span>
+                <span>Save Event</span>
               </>
             )}
           </button>
@@ -474,15 +474,15 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
             className={`sched-task-btn ${isSavedAsTask ? 'saved' : ''}`}
             onClick={handleSaveAsTask}
             disabled={isSavedAsTask}
-            title="Add as an actionable item to Tasks checklist"
+            title="Add as task"
           >
-            {isSavedAsTask ? '✓ Added to Tasks' : '+ Add to Tasks Checklist'}
+            {isSavedAsTask ? '✓ Added to Tasks' : '+ Add to Tasks'}
           </button>
         </div>
 
-        {/* 1-Click Multi-App Export */}
+        {/* Multi-App Export */}
         <div className="sched-export-row">
-          <span className="sched-export-label">1-Click Add to Other Apps:</span>
+          <span className="sched-export-label">Sync / Export:</span>
           <div className="sched-export-buttons">
             {/* Google Calendar */}
             <a

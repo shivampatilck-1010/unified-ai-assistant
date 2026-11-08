@@ -102,6 +102,8 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
   const [transcript, setTranscript] = useState('');
   const [currentPrompt, setCurrentPrompt] = useState('');
   const [isMuted, setIsMuted] = useState(false);
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [micVolume, setMicVolume] = useState<number>(0);
   const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -117,6 +119,11 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
   const chromeKeepAliveRef = useRef<any>(null);
   const currentLiveMessageIdRef = useRef<string | null>(null);
   const prevStreamingRef = useRef(isStreaming);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioAnimationRef = useRef<number | null>(null);
 
   // Chrome TTS Anti-Freeze Watchdog (Prevents Chrome 15s pause bug)
   useEffect(() => {
@@ -269,6 +276,97 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     }
     setVoiceState('listening');
   }, [isStreaming, onCancelGeneration]);
+
+  // Web Audio API Microphone Energy Analysis for Real-time Spiking & Barge-In
+  useEffect(() => {
+    if (!isOpen || isMuted) {
+      if (audioAnimationRef.current) cancelAnimationFrame(audioAnimationRef.current);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+      setMicVolume(0);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const initMicrophoneStream = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        mediaStreamRef.current = stream;
+
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        audioContextRef.current = ctx;
+
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.5;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let spikeCounter = 0;
+
+        const processAudio = () => {
+          if (!analyserRef.current || isCancelled) return;
+          analyserRef.current.getByteFrequencyData(dataArray);
+
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          const normalized = Math.min(1, avg / 85); // 0 to 1 range
+
+          setMicVolume((prev) => Math.max(normalized, prev * 0.75));
+
+          // Voice barge-in: If assistant is speaking and user starts talking (>0.32 volume)
+          if (isSpeakingRef.current && normalized > 0.32) {
+            spikeCounter++;
+            if (spikeCounter > 6) { // ~100ms of sustained voice
+              spikeCounter = 0;
+              handleInterruptVoice();
+            }
+          } else {
+            spikeCounter = 0;
+          }
+
+          audioAnimationRef.current = requestAnimationFrame(processAudio);
+        };
+
+        processAudio();
+      } catch (err) {
+        console.warn('Microphone audio stream error:', err);
+      }
+    };
+
+    initMicrophoneStream();
+
+    return () => {
+      isCancelled = true;
+      if (audioAnimationRef.current) cancelAnimationFrame(audioAnimationRef.current);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+    };
+  }, [isOpen, isMuted, handleInterruptVoice]);
 
   // Start continuous recognition
   const startLiveRecognition = useCallback(() => {
@@ -516,6 +614,69 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
 
   if (!isOpen) return null;
 
+  // Render floating ambient dock when user minimizes live voice
+  if (isMinimized) {
+    return (
+      <aside className="live-voice-floating-bar" aria-label="Live Voice Floating Bar">
+        <div className="live-floating-left">
+          <div
+            className="live-floating-orb-dot"
+            style={{
+              transform: `scale(${1 + (voiceState === 'listening' ? micVolume * 0.7 : 0.2)})`,
+            }}
+          />
+          <div className="live-floating-text-wrap">
+            <span className="live-floating-title">LIVE TALK</span>
+            <span className="live-floating-state-label">
+              {voiceState === 'listening'
+                ? (transcript ? `“${transcript}”` : 'Listening… speak anytime')
+                : voiceState === 'thinking'
+                ? 'Formulating answer…'
+                : 'Speaking…'}
+            </span>
+          </div>
+        </div>
+
+        <div className="live-floating-actions">
+          {voiceState === 'speaking' && (
+            <button
+              type="button"
+              className="live-floating-btn live-floating-btn--interrupt"
+              onClick={handleInterruptVoice}
+              title="Interrupt voice"
+            >
+              Stop Speaking
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="live-floating-btn live-floating-btn--expand"
+            onClick={() => setIsMinimized(false)}
+            title="Expand to Full Visualizer"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+            <span>Expand</span>
+          </button>
+
+          <button
+            type="button"
+            className="live-floating-btn live-floating-btn--close"
+            onClick={onClose}
+            title="Exit Live Voice"
+          >
+            ✕
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   // Get current live response text from active assistant message
   const assistantMsgs = messages.filter((m) => m.role === 'assistant');
   const latestAssistantMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
@@ -554,6 +715,18 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
 
           <button
             type="button"
+            className="live-voice-minimize-icon-btn"
+            onClick={() => setIsMinimized(true)}
+            aria-label="Minimize live voice"
+            title="Minimize to floating bar (view active chat)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="4" y1="12" x2="20" y2="12" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
             className="live-voice-close-icon-btn"
             onClick={onClose}
             aria-label="Exit live voice mode"
@@ -570,6 +743,10 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
         <div className="live-bubble-stage">
           <div
             className={`live-bubble-orb live-bubble-orb--${voiceState}`}
+            style={{
+              transform: `scale(${1 + (voiceState === 'listening' ? micVolume * 0.45 : 0)})`,
+              transition: 'transform 0.08s ease-out',
+            }}
             onClick={() => {
               if (voiceState === 'speaking') {
                 handleInterruptVoice();
@@ -578,10 +755,34 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
             title={voiceState === 'speaking' ? 'Click orb to interrupt' : 'Interactive Live Bubble'}
           >
             {/* Morphing Dynamic Fluid Concentric Light Rings */}
-            <div className="live-bubble-fluid-ring live-bubble-fluid-ring--1" />
-            <div className="live-bubble-fluid-ring live-bubble-fluid-ring--2" />
-            <div className="live-bubble-fluid-ring live-bubble-fluid-ring--3" />
-            <div className="live-bubble-fluid-ring live-bubble-fluid-ring--4" />
+            <div
+              className="live-bubble-fluid-ring live-bubble-fluid-ring--1"
+              style={{
+                transform: `scale(${1 + micVolume * 0.5})`,
+                opacity: 0.35 + micVolume * 0.5,
+              }}
+            />
+            <div
+              className="live-bubble-fluid-ring live-bubble-fluid-ring--2"
+              style={{
+                transform: `scale(${1.2 + micVolume * 0.75})`,
+                opacity: 0.25 + micVolume * 0.45,
+              }}
+            />
+            <div
+              className="live-bubble-fluid-ring live-bubble-fluid-ring--3"
+              style={{
+                transform: `scale(${1.4 + micVolume * 1.0})`,
+                opacity: 0.15 + micVolume * 0.4,
+              }}
+            />
+            <div
+              className="live-bubble-fluid-ring live-bubble-fluid-ring--4"
+              style={{
+                transform: `scale(${1.6 + micVolume * 1.25})`,
+                opacity: 0.1 + micVolume * 0.35,
+              }}
+            />
 
             {/* Central Interactive Core Button */}
             <button
@@ -607,11 +808,11 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
             >
               {voiceState === 'listening' && (
                 <div className="live-bubble-soundbars">
-                  <span className="live-soundbar bar-1" />
-                  <span className="live-soundbar bar-2" />
-                  <span className="live-soundbar bar-3" />
-                  <span className="live-soundbar bar-4" />
-                  <span className="live-soundbar bar-5" />
+                  <span className="live-soundbar bar-1" style={{ height: `${Math.max(6, 8 + micVolume * 34)}px` }} />
+                  <span className="live-soundbar bar-2" style={{ height: `${Math.max(8, 12 + micVolume * 48)}px` }} />
+                  <span className="live-soundbar bar-3" style={{ height: `${Math.max(10, 16 + micVolume * 58)}px` }} />
+                  <span className="live-soundbar bar-4" style={{ height: `${Math.max(8, 12 + micVolume * 48)}px` }} />
+                  <span className="live-soundbar bar-5" style={{ height: `${Math.max(6, 8 + micVolume * 34)}px` }} />
                 </div>
               )}
 

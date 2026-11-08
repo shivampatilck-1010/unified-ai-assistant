@@ -1,283 +1,334 @@
 /* ==========================================================================
    InteractiveCalendarEventCard.css
-   Modern, Linear-style interactive event scheduler with live customization
+   Minimalist, human-designed event scheduler (Linear / Raycast / Apple style)
+   - Zero glowing neon borders or box-shadows
+   - Neutral dark slate/zinc palette (#111218, #181920, #27272a)
+   - Crisp 1px static borders with clean typography
+   - Backward-compatible styling for both new and existing chat cards
    ========================================================================== */
 
-.smart-scheduler-card {
+/* 1. Main Card Container */
+.smart-scheduler-card,
+.interactive-cal-card {
   position: relative;
-  margin: 18px 0;
-  padding: 22px 24px;
-  background: rgba(13, 17, 28, 0.78);
-  border: 1px solid rgba(56, 189, 248, 0.32);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-radius: 18px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 20px rgba(56, 189, 248, 0.12);
+  margin: 16px 0;
+  padding: 20px 22px;
+  background: #111218;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  color: #f1f5f9;
+  gap: 14px;
+  color: #e4e4e7;
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  animation: schedSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  transition: all 0.2s ease;
+  animation: schedFadeIn 0.2s ease-out;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
-.smart-scheduler-card:hover {
-  border-color: rgba(56, 189, 248, 0.55);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 0 28px rgba(56, 189, 248, 0.2);
+.smart-scheduler-card:hover,
+.interactive-cal-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
-@keyframes schedSlideIn {
+@keyframes schedFadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
-/* 1. Header */
-.sched-header {
+/* 2. Top Header */
+.sched-header,
+.cal-card-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sched-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .sched-icon-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #e2e8f0;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f4f4f5;
   letter-spacing: -0.01em;
 }
 
 .sched-icon-pill svg {
-  color: #38bdf8;
+  color: #a1a1aa;
 }
 
-.sched-sync-badge {
+.sched-sync-badge,
+.cal-badge-saved {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 11.5px;
-  font-weight: 600;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #34d399;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
 }
 
-.sched-live-dot {
-  width: 6px;
-  height: 6px;
+.cal-badge-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+}
+
+.sched-live-dot,
+.cal-sync-dot {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-  animation: pulseDot 1.4s infinite;
-}
-
-@keyframes pulseDot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.3); }
+  display: inline-block;
 }
 
 .sched-view-cal-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: transparent;
   border: none;
-  color: #38bdf8;
-  font-size: 12.5px;
-  font-weight: 600;
+  color: #a1a1aa;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 6px;
-  transition: all 0.18s ease;
+  transition: color 0.15s ease;
 }
 
 .sched-view-cal-link:hover {
-  background: rgba(56, 189, 248, 0.15);
-  color: #7dd3fc;
+  color: #ffffff;
 }
 
-/* 2. Body */
-.sched-body {
+/* 3. Main Body */
+.sched-body,
+.cal-card-main-body {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
 }
 
-/* Calendar Date Badge */
-.sched-date-badge {
-  width: 66px;
-  height: 76px;
-  background: rgba(20, 26, 42, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
+/* Date Display Badge */
+.sched-date-badge,
+.cal-date-badge {
+  width: 56px;
+  height: 64px;
+  background: #181920;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
-.sched-date-month {
+.sched-date-month,
+.cal-date-month {
   width: 100%;
-  background: linear-gradient(135deg, #0284c7, #38bdf8);
-  color: #ffffff;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  background: #20222a;
+  color: #d4d4d8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-align: center;
   padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.sched-date-day {
-  font-size: 24px;
-  font-weight: 800;
+.sched-date-day,
+.cal-date-day {
+  font-size: 20px;
+  font-weight: 700;
   color: #ffffff;
   line-height: 1;
   margin-top: 2px;
 }
 
-.sched-date-weekday {
-  font-size: 9.5px;
-  font-weight: 600;
-  color: #94a3b8;
+.sched-date-weekday,
+.cal-date-weekday {
+  font-size: 9px;
+  font-weight: 500;
+  color: #71717a;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 
 /* Fields Container */
-.sched-fields-container {
+.sched-fields-container,
+.cal-event-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+
+.sched-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sched-field-label {
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  color: #71717a;
   display: block;
-  margin-bottom: 4px;
 }
 
-/* Title text input */
+/* Text Input */
 .sched-text-input {
   width: 100%;
-  background: rgba(18, 24, 38, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
+  background: #16171d;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #f4f4f5;
+  font-size: 14px;
+  font-weight: 500;
   outline: none;
   box-sizing: border-box;
-  transition: all 0.18s ease;
+  transition: border-color 0.15s ease;
 }
 
 .sched-text-input:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
-  background: rgba(22, 30, 48, 0.95);
+  border-color: #52525b;
 }
 
-/* Chips Row */
+.cal-event-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.cal-event-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.cal-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cal-event-desc {
+  margin: 0;
+  font-size: 12.5px;
+  color: #a1a1aa;
+  line-height: 1.45;
+}
+
+/* Subject & Slot Chips */
 .sched-chips-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .sched-chips-label {
   font-size: 11px;
-  color: #64748b;
-  font-weight: 600;
+  color: #71717a;
+  font-weight: 500;
   margin-right: 2px;
 }
 
 .sched-chip {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #cbd5e1;
-  font-size: 11.5px;
+  background: #16171d;
+  border: 1px solid #27272a;
+  color: #a1a1aa;
+  font-size: 11px;
   font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 14px;
+  padding: 3px 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all 0.14s ease;
 }
 
 .sched-chip:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: #20222a;
   color: #ffffff;
 }
 
 .sched-chip.active {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: rgba(56, 189, 248, 0.6);
-  color: #38bdf8;
-  font-weight: 600;
+  background: #27272a;
+  border-color: #3f3f46;
+  color: #ffffff;
 }
 
-/* Date & Time Grid */
+/* Date & Time Selectors */
 .sched-datetime-grid {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
+}
+
+.sched-datetime-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sched-date-input,
 .sched-time-input {
   width: 100%;
-  background: rgba(18, 24, 38, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  padding: 6px 10px;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 500;
+  background: #16171d;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #f4f4f5;
+  font-size: 12px;
+  font-family: inherit;
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.18s ease;
 }
 
 .sched-date-input:focus,
 .sched-time-input:focus {
-  border-color: #38bdf8;
-  background: rgba(22, 30, 48, 0.95);
+  border-color: #52525b;
 }
 
-/* Notes Row */
+/* Notes & Syllabus */
 .sched-notes-row {
-  background: rgba(15, 20, 32, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sched-notes-header {
@@ -289,201 +340,193 @@
 .sched-notes-toggle-btn {
   background: transparent;
   border: none;
-  color: #38bdf8;
-  font-size: 11.5px;
-  font-weight: 600;
+  color: #71717a;
+  font-size: 11px;
   cursor: pointer;
   padding: 0;
 }
 
 .sched-notes-toggle-btn:hover {
-  text-decoration: underline;
-}
-
-.sched-notes-preview {
-  margin: 4px 0 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: #cbd5e1;
+  color: #d4d4d8;
 }
 
 .sched-notes-textarea {
   width: 100%;
-  background: rgba(18, 24, 38, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #16171d;
+  border: 1px solid #27272a;
   border-radius: 6px;
-  padding: 6px 10px;
-  color: #f1f5f9;
-  font-size: 12.5px;
-  line-height: 1.4;
+  padding: 6px 8px;
+  color: #d4d4d8;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
   outline: none;
   box-sizing: border-box;
-  resize: vertical;
-  margin-top: 4px;
 }
 
-/* 3. Footer & Multi-App Sync */
-.sched-footer {
+.sched-notes-preview {
+  margin: 0;
+  font-size: 12px;
+  color: #a1a1aa;
+  line-height: 1.4;
+}
+
+/* 4. Footer & Action Row */
+.sched-footer,
+.cal-sync-banner {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sched-primary-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sched-save-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 600;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(129, 140, 248, 0.25));
-  border: 1px solid rgba(56, 189, 248, 0.5);
-  color: #38bdf8;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #181920;
+  border: 1px solid #27272a;
+  color: #e4e4e7;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .sched-save-btn:hover {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.4), rgba(129, 140, 248, 0.4));
-  border-color: #38bdf8;
+  background: #24252e;
+  border-color: #3f3f46;
   color: #ffffff;
-  transform: translateY(-1px);
 }
 
 .sched-save-btn.saved {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.5);
-  color: #34d399;
+  background: #16171d;
+  border-color: #27272a;
+  color: #10b981;
 }
 
-.sched-task-btn {
+.sched-task-btn,
+.cal-open-internal-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: 9px;
-  font-size: 13px;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #cbd5e1;
+  background: #181920;
+  border: 1px solid #27272a;
+  color: #a1a1aa;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 }
 
-.sched-task-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+.sched-task-btn:hover,
+.cal-open-internal-btn:hover {
+  background: #24252e;
   color: #ffffff;
 }
 
 .sched-task-btn.saved {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.45);
-  color: #34d399;
+  color: #10b981;
 }
 
-/* 1-Click Multi-App Export */
-.sched-export-row {
+/* Export / Sync Options */
+.sched-export-row,
+.cal-export-section {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
-}
-
-.sched-export-label {
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #64748b;
-}
-
-.sched-export-buttons {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
-.sched-app-link {
+.sched-export-label,
+.cal-export-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: #71717a;
+}
+
+.sched-export-buttons,
+.cal-export-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sched-app-link,
+.cal-app-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 13px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.18s ease;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #cbd5e1;
+  transition: all 0.15s ease;
+  background: #181920;
+  border: 1px solid #27272a;
+  color: #d4d4d8;
 }
 
-.sched-app-link:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-}
-
-.sched-app-link--google:hover {
-  background: rgba(66, 133, 244, 0.2);
-  border-color: rgba(66, 133, 244, 0.5);
-  color: #93c5fd;
-}
-
-.sched-app-link--apple:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.35);
+.sched-app-link:hover,
+.cal-app-btn:hover {
+  background: #24252e;
+  border-color: #3f3f46;
   color: #ffffff;
 }
 
-.sched-app-link--outlook:hover {
-  background: rgba(0, 120, 212, 0.2);
-  border-color: rgba(0, 120, 212, 0.5);
-  color: #93c5fd;
-}
-
 @media (max-width: 640px) {
-  .smart-scheduler-card {
-    padding: 16px 18px;
+  .smart-scheduler-card,
+  .interactive-cal-card {
+    padding: 14px 16px;
   }
-  .sched-body {
+  .sched-body,
+  .cal-card-main-body {
     flex-direction: column;
   }
-  .sched-date-badge {
+  .sched-date-badge,
+  .cal-date-badge {
     width: 100%;
-    height: 44px;
+    height: 38px;
     flex-direction: row;
-    padding: 0 12px;
+    padding: 0 10px;
   }
-  .sched-date-month {
+  .sched-date-month,
+  .cal-date-month {
     width: auto;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 4px;
+    border-bottom: none;
   }
   .sched-datetime-grid {
     grid-template-columns: 1fr;
   }
-  .sched-export-row {
+  .sched-export-row,
+  .cal-export-section {
     flex-direction: column;
     align-items: flex-start;
   }
-  .sched-export-buttons {
+  .sched-export-buttons,
+  .cal-export-buttons {
     width: 100%;
   }
-  .sched-app-link {
+  .sched-app-link,
+  .cal-app-btn {
     flex: 1;
     justify-content: center;
   }

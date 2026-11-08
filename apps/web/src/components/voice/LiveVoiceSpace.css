@@ -15,14 +15,14 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  /* Crystal Frosted Glass: The entire underlying application stays visible underneath */
-  background: rgba(8, 12, 22, 0.28);
-  backdrop-filter: blur(14px) saturate(180%) brightness(1.03);
-  -webkit-backdrop-filter: blur(14px) saturate(180%) brightness(1.03);
+  /* Crystal Frosted Glass: The underlying chat is softly visible beneath */
+  background: rgba(8, 11, 20, 0.55);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
   color: #f4f4f5;
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   overflow: hidden;
-  animation: liveVoiceFadeIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: liveVoiceFadeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
@@ -45,14 +45,14 @@
   inset: -25%;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 22%, rgba(0, 210, 255, 0.24) 0%, transparent 45%),
-    radial-gradient(circle at 82% 18%, rgba(139, 92, 246, 0.26) 0%, transparent 48%),
-    radial-gradient(circle at 75% 78%, rgba(255, 94, 98, 0.22) 0%, transparent 50%),
-    radial-gradient(circle at 22% 82%, rgba(217, 70, 239, 0.22) 0%, transparent 52%),
-    radial-gradient(circle at 50% 48%, rgba(16, 185, 129, 0.18) 0%, transparent 55%);
+    radial-gradient(circle at 18% 22%, rgba(0, 210, 255, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 82% 18%, rgba(139, 92, 246, 0.18) 0%, transparent 48%),
+    radial-gradient(circle at 75% 78%, rgba(255, 94, 98, 0.16) 0%, transparent 50%),
+    radial-gradient(circle at 22% 82%, rgba(217, 70, 239, 0.16) 0%, transparent 52%),
+    radial-gradient(circle at 50% 48%, rgba(16, 185, 129, 0.14) 0%, transparent 55%);
   filter: blur(75px);
   mix-blend-mode: screen;
-  opacity: 0.65;
+  opacity: 0.35;
   animation: livelyAuroraShift 16s ease-in-out infinite alternate;
   z-index: 0;
 }
@@ -165,6 +165,28 @@
 }
 
 .live-voice-close-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.live-voice-minimize-icon-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #e4e4e7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.live-voice-minimize-icon-btn:hover {
   background: rgba(255, 255, 255, 0.24);
   color: #ffffff;
   transform: scale(1.08);
@@ -350,26 +372,23 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 32px;
+  height: 64px;
 }
 
 .live-soundbar {
   width: 4px;
   background: #38bdf8;
   border-radius: 3px;
-  animation: soundWaveBar 0.9s ease-in-out infinite alternate;
+  min-height: 6px;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+  transition: height 0.05s ease-out;
 }
 
-.bar-1 { height: 14px; animation-delay: 0.1s; }
-.bar-2 { height: 26px; animation-delay: 0.3s; }
-.bar-3 { height: 32px; animation-delay: 0.0s; }
-.bar-4 { height: 22px; animation-delay: 0.4s; }
-.bar-5 { height: 16px; animation-delay: 0.2s; }
-
-@keyframes soundWaveBar {
-  0% { transform: scaleY(0.4); opacity: 0.6; }
-  100% { transform: scaleY(1.2); opacity: 1; }
-}
+.bar-1 { height: 14px; }
+.bar-2 { height: 26px; }
+.bar-3 { height: 32px; }
+.bar-4 { height: 22px; }
+.bar-5 { height: 16px; }
 
 /* Spinner during Thinking */
 .live-bubble-thinking-spinner {
@@ -680,4 +699,125 @@
   .live-voice-footer {
     padding-bottom: 20px;
   }
+}
+
+/* ==========================================================================
+   Floating Ambient Dock when user minimizes Live Voice to view chat
+   ========================================================================== */
+.live-voice-floating-bar {
+  position: fixed;
+  bottom: 82px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  border-radius: 40px;
+  background: rgba(14, 18, 28, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(56, 189, 248, 0.2);
+  color: #f4f4f5;
+  max-width: 90vw;
+  animation: floatBarSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes floatBarSlideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.live-floating-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.live-floating-orb-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #38bdf8, #0284c7);
+  box-shadow: 0 0 10px #38bdf8;
+  flex-shrink: 0;
+  transition: transform 0.08s ease-out;
+}
+
+.live-floating-text-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.live-floating-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.06em;
+}
+
+.live-floating-state-label {
+  font-size: 13px;
+  color: #e4e4e7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.live-floating-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.live-floating-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #d4d4d8;
+  transition: all 0.15s ease;
+}
+
+.live-floating-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.live-floating-btn--interrupt {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.live-floating-btn--close {
+  padding: 5px 8px;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  justify-content: center;
 }

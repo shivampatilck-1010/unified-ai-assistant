@@ -400,6 +400,9 @@ export function ChatView({
 
   return (
     <div className={`chat-view ${isLiveVoice ? 'chat-view--live-voice' : ''}`}>
+      {/* Ambient Screen Aura Ring when Live Voice is active */}
+      {isLiveVoice && <div className="chat-view__live-voice-ring chat-view__live-voice-ring--listening" />}
+
       {/* Messages area */}
       <div
         className="chat-view__messages"

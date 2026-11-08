@@ -284,7 +284,19 @@ const EmbeddedFigure: React.FC<{ svgCode: string; title?: string }> = ({ svgCode
 const KaTeXBlock: React.FC<{ math: string }> = ({ math }) => {
   const html = React.useMemo(() => {
     try {
-      return katex.renderToString(math.trim(), {
+      let cleanMath = math.trim();
+      // Auto-balance LaTeX environments during streaming
+      const openMatches = cleanMath.match(/\\begin\{([a-zA-Z*]+)\}/g) || [];
+      const closeMatches = cleanMath.match(/\\end\{([a-zA-Z*]+)\}/g) || [];
+      if (openMatches.length > closeMatches.length) {
+        const opens = openMatches.map((m) => m.replace(/\\begin\{|\}/g, ''));
+        const closes = closeMatches.map((m) => m.replace(/\\end\{|\}/g, ''));
+        for (let i = closes.length; i < opens.length; i++) {
+          cleanMath += `\\end{${opens[i]}}`;
+        }
+      }
+
+      return katex.renderToString(cleanMath, {
         displayMode: true,
         throwOnError: false,
       });
