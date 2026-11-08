@@ -209,6 +209,19 @@ export function CalendarTasksView() {
     void loadTasks();
     void loadCalendar();
     void loadReminders();
+
+    const handleSync = () => {
+      void loadTasks();
+      void loadCalendar();
+      void loadReminders();
+    };
+
+    window.addEventListener('calendar-updated', handleSync);
+    window.addEventListener('task-updated', handleSync);
+    return () => {
+      window.removeEventListener('calendar-updated', handleSync);
+      window.removeEventListener('task-updated', handleSync);
+    };
   }, [loadTasks, loadCalendar, loadReminders]);
 
   // Task actions

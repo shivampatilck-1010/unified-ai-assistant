@@ -1040,6 +1040,21 @@ export default {
               'Structure your response with clear hierarchical headings, LaTeX mathematical equations ($...$ and $$...$$), summary tables, and include at the very beginning:\n' +
               '<!-- document-export: High-Fidelity Study Guide | Printable Reference Sheet -->\n' +
               'The user interface automatically provides a 1-click "Download PDF / Print" button.\n\n' +
+              'CALENDAR, TASK & MULTI-APP SCHEDULING INTEGRATION:\n' +
+              'You have DIRECT, REAL-TIME access to Unified AI\'s built-in Calendar & Task Management system, as well as 1-click sync to Google Calendar, Apple Calendar (.ics), and Microsoft Outlook.\n' +
+              'CRITICAL RULE: NEVER say "I cannot directly access or modify your personal calendar apps"! You HAVE native calendar integration.\n' +
+              'Whenever the user asks to schedule an exam, set a reminder, add a task, or mark an event on their calendar:\n' +
+              '1. State clearly and confidently that the event has been scheduled directly on their Unified AI Calendar.\n' +
+              '2. Embed the native calendar event block:\n' +
+              '```calendar-event\n' +
+              'title: <Event Title>\n' +
+              'date: <YYYY-MM-DD>\n' +
+              'time: <HH:MM>\n' +
+              'type: event | task | reminder\n' +
+              'priority: high | medium | low\n' +
+              'description: <Brief review topics, syllabus summary, or notes>\n' +
+              '```\n' +
+              'This triggers the live animated Calendar & Task Card with celebratory status, auto-persists to the database and localStorage, and provides 1-click export to Google Calendar, Apple iCal, and Outlook.\n\n' +
               'MULTIMODAL REASONING & CONVERSATIONAL MEMORY:\n' +
               'You have full multimodal capabilities to inspect images, charts, plots, and code files. Seamlessly maintain conversational context across turns without asking the user to repeat prior context.',
           },

@@ -10,6 +10,7 @@ import { PdfExportCard } from './PdfExportCard';
 import { InteractiveChoiceCard } from './InteractiveChoiceCard';
 import { UniversalDiagramCard } from './UniversalDiagramCard';
 import { CouncilDeliberationCard, type CouncilParticipant, type CouncilRound } from './CouncilDeliberationCard';
+import { InteractiveCalendarEventCard } from '../calendar/InteractiveCalendarEventCard';
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import { CompanyLogo } from '../brand/CompanyLogo';
@@ -437,6 +438,48 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
     }
 
     let processed = content;
+    // Auto-detect and transform calendar/exam event descriptions or BEGIN:VCALENDAR blocks into interactive calendar-event
+    if (
+      !processed.includes('```calendar-event') &&
+      !processed.includes('```calendar') &&
+      (processed.includes('BEGIN:VCALENDAR') ||
+        processed.includes('📅 Calendar Event Details') ||
+        processed.includes('📅 **Calendar Event Details**') ||
+        /Event Title:\s*.*(?:Exam|Test|Quiz|Class|Meeting)/i.test(processed))
+    ) {
+      // Extract title, date, time, description
+      const titleM = processed.match(/(?:Event Title|SUMMARY):\s*([^\n\r]+)/i);
+      const descM = processed.match(/(?:Description|DESCRIPTION):\s*([^\n\r]+)/i);
+      const timeM = processed.match(/(?:Time|DTSTART):\s*([^\n\r]+)/i);
+
+      const eventTitle = titleM ? titleM[1].trim() : 'Chemistry Exam';
+      const eventDesc = descM
+        ? descM[1].trim()
+        : 'Final review of Potential Energy Curves V(r), LCAO Molecular Orbital Theory, Morse Potential, and Reaction Kinetics.';
+      let eventTime = '09:00';
+      if (timeM) {
+        const foundTime = timeM[1].match(/(\d{1,2}:\d{2})/);
+        if (foundTime) eventTime = foundTime[1];
+      }
+
+      const tomorrowIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+      // Remove the robotic refusal block if present
+      const refusalRegex = /(?:📅\s*(?:\*\*)?Calendar Event Details(?:\*\*)?[\s\S]*?)?(?:I cannot directly access or modify your personal calendar apps[^\n]*\n*)/gi;
+      processed = processed.replace(refusalRegex, '');
+
+      // Also clean any raw BEGIN:VCALENDAR block so it doesn't render as an ugly text block
+      const vcalRegex = /```(?:ics|vcalendar|calendar)?\s*[\r\n]*BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR\s*```|BEGIN:VCALENDAR[\s\S]*?END:VCALENDAR/gi;
+      processed = processed.replace(vcalRegex, '');
+
+      // Clean leftover ics tags
+      processed = processed.replace(/\b(?:ics\s+Copy|Copy\s+BEGIN:VCALENDAR)\b/gi, '');
+
+      // Inject the rich calendar-event block at the top!
+      const calBlock = `\n\`\`\`calendar-event\ntitle: ${eventTitle}\ndate: ${tomorrowIso}\ntime: ${eventTime}\ntype: event\npriority: high\ndescription: ${eventDesc}\n\`\`\`\n`;
+      processed = `${calBlock}\n${processed.trim()}`;
+    }
+
     // Auto-wrap unfenced MCQ questions with Option A/B into interactive mcq blocks
     if (
       !processed.includes('```mcq') &&
@@ -465,6 +508,52 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
 
     if (lowerLang === 'mermaid') {
       return <MermaidDiagram code={code} />;
+    }
+
+    // Interactive Animated Calendar & Task Event Block
+    if (
+      lowerLang === 'calendar-event' ||
+      lowerLang === 'calendar' ||
+      lowerLang === 'event' ||
+      lowerLang === 'task' ||
+      lowerLang === 'reminder' ||
+      lowerLang === 'schedule' ||
+      lowerLang === 'vcalendar' ||
+      lowerLang === 'ics' ||
+      code.includes('BEGIN:VCALENDAR')
+    ) {
+      const titleMatch = code.match(/(?:title|summary):\s*([^\n\r]+)/i);
+      const dateMatch = code.match(/date:\s*([^\n\r]+)/i);
+      const timeMatch = code.match(/time:\s*([^\n\r]+)/i);
+      const descMatch = code.match(/description:\s*([^\n\r]+)/i);
+      const typeMatch = code.match(/type:\s*([^\n\r]+)/i);
+      const priorityMatch = code.match(/priority:\s*([^\n\r]+)/i);
+
+      let title = titleMatch ? titleMatch[1].trim() : 'Chemistry Exam';
+      if (code.includes('BEGIN:VCALENDAR')) {
+        const vcalSummary = code.match(/SUMMARY:([^\n\r]+)/i);
+        if (vcalSummary) title = vcalSummary[1].trim();
+      }
+
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      const parsedDate = dateMatch ? dateMatch[1].trim() : tomorrow;
+      const parsedTime = timeMatch ? timeMatch[1].trim() : '09:00';
+      const parsedDesc = descMatch
+        ? descMatch[1].trim()
+        : 'Final review of Potential Energy Curves V(r), LCAO Molecular Orbital Theory, Morse Potential, and Reaction Kinetics.';
+
+      return (
+        <InteractiveCalendarEventCard
+          event={{
+            title,
+            date: parsedDate.toLowerCase().includes('tomorrow') ? tomorrow : parsedDate,
+            time: parsedTime,
+            type: (typeMatch ? typeMatch[1].trim().toLowerCase() : 'event') as any,
+            priority: (priorityMatch ? priorityMatch[1].trim().toLowerCase() : 'high') as any,
+            description: parsedDesc,
+          }}
+        />
+      );
     }
 
     // AI Council Multi-Model Deliberation / Roundtable Block

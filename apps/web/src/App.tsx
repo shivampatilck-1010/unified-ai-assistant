@@ -38,6 +38,17 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Support cross-component navigation (e.g., from in-chat Calendar card directly to Calendar & Tasks view)
+  useEffect(() => {
+    const handleNavigate = (e: any) => {
+      if (e.detail?.section) {
+        setActiveSection(e.detail.section);
+      }
+    };
+    window.addEventListener('navigate-section', handleNavigate);
+    return () => window.removeEventListener('navigate-section', handleNavigate);
+  }, []);
+
   // Keyboard shortcut Ctrl+\ or Cmd+\ to collapse/expand sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
