@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ChatMessage } from '../../types';
 import { MarkdownContent } from '../chat/MarkdownContent';
+import { LiveFluidOrb } from './LiveFluidOrb';
 import './LiveVoiceSpace.css';
 
 export interface LiveVoiceSpaceProps {
@@ -739,99 +740,22 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
 
       {/* 3. Center Live Interactive Morphing Bubble Orb & Transcript */}
       <div className="live-voice-center-stage">
-        {/* The Live Interactive Moving Bubble (as depicted in PDF Page 2) */}
+        {/* The Live Interactive Moving 3D Ribbon Bubble (as depicted in PDF Page 2) */}
         <div className="live-bubble-stage">
-          <div
-            className={`live-bubble-orb live-bubble-orb--${voiceState}`}
-            style={{
-              transform: `scale(${1 + (voiceState === 'listening' ? micVolume * 0.45 : 0)})`,
-              transition: 'transform 0.08s ease-out',
-            }}
+          <LiveFluidOrb
+            volume={micVolume}
+            voiceState={voiceState}
+            size={280}
             onClick={() => {
               if (voiceState === 'speaking') {
                 handleInterruptVoice();
+              } else if (voiceState === 'listening' && transcript.trim()) {
+                setCurrentPrompt(transcript.trim());
+                onSendMessage(transcript.trim());
+                setTranscript('');
               }
             }}
-            title={voiceState === 'speaking' ? 'Click orb to interrupt' : 'Interactive Live Bubble'}
-          >
-            {/* Morphing Dynamic Fluid Concentric Light Rings */}
-            <div
-              className="live-bubble-fluid-ring live-bubble-fluid-ring--1"
-              style={{
-                transform: `scale(${1 + micVolume * 0.5})`,
-                opacity: 0.35 + micVolume * 0.5,
-              }}
-            />
-            <div
-              className="live-bubble-fluid-ring live-bubble-fluid-ring--2"
-              style={{
-                transform: `scale(${1.2 + micVolume * 0.75})`,
-                opacity: 0.25 + micVolume * 0.45,
-              }}
-            />
-            <div
-              className="live-bubble-fluid-ring live-bubble-fluid-ring--3"
-              style={{
-                transform: `scale(${1.4 + micVolume * 1.0})`,
-                opacity: 0.15 + micVolume * 0.4,
-              }}
-            />
-            <div
-              className="live-bubble-fluid-ring live-bubble-fluid-ring--4"
-              style={{
-                transform: `scale(${1.6 + micVolume * 1.25})`,
-                opacity: 0.1 + micVolume * 0.35,
-              }}
-            />
-
-            {/* Central Interactive Core Button */}
-            <button
-              type="button"
-              className="live-bubble-core"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (voiceState === 'speaking') {
-                  handleInterruptVoice();
-                } else if (voiceState === 'listening' && transcript.trim()) {
-                  setCurrentPrompt(transcript.trim());
-                  onSendMessage(transcript.trim());
-                  setTranscript('');
-                }
-              }}
-              title={
-                voiceState === 'speaking'
-                  ? 'Tap to interrupt speech'
-                  : voiceState === 'listening'
-                  ? 'Tap when done speaking'
-                  : 'Live Audio Active'
-              }
-            >
-              {voiceState === 'listening' && (
-                <div className="live-bubble-soundbars">
-                  <span className="live-soundbar bar-1" style={{ height: `${Math.max(6, 8 + micVolume * 34)}px` }} />
-                  <span className="live-soundbar bar-2" style={{ height: `${Math.max(8, 12 + micVolume * 48)}px` }} />
-                  <span className="live-soundbar bar-3" style={{ height: `${Math.max(10, 16 + micVolume * 58)}px` }} />
-                  <span className="live-soundbar bar-4" style={{ height: `${Math.max(8, 12 + micVolume * 48)}px` }} />
-                  <span className="live-soundbar bar-5" style={{ height: `${Math.max(6, 8 + micVolume * 34)}px` }} />
-                </div>
-              )}
-
-              {voiceState === 'thinking' && (
-                <div className="live-bubble-thinking-spinner">
-                  <div className="spinner-orbit" />
-                </div>
-              )}
-
-              {voiceState === 'speaking' && (
-                <div className="live-bubble-speaking-waves">
-                  <span className="speak-bar sbar-1" />
-                  <span className="speak-bar sbar-2" />
-                  <span className="speak-bar sbar-3" />
-                  <span className="speak-bar sbar-4" />
-                </div>
-              )}
-            </button>
-          </div>
+          />
 
           {/* Real-time State Label */}
           <div className="live-bubble-status-text">

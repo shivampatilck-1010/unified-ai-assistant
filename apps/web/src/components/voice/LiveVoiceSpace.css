@@ -7,7 +7,7 @@
    - Glassy streaming transcript display with KaTeX math & typography
    ========================================================================== */
 
-/* Main Overlay Container with Genuine Glassy Translucency */
+/* Main Overlay Container with Genuine Glassy Translucency & Ambient Micro-Grid Texture */
 .live-voice-space-overlay {
   position: fixed;
   inset: 0;
@@ -16,9 +16,12 @@
   flex-direction: column;
   justify-content: space-between;
   /* Crystal Frosted Glass: The underlying chat is softly visible beneath */
-  background: rgba(8, 11, 20, 0.55);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  background-color: rgba(9, 12, 22, 0.58);
+  /* Elegant technical dot-matrix design pattern */
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
   color: #f4f4f5;
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   overflow: hidden;
@@ -216,6 +219,22 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
+}
+
+.live-fluid-orb-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.live-fluid-orb-wrap:hover {
+  transform: scale(1.05);
+}
+
+.live-fluid-orb-wrap:active {
+  transform: scale(0.96);
 }
 
 .live-bubble-orb {
