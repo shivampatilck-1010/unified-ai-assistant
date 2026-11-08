@@ -13,6 +13,7 @@ import {
   reprocessFile,
   answerKnowledge,
 } from '../../lib/api';
+import { MarkdownContent } from '../chat/MarkdownContent';
 import './FilesKnowledgeView.css';
 
 function formatBytes(bytes: number): string {
@@ -449,7 +450,7 @@ export const FilesKnowledgeView: React.FC = () => {
               </div>
 
               <div className="fk-answer-text">
-                {answerResult.answer}
+                <MarkdownContent content={answerResult.answer} />
               </div>
 
               {answerResult.citations.length > 0 && (

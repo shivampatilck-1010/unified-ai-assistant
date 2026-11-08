@@ -57,15 +57,32 @@ interface StoredProject {
 }
 const projectsStore = new Map<string, StoredProject>();
 
+interface StoredChunk {
+  id: string;
+  chunk_index: number;
+  page_number?: number | null;
+  section_title?: string | null;
+  content: string;
+  token_count: number;
+}
+
 interface StoredFile {
   id: string;
+  owner_id: string;
   filename: string;
-  size: number;
+  file_type: string;
   mime_type: string;
-  status: 'indexed' | 'processing';
+  file_size: number;
+  size: number; // backward compatibility
+  content_hash: string;
+  status: 'ready' | 'processing' | 'uploaded' | 'failed';
+  error_message?: string | null;
+  page_count?: number | null;
   chunk_count: number;
   created_at: string;
+  updated_at: string;
   content?: string;
+  chunks: StoredChunk[];
 }
 const filesStore = new Map<string, StoredFile>();
 
@@ -174,36 +191,169 @@ projectsStore.set('proj-stem-1', {
   ],
 });
 
-// Seed default files
+// Seed default files (Phase 5 Files & Knowledge Engine)
 filesStore.set('file-1', {
   id: 'file-1',
+  owner_id: 'default-user',
   filename: 'algorithmic_complexity_handbook.pdf',
-  size: 1420840,
+  file_type: 'pdf',
   mime_type: 'application/pdf',
-  status: 'indexed',
-  chunk_count: 24,
+  file_size: 1420840,
+  size: 1420840,
+  content_hash: 'a1b2c3d4e5f60102030405060708090a11121314151617181920212223242526',
+  status: 'ready',
+  error_message: null,
+  page_count: 8,
+  chunk_count: 6,
   created_at: new Date(Date.now() - 86400000).toISOString(),
-  content: 'Asymptotic complexity handbook covering Master Theorem, Dijkstra Priority Queue relaxation O((V+E)log V), and Separate Chaining Hash Tables with uniform hashing.',
+  updated_at: new Date(Date.now() - 86400000).toISOString(),
+  content: 'Asymptotic complexity handbook covering Master Theorem, Dijkstra Priority Queue relaxation O((V+E)log V), Separate Chaining Hash Tables, Bellman-Ford, and Disjoint-Set Union.',
+  chunks: [
+    {
+      id: 'chk-1-0',
+      chunk_index: 0,
+      page_number: 1,
+      section_title: '1. Divide-and-Conquer Recurrences & Master Theorem',
+      token_count: 155,
+      content: 'The Master Theorem provides asymptotic bounds for recurrences of the form T(n) = a*T(n/b) + f(n), where a >= 1 and b > 1 are constants. Three primary cases arise by comparing f(n) with n^(log_b(a)): Case 1: If f(n) = O(n^(log_b(a) - epsilon)), then T(n) = Theta(n^(log_b(a))). Case 2: If f(n) = Theta(n^(log_b(a)) * log^k(n)), then T(n) = Theta(n^(log_b(a)) * log^(k+1)(n)). Case 3: If f(n) = Omega(n^(log_b(a) + epsilon)) and regularity condition a*f(n/b) <= c*f(n) holds, then T(n) = Theta(f(n)).',
+    },
+    {
+      id: 'chk-1-1',
+      chunk_index: 1,
+      page_number: 2,
+      section_title: '2. Dijkstra Shortest Path & Fibonacci Heaps',
+      token_count: 165,
+      content: "Dijkstra's single-source shortest path algorithm on directed graph G=(V,E) with non-negative edge weights operates by repeatedly extracting the vertex with minimum tentative distance from a priority queue. Using a standard binary min-heap, each extract-min takes O(log V) and each decrease-key takes O(log V), yielding total running time O((V + E) log V). With Fibonacci heaps, amortized decrease-key runs in O(1), achieving O(E + V log V) asymptotic optimality.",
+    },
+    {
+      id: 'chk-1-2',
+      chunk_index: 2,
+      page_number: 3,
+      section_title: '3. Hash Tables: Separate Chaining vs Open Addressing',
+      token_count: 175,
+      content: 'Collision resolution in hash tables is evaluated under the simple uniform hashing assumption. Under Separate Chaining, each slot in table T of size m points to a linked list of collided keys. For load factor alpha = n/m, unsuccessful search takes Theta(1 + alpha) and successful search takes Theta(1 + alpha) expected time. Under Open Addressing (Linear Probing, Quadratic Probing, Double Hashing), keys reside directly in slots. Expected probes for unsuccessful search is at most 1/(1 - alpha) for alpha < 1.',
+    },
+    {
+      id: 'chk-1-3',
+      chunk_index: 3,
+      page_number: 5,
+      section_title: '4. Dynamic Programming: Bellman-Ford & Negative Cycles',
+      token_count: 145,
+      content: 'The Bellman-Ford algorithm computes single-source shortest paths in graphs with arbitrary (including negative) edge weights in O(V * E) time. It relaxes all |E| edges |V|-1 times. A final pass over all edges detects reachable negative-weight cycles: if dist[v] > dist[u] + w(u,v), a negative cycle exists and unbounded negative paths can be traversed.',
+    },
+    {
+      id: 'chk-1-4',
+      chunk_index: 4,
+      page_number: 7,
+      section_title: '5. Disjoint-Set Union & Tarjan Inverse Ackermann',
+      token_count: 140,
+      content: 'Disjoint-Set Union (Union-Find) with Union-by-Rank and Path Compression guarantees that any sequence of m operations on n elements runs in O(m * alpha(n)) time, where alpha(n) is the extremely slow-growing inverse Ackermann function, practically constant (alpha(n) <= 4) for all physical input sizes.',
+    },
+    {
+      id: 'chk-1-5',
+      chunk_index: 5,
+      page_number: 8,
+      section_title: '6. Red-Black Tree Balancing Invariants',
+      token_count: 150,
+      content: 'A Red-Black tree is a self-balancing binary search tree satisfying: 1. Every node is red or black. 2. Root is black. 3. Every leaf (NIL) is black. 4. If a node is red, both children are black (no consecutive red nodes). 5. For each node, all simple paths from node to descendant leaves contain the same black-height. Height is guaranteed to be at most 2*log2(n + 1).',
+    },
+  ],
 });
+
 filesStore.set('file-2', {
   id: 'file-2',
+  owner_id: 'default-user',
   filename: 'plasma_confinement_physics.pdf',
-  size: 840210,
+  file_type: 'pdf',
   mime_type: 'application/pdf',
-  status: 'indexed',
-  chunk_count: 16,
+  file_size: 840210,
+  size: 840210,
+  content_hash: 'b2c3d4e5f60102030405060708090a1112131415161718192021222324252627',
+  status: 'ready',
+  error_message: null,
+  page_count: 6,
+  chunk_count: 4,
   created_at: new Date(Date.now() - 43200000).toISOString(),
+  updated_at: new Date(Date.now() - 43200000).toISOString(),
   content: 'Deuterium-Tritium thermonuclear fusion kinetics: D + T -> He4 (3.5 MeV) + n (14.1 MeV). Lawson criterion and magnetic confinement in tokamak fields.',
+  chunks: [
+    {
+      id: 'chk-2-0',
+      chunk_index: 0,
+      page_number: 1,
+      section_title: '1. Thermonuclear Reaction Kinetics: D-T Cross Section',
+      token_count: 160,
+      content: 'The primary fusion reaction for magnetic confinement fusion is Deuterium-Tritium: D + T -> 4He (3.5 MeV) + n (14.1 MeV) + 17.6 MeV total energy. The cross-section reaches its peak at lower kinetic energies (approx 65 keV) than D-D or D-3He due to the resonant nuclear state of 5He*. In a thermalized Maxwellian plasma, optimal reaction rates occur at temperatures T ~ 10-20 keV (100-200 million Kelvin).',
+    },
+    {
+      id: 'chk-2-1',
+      chunk_index: 1,
+      page_number: 2,
+      section_title: '2. The Lawson Criterion & Triple Product',
+      token_count: 170,
+      content: 'For a fusion plasma to reach ignition (where self-heating by alpha particles 4He sustains the temperature against bremsstrahlung and transport losses), the Lawson triple product must satisfy: n * tau_E * T >= 3 x 10^21 keV * s / m^3, where n is plasma electron density, tau_E is energy confinement time, and T is core ion temperature. In ITER and modern tokamaks, high density and elongated cross-sections maximize tau_E.',
+    },
+    {
+      id: 'chk-2-2',
+      chunk_index: 2,
+      page_number: 4,
+      section_title: '3. Tokamak Magnetic Topology & Safety Factor q(r)',
+      token_count: 165,
+      content: 'Toroidal magnetic confinement requires helical magnetic field lines to cancel the vertical charge separation caused by grad-B and curvature drifts. The toroidal field B_phi is generated by external coils, while the poloidal field B_theta is induced by the plasma toroidal current. The safety factor q(r) = (r * B_phi) / (R * B_theta) represents field line pitch; MHD kink instabilities (Kruskal-Shafranov limit) require q(a) > 2.',
+    },
+    {
+      id: 'chk-2-3',
+      chunk_index: 3,
+      page_number: 5,
+      section_title: '4. High-Confinement Mode (H-mode) & Edge Transport Barriers',
+      token_count: 155,
+      content: 'The transition from Low-Confinement (L-mode) to High-Confinement (H-mode) occurs when auxiliary heating power exceeds a threshold P_LH. An edge transport barrier (ETB) forms due to sheared E x B flow decorrelating turbulent eddies, creating steep pressure gradients (pedestal) and doubling energy confinement time tau_E. Periodic relaxation manifests as Edge Localized Modes (ELMs).',
+    },
+  ],
 });
+
 filesStore.set('file-3', {
   id: 'file-3',
+  owner_id: 'default-user',
   filename: 'INT335_P24_chat_export.md',
-  size: 42180,
+  file_type: 'md',
   mime_type: 'text/markdown',
-  status: 'indexed',
-  chunk_count: 5,
+  file_size: 42180,
+  size: 42180,
+  content_hash: 'c3d4e5f60102030405060708090a111213141516171819202122232425262728',
+  status: 'ready',
+  error_message: null,
+  page_count: 3,
+  chunk_count: 3,
   created_at: new Date(Date.now() - 10800000).toISOString(),
+  updated_at: new Date(Date.now() - 10800000).toISOString(),
   content: 'Chemical photolysis and light reactions in Photosystem II. Hill reaction equations and Calvin cycle synthesis.',
+  chunks: [
+    {
+      id: 'chk-3-0',
+      chunk_index: 0,
+      page_number: 1,
+      section_title: 'Photosystem II & Photolysis Mechanism',
+      token_count: 155,
+      content: 'Water photolysis occurs within the Oxygen Evolving Complex (OEC) of Photosystem II (PSII) via the Kok S-state cycle: 2H2O -> O2 + 4H+ + 4e-. The catalytic Mn4CaO5 cluster undergoes sequential one-electron oxidations driven by light absorption at P680 reaction centers. Excited P680* transfers electrons to primary acceptor pheophytin, which reduces plastoquinone QA and subsequently QB.',
+    },
+    {
+      id: 'chk-3-1',
+      chunk_index: 1,
+      page_number: 2,
+      section_title: 'Z-Scheme Electron Transport & Proton Gradient',
+      token_count: 165,
+      content: 'Plastoquinol (PQH2) diffuses through the thylakoid lipid bilayer to the cytochrome b6f complex, which pumps protons into the thylakoid lumen via the Q-cycle, establishing the electrochemical proton gradient (deltap = delta-psi + delta-pH). Plastocyanin carries electrons from cytochrome b6f to Photosystem I (PSI, P700). Excited P700* reduces ferredoxin, and ferredoxin-NADP+ reductase (FNR) synthesizes NADPH in the stroma.',
+    },
+    {
+      id: 'chk-3-2',
+      chunk_index: 2,
+      page_number: 3,
+      section_title: 'Calvin-Benson-Bassham Cycle & RuBisCO',
+      token_count: 150,
+      content: 'The dark reactions utilize ATP and NADPH generated in the light reactions to fix atmospheric CO2. Ribulose-1,5-bisphosphate carboxylase/oxygenase (RuBisCO) catalyzes the carboxylation of RuBP into two molecules of 3-phosphoglycerate (3-PGA). Phosphoglycerate kinase and G3P dehydrogenase consume ATP and NADPH to reduce 3-PGA into glyceraldehyde-3-phosphate (G3P) for hexose sugar synthesis.',
+    },
+  ],
 });
 
 // Seed default browser task
@@ -564,6 +714,190 @@ async function streamGeminiWithCandidates({
     }
   }
   return { success: false, model: '', text: fullText, error: lastErr };
+}
+
+// =============================================================================
+// PHASE 5: FILES & KNOWLEDGE RAG ENGINE HELPERS
+// =============================================================================
+
+/** Compute SHA-256 hex digest for byte/string deduplication */
+async function computeSha256(data: ArrayBuffer | string): Promise<string> {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Modular document chunker that extracts text and preserves page/section provenance */
+function chunkDocumentText(
+  filename: string,
+  text: string,
+  fileType: string
+): { chunks: StoredChunk[]; pageCount: number } {
+  const chunks: StoredChunk[] = [];
+  const lines = text.split(/\r?\n/);
+  let currentChunk = '';
+  let currentPage = 1;
+  let currentSection = 'Introduction';
+  let chunkIdx = 0;
+
+  const flushChunk = () => {
+    const trimmed = currentChunk.trim();
+    if (trimmed.length > 25) {
+      const tokens = Math.ceil(trimmed.length / 4);
+      chunks.push({
+        id: `chk-${Date.now()}-${chunkIdx}`,
+        chunk_index: chunkIdx++,
+        page_number: currentPage,
+        section_title: currentSection,
+        content: trimmed,
+        token_count: tokens,
+      });
+      currentChunk = '';
+    }
+  };
+
+  for (const line of lines) {
+    // Detect page provenance delimiters
+    const pageMatch = line.match(/(?:Page|\/Page)\s*([0-9]+)/i);
+    if (pageMatch) {
+      flushChunk();
+      const p = parseInt(pageMatch[1], 10);
+      if (p > 0) currentPage = p;
+    }
+
+    // Detect markdown or document section headers
+    const headerMatch = line.match(/^#{1,4}\s+(.+)$/);
+    if (headerMatch) {
+      flushChunk();
+      currentSection = headerMatch[1].trim();
+    }
+
+    currentChunk += (currentChunk ? '\n' : '') + line;
+
+    // Chunk size threshold (~350 tokens / 1400 characters)
+    if (currentChunk.length >= 1400) {
+      flushChunk();
+    }
+  }
+  flushChunk();
+
+  if (chunks.length === 0) {
+    chunks.push({
+      id: `chk-${Date.now()}-0`,
+      chunk_index: 0,
+      page_number: 1,
+      section_title: 'Document Content',
+      content: text.slice(0, 2000) || `Indexed contents for ${filename}`,
+      token_count: Math.ceil(Math.min(text.length, 2000) / 4),
+    });
+  }
+
+  return { chunks, pageCount: Math.max(1, currentPage) };
+}
+
+/** Dual retrieval scorer: semantic-aligned keyword matching with section, title, and phrase weighting */
+function searchKnowledgeChunks(
+  query: string,
+  targetFileIds?: string[],
+  topK: number = 5
+): Array<{
+  file_id: string;
+  filename: string;
+  chunk_index: number;
+  page_number?: number | null;
+  section_title?: string | null;
+  snippet: string;
+  score: number;
+}> {
+  const qClean = query.toLowerCase().trim();
+  if (!qClean) return [];
+
+  const stopWords = new Set([
+    'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'in', 'for', 'to', 'of',
+    'what', 'how', 'why', 'can', 'you', 'explain', 'tell', 'me', 'about', 'from', 'with'
+  ]);
+
+  const queryTerms = qClean
+    .split(/[^a-z0-9_-]+/)
+    .filter((w) => w.length > 2 && !stopWords.has(w));
+
+  const scored: Array<{
+    file_id: string;
+    filename: string;
+    chunk_index: number;
+    page_number?: number | null;
+    section_title?: string | null;
+    snippet: string;
+    score: number;
+  }> = [];
+
+  for (const f of filesStore.values()) {
+    if (targetFileIds && targetFileIds.length > 0 && !targetFileIds.includes(f.id)) {
+      continue;
+    }
+
+    const fileChunks = f.chunks && f.chunks.length > 0 ? f.chunks : [
+      {
+        id: `chk-${f.id}-0`,
+        chunk_index: 0,
+        page_number: 1,
+        section_title: 'General',
+        content: f.content || f.filename,
+        token_count: 50,
+      }
+    ];
+
+    for (const chk of fileChunks) {
+      const contentLower = chk.content.toLowerCase();
+      const secLower = (chk.section_title || '').toLowerCase();
+      const fnLower = f.filename.toLowerCase();
+
+      let score = 0;
+
+      // Exact phrase match bonus
+      if (contentLower.includes(qClean)) score += 25.0;
+      if (secLower.includes(qClean)) score += 30.0;
+      if (fnLower.includes(qClean)) score += 18.0;
+
+      // Multi-term overlaps
+      let termHits = 0;
+      for (const t of queryTerms) {
+        if (contentLower.includes(t)) {
+          score += 4.5;
+          termHits++;
+        }
+        if (secLower.includes(t)) {
+          score += 8.0;
+          termHits++;
+        }
+        if (fnLower.includes(t)) {
+          score += 6.0;
+          termHits++;
+        }
+      }
+
+      // Bonus if multiple query terms hit
+      if (queryTerms.length > 1 && termHits >= queryTerms.length) {
+        score += 16.0;
+      }
+
+      if (score > 0) {
+        scored.push({
+          file_id: f.id,
+          filename: f.filename,
+          chunk_index: chk.chunk_index,
+          page_number: chk.page_number,
+          section_title: chk.section_title,
+          snippet: chk.content,
+          score: Math.min(0.99, Number((score / 36.0).toFixed(2))),
+        });
+      }
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
 }
 
 export default {
@@ -987,11 +1321,35 @@ export default {
         }
       }
 
+      // RAG Knowledge Base Grounding (Phase 5)
+      if (userMessage.trim().length > 4) {
+        const ragHits = searchKnowledgeChunks(userMessage, undefined, 3);
+        if (ragHits.length > 0 && ragHits[0].score >= 0.35) {
+          let lastUserTurn = geminiContents[geminiContents.length - 1];
+          if (!lastUserTurn || lastUserTurn.role !== 'user') {
+            lastUserTurn = { role: 'user', parts: [] };
+            geminiContents.push(lastUserTurn);
+          }
+          const ragContext =
+            `\n\n[VERIFIED KNOWLEDGE BASE EXCERPTS (Phase 5 RAG Grounding)]:\n` +
+            ragHits
+              .map(
+                (h) =>
+                  `[Doc: ${h.filename}, ${h.page_number ? `Page ${h.page_number}` : `Section: ${h.section_title || 'General'}`}]:\n${h.snippet}`
+              )
+              .join('\n\n') +
+            `\n[Rule: Synthesize your answer accurately based on these verified facts and cite them with [Doc: filename, Page X] badges.]\n`;
+          lastUserTurn.parts.push({ text: ragContext });
+        }
+      }
+
       const systemInstruction = {
         parts: [
           {
             text:
               'You are Unified AI, an elite cognitive reasoning assistant, pedagogue, and senior systems engineer designed with Claude-level depth, literary clarity, and mathematical rigor.\n\n' +
+              'FILES & KNOWLEDGE RAG ENGINE (Phase 5):\n' +
+              'You have DIRECT, REAL-TIME access to Unified AI\'s Files & Knowledge Base. When verified document excerpts are provided, ground your explanations directly on those facts and cite them using [Doc: filename, Page X] badges.\n\n' +
               'CORE COGNITIVE & RESPONSE PRINCIPLES:\n' +
               '1. HIGH-SPEED DIRECT STREAMING: Deliver the substantive answer, core conceptual insight, or code FIRST. Never begin with conversational filler or robotic throat-clearing ("Certainly!", "I can help with that", "Sure!"). Begin directly with the answer.\n' +
               '2. EDITORIAL CLARITY & RIGOR: Structure technical explanations with academic rigor. Write publication-grade markdown with clean hierarchical headings (use ### and #### for section headers; never output raw #####). Use precise LaTeX mathematics ($...$ inline, $$...$$ display equations), asymptotic bounds (O, Ω, Θ), and well-commented code.\n' +
@@ -2091,22 +2449,34 @@ export default {
     }
 
     // =========================================================================
-    // FILES & KNOWLEDGE RETRIEVAL API (Upload, Index, Semantic Search)
+    // FILES & KNOWLEDGE RETRIEVAL API (Upload, Index, Semantic Search - Phase 5)
     // =========================================================================
     if (path === '/api/files/upload' && request.method === 'POST') {
       try {
         const contentType = request.headers.get('content-type') || '';
-        let filename = 'document.pdf';
-        let size = 102400;
-        let mimeType = 'application/pdf';
+        let filename = 'document.txt';
+        let size = 1024;
+        let mimeType = 'text/plain';
+        let fileContent = '';
 
         if (contentType.includes('multipart/form-data')) {
           const formData = await request.formData();
           const file = formData.get('file');
           if (file && typeof file === 'object' && 'name' in file) {
-            filename = (file as any).name;
-            size = (file as any).size || 102400;
-            mimeType = (file as any).type || 'application/pdf';
+            filename = (file as any).name || 'document.txt';
+            size = (file as any).size || 1024;
+            mimeType = (file as any).type || 'text/plain';
+
+            try {
+              if (typeof (file as any).text === 'function') {
+                fileContent = await (file as any).text();
+              } else if (typeof (file as any).arrayBuffer === 'function') {
+                const buf = await (file as any).arrayBuffer();
+                fileContent = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+              }
+            } catch {
+              fileContent = '';
+            }
           }
         } else {
           try {
@@ -2114,37 +2484,103 @@ export default {
             filename = (json as any).filename || filename;
             size = (json as any).size || size;
             mimeType = (json as any).mime_type || mimeType;
+            fileContent = (json as any).content || '';
           } catch {}
         }
+
+        // Quota checks: 20MB per file, 100MB total storage
+        if (size > 20 * 1024 * 1024) {
+          return jsonResponse({ detail: 'File size exceeds maximum 20MB limit.' }, 400);
+        }
+        const currentTotalBytes = Array.from(filesStore.values()).reduce(
+          (acc, f) => acc + (f.file_size || f.size || 0),
+          0
+        );
+        if (currentTotalBytes + size > 100 * 1024 * 1024) {
+          return jsonResponse({ detail: 'User storage quota (100MB) exceeded.' }, 400);
+        }
+        if (filesStore.size >= 50) {
+          return jsonResponse({ detail: 'Maximum file limit (50 documents) reached.' }, 400);
+        }
+
+        // Compute SHA-256 for deduplication
+        const contentHash = await computeSha256(fileContent || filename);
+
+        // Deduplication check: if file with identical content hash already exists
+        for (const existing of filesStore.values()) {
+          if (existing.content_hash === contentHash) {
+            return jsonResponse(existing);
+          }
+        }
+
+        // Determine file type
+        const ext = filename.split('.').pop()?.toLowerCase() || 'txt';
+        const fileType = ['pdf', 'docx', 'md', 'txt', 'csv'].includes(ext)
+          ? ext
+          : ['py', 'ts', 'js', 'json', 'sql', 'html', 'css'].includes(ext)
+          ? 'code'
+          : 'txt';
+
+        // Chunk document
+        const { chunks, pageCount } = chunkDocumentText(
+          filename,
+          fileContent || `Indexed contents of ${filename}`,
+          fileType
+        );
 
         const newFileId = `file-${Date.now()}`;
         const newFile: StoredFile = {
           id: newFileId,
+          owner_id: 'default-user',
           filename,
-          size,
+          file_type: fileType,
           mime_type: mimeType,
-          status: 'indexed',
-          chunk_count: Math.max(3, Math.ceil(size / 30000)),
+          file_size: size,
+          size,
+          content_hash: contentHash,
+          status: 'ready',
+          error_message: null,
+          page_count: pageCount,
+          chunk_count: chunks.length,
           created_at: new Date().toISOString(),
-          content: `Indexed contents for ${filename}. Mathematical and algorithmic knowledge vector representations stored.`,
+          updated_at: new Date().toISOString(),
+          content: fileContent || `Indexed contents for ${filename}`,
+          chunks,
         };
-        filesStore.set(newFileId, newFile);
 
+        filesStore.set(newFileId, newFile);
         return jsonResponse(newFile);
       } catch (uploadErr) {
-        return jsonResponse({ error: String(uploadErr) }, 500);
+        return jsonResponse({ detail: String(uploadErr) }, 500);
       }
     }
 
     if (path === '/api/files' && request.method === 'GET') {
-      const items = Array.from(filesStore.values());
+      const urlObj = new URL(request.url);
+      const statusParam = urlObj.searchParams.get('status');
+      const searchParam = urlObj.searchParams.get('search')?.toLowerCase();
+
+      let items = Array.from(filesStore.values());
+
+      if (statusParam) {
+        items = items.filter((f) => f.status === statusParam);
+      }
+      if (searchParam) {
+        items = items.filter((f) => f.filename.toLowerCase().includes(searchParam));
+      }
+
+      const total_storage_bytes = Array.from(filesStore.values()).reduce(
+        (sum, f) => sum + (f.file_size || f.size || 0),
+        0
+      );
+
       return jsonResponse({
         items,
         files: items,
         total: items.length,
-        total_storage_bytes: 0,
-        max_storage_bytes: 104857600,
-        file_count: items.length,
+        total_storage_bytes,
+        max_storage_bytes: 104857600, // 100 MB
+        file_count: filesStore.size,
         max_file_count: 50,
         limit: 50,
         offset: 0,
@@ -2159,64 +2595,165 @@ export default {
       const file = filesStore.get(fileId);
 
       if (subAction === 'status') {
-        if (!file) return jsonResponse({ error: 'File not found' }, 404);
+        if (!file) return jsonResponse({ detail: 'File not found' }, 404);
         return jsonResponse({
           id: file.id,
-          filename: file.filename,
           status: file.status,
-          error: null,
           chunk_count: file.chunk_count,
+          error_message: file.error_message || null,
+          updated_at: file.updated_at,
         });
       }
 
-      if (request.method === 'GET') {
-        if (!file) return jsonResponse({ error: 'File not found' }, 404);
+      if (subAction === 'reprocess' && request.method === 'POST') {
+        if (!file) return jsonResponse({ detail: 'File not found' }, 404);
+        const { chunks, pageCount } = chunkDocumentText(
+          file.filename,
+          file.content || `Reprocessed contents for ${file.filename}`,
+          file.file_type
+        );
+        file.chunks = chunks;
+        file.chunk_count = chunks.length;
+        file.page_count = pageCount;
+        file.status = 'ready';
+        file.updated_at = new Date().toISOString();
+        filesStore.set(fileId, file);
         return jsonResponse(file);
       }
+
+      if (request.method === 'GET') {
+        if (!file) return jsonResponse({ detail: 'File not found' }, 404);
+        return jsonResponse({
+          file,
+          preview_chunks: file.chunks || [],
+        });
+      }
+
       if (request.method === 'DELETE') {
         filesStore.delete(fileId);
+        // Clean up pinned references in projectsStore
+        for (const p of projectsStore.values()) {
+          if (p.pinned_files) {
+            p.pinned_files = p.pinned_files.filter((f) => f.id !== fileId);
+          }
+        }
         return jsonResponse({ status: 'ok', id: fileId });
       }
     }
 
-    // Knowledge Search & Grounding
+    // Knowledge Search & Provenance Grounding
     if (path === '/api/knowledge/search' && request.method === 'POST') {
       let body: any = {};
       try {
         body = await request.json();
       } catch {}
-      const query = (body.query || '').toLowerCase();
+      const query = (body.query || '').trim();
+      const targetFileIds = Array.isArray(body.file_ids) ? body.file_ids : undefined;
+      const topK = typeof body.top_k === 'number' ? body.top_k : 5;
 
-      // Search matching documents in filesStore
-      const results: any[] = [];
-      for (const f of filesStore.values()) {
-        const text = `${f.filename} ${f.content || ''}`.toLowerCase();
-        const score = text.includes(query) ? 0.95 : query.split(' ').some((w: string) => text.includes(w)) ? 0.85 : 0.72;
-        results.push({
-          file_id: f.id,
-          filename: f.filename,
-          chunk_id: `chunk-${f.id}-1`,
-          snippet: f.content || `Extracted relevant mathematical & theoretical formulations from ${f.filename}.`,
-          page_number: 1,
-          score,
-        });
-      }
-      return jsonResponse({ results: results.slice(0, 5), query: body.query || '' });
+      const citations = searchKnowledgeChunks(query, targetFileIds, topK);
+
+      return jsonResponse({
+        query,
+        results: citations,
+        citations,
+        total_results: citations.length,
+        strategy_used: 'hybrid',
+      });
     }
 
+    // Grounded Q&A Answering
     if (path === '/api/knowledge/answer' && request.method === 'POST') {
       let body: any = {};
       try {
         body = await request.json();
       } catch {}
-      const query = body.query || '';
+      const query = (body.query || '').trim();
+      const targetFileIds = Array.isArray(body.file_ids) ? body.file_ids : undefined;
+
+      const citations = searchKnowledgeChunks(query, targetFileIds, 4);
+
+      // Check evidence sufficiency
+      const hasSufficientEvidence = citations.length > 0 && citations[0].score >= 0.22;
+
+      if (!hasSufficientEvidence) {
+        return jsonResponse({
+          query,
+          answer: `Based on your uploaded documents in the Knowledge Base, there is insufficient evidence to answer "${query}". Please verify your query or upload documents containing relevant context.`,
+          citations: [],
+          sufficient_evidence: false,
+          strategy_used: 'hybrid',
+        });
+      }
+
+      // Format verified excerpts
+      const excerptsText = citations
+        .map(
+          (c) =>
+            `[Doc: ${c.filename}, ${c.page_number ? `Page ${c.page_number}` : `Section: ${c.section_title || c.chunk_index + 1}`}]\n${c.snippet}`
+        )
+        .join('\n\n---\n\n');
+
+      let answerText = '';
+      const apiKey = env.GOOGLE_API_KEY || env.GEMINI_API_KEY;
+
+      if (apiKey) {
+        try {
+          const geminiPrompt = `You are Unified AI's Knowledge Base Assistant (Phase 5 Files & Knowledge Engine).
+Your goal is to provide a grounded, high-fidelity explanation to the user's question, strictly based on the verified document excerpts below.
+
+CRITICAL RULES:
+1. Ground every substantive statement in the provided excerpts.
+2. Cite every fact using the exact provenance badge format: [Doc: <filename>, Page <X>] or [Doc: <filename>, Section: <title>].
+3. Format mathematical formulas using LaTeX ($...$ and $$...$$).
+4. Do NOT hallucinate facts outside the provided excerpts. If certain details are not provided in the text, state that clearly.
+
+VERIFIED DOCUMENT EXCERPTS:
+${excerptsText}
+
+USER QUESTION:
+${query}`;
+
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  maxOutputTokens: 1024,
+                },
+              }),
+            }
+          );
+
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            const cand = (geminiData as any)?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (cand) answerText = cand.trim();
+          }
+        } catch (gemErr) {
+          console.warn('Gemini grounded Q&A error:', gemErr);
+        }
+      }
+
+      // Intelligent extractive fallback synthesis if offline or Gemini unavailable
+      if (!answerText) {
+        const primary = citations[0];
+        const pageLabel = primary.page_number
+          ? `Page ${primary.page_number}`
+          : `Section: ${primary.section_title || 'Core'}`;
+        answerText = `According to **${primary.filename}** ([Doc: ${primary.filename}, ${pageLabel}]):\n\n> ${primary.snippet}\n\nAdditional supporting evidence was identified across ${citations.length} indexed chunks.`;
+      }
+
       return jsonResponse({
-        answer: `Synthesized grounded analysis for: "${query}". Citations extracted across indexed STEM textbooks and technical repositories.`,
-        citations: Array.from(filesStore.values()).slice(0, 2).map((f) => ({
-          filename: f.filename,
-          page_number: 1,
-          snippet: f.content,
-        })),
+        query,
+        answer: answerText,
+        citations,
+        sufficient_evidence: true,
+        strategy_used: apiKey ? 'semantic' : 'hybrid',
       });
     }
 

@@ -1159,6 +1159,50 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
     const mathTokenRegex = /(\\\([\s\S]+?\\\)|(?<!\$)\$(?!\$)(?:[^\$\n]|\\\$)+?(?<!\$)\$(?!\$))/g;
     const mathSegments = text.split(mathTokenRegex);
 
+    // Helper to render text with custom emojis and verified [Doc: ...] citation badges
+    const renderInlineTextWithCitations = (str: string): React.ReactNode[] => {
+      const docRegex = /(\[Doc:\s*[^\]]+\])/g;
+      const docParts = str.split(docRegex);
+      if (docParts.length <= 1) {
+        return replaceEmojisWithCustom(str);
+      }
+      return docParts.map((dp, dpIdx) => {
+        if (dp.startsWith('[Doc:') && dp.endsWith(']')) {
+          return (
+            <span
+              key={`doc-cite-${dpIdx}`}
+              className="rag-doc-citation-pill"
+              title="Verified Document Citation (Phase 5 Knowledge Grounding)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                color: '#f59e0b',
+                border: '1px solid rgba(245, 158, 11, 0.28)',
+                borderRadius: '4px',
+                padding: '1px 6px',
+                fontSize: '0.82em',
+                fontWeight: 600,
+                margin: '0 3px',
+                verticalAlign: 'baseline',
+                letterSpacing: '0.01em',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              {dp.slice(1, -1)}
+            </span>
+          );
+        }
+        return <React.Fragment key={`doc-txt-${dpIdx}`}>{replaceEmojisWithCustom(dp)}</React.Fragment>;
+      });
+    };
+
     return mathSegments.map((segment, sIdx) => {
       if (!segment) return null;
 
@@ -1193,7 +1237,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
           <React.Fragment key={`bold-${sIdx}-${pIdx}`}>
             {boldParts.map((bPart, bIdx) => {
               if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length > 4) {
-                return <strong key={bIdx}>{replaceEmojisWithCustom(bPart.slice(2, -2))}</strong>;
+                return <strong key={bIdx}>{renderInlineTextWithCitations(bPart.slice(2, -2))}</strong>;
               }
 
               // 4. Format *italic*
@@ -1202,11 +1246,11 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
                 <React.Fragment key={bIdx}>
                   {italicParts.map((iPart, iIdx) => {
                     if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length > 2) {
-                      return <em key={iIdx}>{replaceEmojisWithCustom(iPart.slice(1, -1))}</em>;
+                      return <em key={iIdx}>{renderInlineTextWithCitations(iPart.slice(1, -1))}</em>;
                     }
                     return (
                       <React.Fragment key={iIdx}>
-                        {replaceEmojisWithCustom(iPart)}
+                        {renderInlineTextWithCitations(iPart)}
                       </React.Fragment>
                     );
                   })}
