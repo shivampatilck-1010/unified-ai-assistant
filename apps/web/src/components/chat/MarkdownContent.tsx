@@ -14,6 +14,7 @@ import { InteractiveCalendarEventCard } from '../calendar/InteractiveCalendarEve
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import { CompanyLogo } from '../brand/CompanyLogo';
+import { replaceEmojisWithCustom } from '../common/CustomEmoji';
 import './MarkdownContent.css';
 
 // Initialize Mermaid once with dark theme
@@ -1192,7 +1193,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
           <React.Fragment key={`bold-${sIdx}-${pIdx}`}>
             {boldParts.map((bPart, bIdx) => {
               if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length > 4) {
-                return <strong key={bIdx}>{bPart.slice(2, -2)}</strong>;
+                return <strong key={bIdx}>{replaceEmojisWithCustom(bPart.slice(2, -2))}</strong>;
               }
 
               // 4. Format *italic*
@@ -1201,9 +1202,13 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
                 <React.Fragment key={bIdx}>
                   {italicParts.map((iPart, iIdx) => {
                     if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length > 2) {
-                      return <em key={iIdx}>{iPart.slice(1, -1)}</em>;
+                      return <em key={iIdx}>{replaceEmojisWithCustom(iPart.slice(1, -1))}</em>;
                     }
-                    return iPart;
+                    return (
+                      <React.Fragment key={iIdx}>
+                        {replaceEmojisWithCustom(iPart)}
+                      </React.Fragment>
+                    );
                   })}
                 </React.Fragment>
               );

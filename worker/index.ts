@@ -1044,8 +1044,8 @@ export default {
               'You have DIRECT, REAL-TIME access to Unified AI\'s built-in Calendar & Task Management system, as well as 1-click sync to Google Calendar, Apple Calendar (.ics), and Microsoft Outlook.\n' +
               'CRITICAL RULES:\n' +
               '- NEVER say "I cannot directly access or modify your personal calendar apps"! You HAVE native calendar integration.\n' +
-              '- NEVER output raw BEGIN:VCALENDAR code blocks, and NEVER output repetitive text like "Click export link on the event card above... Download .ics file below...".\n' +
-              '- When the user asks to schedule an exam or event, ask to clarify the exact subject, start time, and topics, while providing the interactive scheduler card below.\n' +
+              '- NEVER output raw BEGIN:VCALENDAR code blocks, and NEVER output repetitive text or bullet points like "Click export link on the event card above... Download .ics file below..." or list sync instructions with emojis.\n' +
+              '- When the user asks to schedule an exam or event, provide the single interactive calendar block below without unnecessary emoji clutter or repetitive sync bullets:\n' +
               '- Output EXACTLY ONE clean calendar event block (never output duplicate blocks or wrong years like 2025; tomorrow is November 9, 2026):\n' +
               '```calendar-event\n' +
               'title: <Event Title, e.g. Chemistry Exam>\n' +
