@@ -13,6 +13,7 @@ import {
   renameConversation as apiRenameConversation,
   deleteConversation as apiDeleteConversation,
   getUserStoragePrefix,
+  getStoredUser,
 } from '../lib/api';
 import { streamChat } from '../lib/streaming';
 
@@ -33,17 +34,6 @@ function loadStoredConversations(): ConversationSummary[] {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-    // Backward compatibility: If guest has legacy un-scoped conversations, migrate them to guest
-    if (key === 'guest_conversations_v2') {
-      const legacyRaw = localStorage.getItem('unified_ai_conversations_v2');
-      if (legacyRaw) {
-        const parsed = JSON.parse(legacyRaw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          localStorage.setItem(key, legacyRaw);
-          return parsed;
-        }
-      }
-    }
   } catch {}
   return [];
 }
@@ -62,14 +52,6 @@ function loadStoredMessages(convId: string): ChatMessage[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
-    }
-    // Backward compatibility for guest
-    if (msgPrefix.startsWith('guest_')) {
-      const legacyRaw = localStorage.getItem(`unified_ai_conv_messages_v2_${convId}`);
-      if (legacyRaw) {
-        const parsed = JSON.parse(legacyRaw);
-        if (Array.isArray(parsed)) return parsed;
-      }
     }
   } catch {}
   return [];
@@ -204,14 +186,23 @@ export function useConversations(backendConnected: boolean = true) {
 
   // Sync conversations list to user-scoped localStorage
   useEffect(() => {
-    if (conversations.length > 0) {
-      saveStoredConversations(conversations);
-    }
+    saveStoredConversations(conversations);
   }, [conversations]);
 
   // Listen for login/logout/account-switch events to cleanly swap user conversations
   useEffect(() => {
-    const handleAuthChange = () => {
+    const handleAuthChange = (event: Event) => {
+      const customEvt = event as CustomEvent<{ user: unknown }>;
+      const isLoggingOut = customEvt?.detail ? !customEvt.detail.user : !getStoredUser();
+
+      if (isLoggingOut) {
+        // Complete clean state on logout: no conversation loaded, zero messages
+        setConversations([]);
+        setActiveId(null);
+        setActiveConversation(null);
+        return;
+      }
+
       const freshConvs = loadStoredConversations();
       setConversations(freshConvs);
       const { activeId: key } = getStorageKeys();

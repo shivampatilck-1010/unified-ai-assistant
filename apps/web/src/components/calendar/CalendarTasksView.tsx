@@ -132,7 +132,7 @@ export function CalendarTasksView() {
       let localTasks: Task[] = [];
       try {
         const prefix = getUserStoragePrefix();
-        const raw = localStorage.getItem(`${prefix}tasks_v1`) || (prefix === 'guest_' ? localStorage.getItem('unified_ai_tasks_v1') : null);
+        const raw = localStorage.getItem(`${prefix}tasks_v1`);
         if (raw) localTasks = JSON.parse(raw);
       } catch {}
       if (localTasks.length > 0) {
@@ -159,7 +159,7 @@ export function CalendarTasksView() {
       setOccurrences(res.occurrences || []);
       try {
         const prefix = getUserStoragePrefix();
-        const raw = localStorage.getItem(`${prefix}calendar_events_v1`) || (prefix === 'guest_' ? localStorage.getItem('unified_ai_calendar_events_v1') : null);
+        const raw = localStorage.getItem(`${prefix}calendar_events_v1`);
         if (raw) {
           const localEvents = JSON.parse(raw);
           if (Array.isArray(localEvents) && localEvents.length > 0) {

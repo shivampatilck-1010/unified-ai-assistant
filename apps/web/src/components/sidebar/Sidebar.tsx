@@ -367,6 +367,7 @@ export function Sidebar({
         onLogout={() => {
           void logoutUser();
           setUser(null);
+          onNewChat();
         }}
       />
     </>

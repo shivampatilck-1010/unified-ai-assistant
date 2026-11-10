@@ -369,6 +369,8 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   const lower = (targetModel + ' ' + stripped).toLowerCase();
   let provider = 'google';
   let modelId = 'gemini-2.5-flash';
+  let themeColor = '#38bdf8';
+  let accentBorder = 'rgba(56, 189, 248, 0.35)';
 
   if (lower.includes('nemotron') || lower.includes('nvidia')) {
     provider = 'nvidia';
@@ -376,6 +378,8 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   } else if (lower.includes('deepseek')) {
     provider = 'deepseek';
     modelId = 'deepseek-r1';
+    themeColor = '#4f46e5';
+    accentBorder = 'rgba(79, 70, 229, 0.35)';
   } else if (lower.includes('groq') || lower.includes('gpt-oss') || lower.includes('lpu')) {
     provider = 'groq';
     modelId = lower.includes('qwen') ? 'qwen' : 'gpt-oss-120b';
@@ -388,23 +392,41 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   } else if (lower.includes('openai') || lower.includes('gpt-4') || lower.includes('gpt-5') || lower.includes('o3-mini') || lower.includes('o1')) {
     provider = 'openai';
     modelId = 'gpt-4o';
+    themeColor = '#10a37f';
+    accentBorder = 'rgba(16, 163, 127, 0.35)';
   } else if (lower.includes('anthropic') || lower.includes('claude')) {
     provider = 'anthropic';
     modelId = 'claude';
+    themeColor = '#D97757';
+    accentBorder = 'rgba(217, 119, 87, 0.35)';
   } else if (lower.includes('gemini') || lower.includes('google')) {
     provider = 'google';
     modelId = lower.includes('pro') ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+    themeColor = '#38bdf8';
+    accentBorder = 'rgba(56, 189, 248, 0.35)';
   }
 
   return (
-    <div className="md-autoroute-banner">
+    <div
+      className="md-autoroute-banner"
+      style={{
+        '--autoroute-accent': themeColor,
+        '--autoroute-border': accentBorder,
+      } as React.CSSProperties}
+    >
+      <div className="md-autoroute-banner__glow" aria-hidden="true" />
       <div className="md-autoroute-banner__left">
         <div className="md-autoroute-banner__logo">
-          <CompanyLogo provider={provider} modelId={modelId} size={18} />
+          <div className="md-autoroute-banner__logo-aura" aria-hidden="true" />
+          <CompanyLogo provider={provider} modelId={modelId} size={19} />
         </div>
         <div className="md-autoroute-banner__info">
           <div className="md-autoroute-banner__title">
-            <span className="md-autoroute-banner__prefix">Auto-Routed to</span>
+            <span className="md-autoroute-banner__badge">
+              <span className="md-autoroute-banner__pulse-dot" />
+              AUTO-ROUTED
+            </span>
+            <span className="md-autoroute-banner__arrow">→</span>
             <strong className="md-autoroute-banner__name">{targetModel}</strong>
           </div>
           {taskDomain && (
@@ -414,6 +436,12 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
             </div>
           )}
         </div>
+      </div>
+      <div className="md-autoroute-banner__status">
+        <span className="md-autoroute-banner__status-pill">
+          <span className="md-autoroute-banner__ping" />
+          Optimal Route
+        </span>
       </div>
     </div>
   );
@@ -1366,6 +1394,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
     let injectedGraphSim = false;
     let injectedHashSim = false;
     let injectedStackSim = false;
+    let hasRenderedAutoRouteBanner = false;
 
     const flushList = () => {
       if (listItems.length === 0) return;
@@ -1440,6 +1469,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       autoDetectedFile = fileMentionMatch[1];
     }
 
+    hasRenderedAutoRouteBanner = false;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
@@ -1682,12 +1712,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
           (fullBq.includes('Model:') && (fullBq.includes('Inference') || fullBq.includes('API'))) ||
           (fullBq.includes('Routing') && fullBq.includes('to'))
         ) {
-          nodes.push(
-            <AutoRouteBanner
-              key={`autoroute-${nodes.length}`}
-              rawText={fullBq}
-            />
-          );
+          if (!hasRenderedAutoRouteBanner) { nodes.push(<AutoRouteBanner key={`autoroute-${nodes.length}`} rawText={fullBq} />); hasRenderedAutoRouteBanner = true; }
         } else {
           const isPromptLike =
             /^(?:["“]|act as|please act as|i have been studying|prompt|quiz me)/i.test(fullBq) ||
@@ -1742,12 +1767,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
               break;
             }
           }
-          nodes.push(
-            <AutoRouteBanner
-              key={`autoroute-${nodes.length}`}
-              rawText={bannerLines.join('\n')}
-            />
-          );
+          if (!hasRenderedAutoRouteBanner) { nodes.push(<AutoRouteBanner key={`autoroute-${nodes.length}`} rawText={bannerLines.join('\n')} />); hasRenderedAutoRouteBanner = true; }
           isPreviousLinePromptIntro = false;
         } else {
           const isPromptIntro =

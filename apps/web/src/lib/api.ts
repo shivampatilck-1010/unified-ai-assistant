@@ -264,6 +264,109 @@ export function getUserStoragePrefix(): string {
   return 'guest_';
 }
 
+export function purgeGuestStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('guest_conversations_v2');
+    localStorage.removeItem('guest_active_id_v2');
+    localStorage.removeItem('unified_ai_conversations_v2');
+    localStorage.removeItem('unified_ai_active_id_v2');
+    localStorage.removeItem('guest_tasks_v1');
+    localStorage.removeItem('unified_ai_tasks_v1');
+    localStorage.removeItem('guest_calendar_events_v1');
+    localStorage.removeItem('unified_ai_calendar_events_v1');
+
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('guest_conv_messages_') || key.startsWith('unified_ai_conv_messages_'))) {
+        toRemove.push(key);
+      }
+    }
+    for (const key of toRemove) {
+      localStorage.removeItem(key);
+    }
+  } catch {}
+}
+
+export function claimGuestDataToUser(user: UserProfile): void {
+  if (typeof window === 'undefined' || !user?.id) return;
+  try {
+    const safeUserId = user.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const userPrefix = `u_${safeUserId}_`;
+    const userConvsKey = `${userPrefix}conversations_v2`;
+
+    // 1. Claim guest conversations
+    const guestConvsRaw = localStorage.getItem('guest_conversations_v2') || localStorage.getItem('unified_ai_conversations_v2');
+    if (guestConvsRaw) {
+      try {
+        const guestConvs = JSON.parse(guestConvsRaw);
+        if (Array.isArray(guestConvs) && guestConvs.length > 0) {
+          const userConvsRaw = localStorage.getItem(userConvsKey);
+          const userConvs = userConvsRaw ? JSON.parse(userConvsRaw) : [];
+          const userConvsMap = new Map<string, unknown>(userConvs.map((c: { id: string }) => [c.id, c]));
+
+          for (const conv of guestConvs) {
+            const updatedConv = { ...conv, owner_id: user.id };
+            userConvsMap.set(conv.id, updatedConv);
+
+            // Move messages
+            const msgKeys = [
+              `guest_conv_messages_v2_${conv.id}`,
+              `unified_ai_conv_messages_v2_${conv.id}`,
+            ];
+            for (const mk of msgKeys) {
+              const msgsRaw = localStorage.getItem(mk);
+              if (msgsRaw) {
+                localStorage.setItem(`${userPrefix}conv_messages_v2_${conv.id}`, msgsRaw);
+                localStorage.removeItem(mk);
+              }
+            }
+          }
+          localStorage.setItem(userConvsKey, JSON.stringify(Array.from(userConvsMap.values())));
+        }
+      } catch {}
+    }
+
+    // 2. Claim guest tasks
+    const guestTasksRaw = localStorage.getItem('guest_tasks_v1') || localStorage.getItem('unified_ai_tasks_v1');
+    if (guestTasksRaw) {
+      try {
+        const guestTasks = JSON.parse(guestTasksRaw);
+        if (Array.isArray(guestTasks) && guestTasks.length > 0) {
+          const userTasksKey = `${userPrefix}tasks_v1`;
+          const userTasksRaw = localStorage.getItem(userTasksKey);
+          const userTasks = userTasksRaw ? JSON.parse(userTasksRaw) : [];
+          const map = new Map<string, unknown>(userTasks.map((t: { id: string }) => [t.id, t]));
+          guestTasks.forEach((t: { id: string }) => map.set(t.id, t));
+          localStorage.setItem(userTasksKey, JSON.stringify(Array.from(map.values())));
+        }
+      } catch {}
+    }
+
+    // 3. Claim guest calendar events
+    const guestEventsRaw = localStorage.getItem('guest_calendar_events_v1') || localStorage.getItem('unified_ai_calendar_events_v1');
+    if (guestEventsRaw) {
+      try {
+        const guestEvents = JSON.parse(guestEventsRaw);
+        if (Array.isArray(guestEvents) && guestEvents.length > 0) {
+          const userEventsKey = `${userPrefix}calendar_events_v1`;
+          const userEventsRaw = localStorage.getItem(userEventsKey);
+          const userEvents = userEventsRaw ? JSON.parse(userEventsRaw) : [];
+          const map = new Map<string, unknown>(userEvents.map((e: { id: string }) => [e.id, e]));
+          guestEvents.forEach((e: { id: string }) => map.set(e.id, e));
+          localStorage.setItem(userEventsKey, JSON.stringify(Array.from(map.values())));
+        }
+      } catch {}
+    }
+
+    // 4. Purge all guest and legacy un-scoped keys so no personal data remains in guest storage
+    purgeGuestStorage();
+  } catch (err) {
+    console.warn('Error claiming guest data:', err);
+  }
+}
+
 export function notifyAuthChange(user: UserProfile | null): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('unified-ai-auth-change', { detail: { user } }));
@@ -274,6 +377,7 @@ export function setStoredUser(user: UserProfile | null): void {
   if (typeof window === 'undefined') return;
   if (user) {
     localStorage.setItem('unified_ai_user', JSON.stringify(user));
+    claimGuestDataToUser(user);
   } else {
     localStorage.removeItem('unified_ai_user');
   }
@@ -342,6 +446,7 @@ export async function logoutUser(): Promise<void> {
   }
   setAuthToken(null);
   setStoredUser(null);
+  purgeGuestStorage();
 }
 
 export interface FollowupEmailPayload {
