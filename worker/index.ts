@@ -2456,29 +2456,33 @@ export default {
             }
           }
 
-          // Persist conversation and messages to worker in-memory store
+          // Persist conversation and messages to worker in-memory store & Cloudflare D1
+          const nowIso = new Date().toISOString();
+          const userMsgId = `msg-${Date.now()}-u`;
+          const convTitle = (userMessage || 'Chat').slice(0, 36).trim();
+
           try {
             let conv = conversationsStore.get(conversationId);
             if (!conv) {
               conv = {
                 id: conversationId,
                 owner_id: streamOwnerId,
-                title: (userMessage || 'Chat').slice(0, 36).trim(),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                title: convTitle,
+                created_at: nowIso,
+                updated_at: nowIso,
                 messages: [],
               };
               conversationsStore.set(conversationId, conv);
             } else if (conv.owner_id === 'guest' && streamOwnerId !== 'guest') {
               conv.owner_id = streamOwnerId;
             }
-            conv.updated_at = new Date().toISOString();
+            conv.updated_at = nowIso;
             if (userMessage || (body.attachments && body.attachments.length > 0)) {
               conv.messages.push({
-                id: `msg-${Date.now()}-u`,
+                id: userMsgId,
                 role: 'user',
                 content: userMessage,
-                created_at: new Date().toISOString(),
+                created_at: nowIso,
                 attachments: body.attachments,
               });
             }
@@ -2487,11 +2491,63 @@ export default {
                 id: messageId,
                 role: 'assistant',
                 content: accumulatedAssistantText,
-                created_at: new Date().toISOString(),
+                created_at: nowIso,
               });
             }
           } catch (persistErr) {
             console.warn('Worker in-memory store error:', persistErr);
+          }
+
+          // Durable Cloudflare D1 persistence for multi-device sync
+          if (env.DB && streamOwnerId !== 'guest') {
+            try {
+              await env.DB.prepare(
+                `INSERT INTO user_conversations (id, user_id, title, project_id, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(id, user_id) DO UPDATE SET updated_at = excluded.updated_at, title = excluded.title`
+              ).bind(
+                conversationId,
+                streamOwnerId,
+                convTitle,
+                body.project_id || null,
+                nowIso,
+                nowIso
+              ).run();
+
+              if (userMessage || (body.attachments && body.attachments.length > 0)) {
+                await env.DB.prepare(
+                  `INSERT INTO user_messages (id, conversation_id, user_id, role, content, attachments, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET content = excluded.content`
+                ).bind(
+                  userMsgId,
+                  conversationId,
+                  streamOwnerId,
+                  'user',
+                  userMessage,
+                  body.attachments ? JSON.stringify(body.attachments) : null,
+                  nowIso
+                ).run();
+              }
+
+              if (accumulatedAssistantText) {
+                await env.DB.prepare(
+                  `INSERT INTO user_messages (id, conversation_id, user_id, role, content, attachments, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET content = excluded.content`
+                ).bind(
+                  messageId,
+                  conversationId,
+                  streamOwnerId,
+                  'assistant',
+                  accumulatedAssistantText,
+                  null,
+                  nowIso
+                ).run();
+              }
+            } catch (dbErr) {
+              console.warn('D1 conversation save error:', dbErr);
+            }
           }
 
           await sendSSE('message_complete', {
@@ -2530,44 +2586,161 @@ export default {
       });
     }
 
-    // Conversations stateful endpoints
+    // Conversations stateful endpoints (with Cloudflare D1 multi-device sync)
     if (path === '/api/conversations') {
       const ownerId = await getRequestOwnerId(request, env);
       if (request.method === 'GET') {
-        const items = Array.from(conversationsStore.values())
-          .filter((c) => c.owner_id === ownerId)
-          .map((c) => ({
-            id: c.id,
-            owner_id: c.owner_id,
-            title: c.title,
-            project_id: c.project_id,
-            created_at: c.created_at,
-            updated_at: c.updated_at,
-            message_count: c.messages.length,
-          }));
-        items.sort(
+        const itemsMap = new Map<string, {
+          id: string;
+          owner_id: string;
+          title: string;
+          project_id: string | null;
+          created_at: string;
+          updated_at: string;
+          message_count?: number;
+        }>();
+
+        // 1. Query Cloudflare D1 for authenticated user
+        if (env.DB && ownerId !== 'guest') {
+          try {
+            const dbConvs = await env.DB.prepare(
+              'SELECT id, user_id, title, project_id, created_at, updated_at FROM user_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50'
+            ).bind(ownerId).all<any>();
+            if (dbConvs.results) {
+              for (const r of dbConvs.results) {
+                itemsMap.set(r.id, {
+                  id: r.id,
+                  owner_id: r.user_id,
+                  title: r.title,
+                  project_id: r.project_id || null,
+                  created_at: r.created_at,
+                  updated_at: r.updated_at,
+                });
+              }
+            }
+          } catch (dbErr) {
+            console.warn('D1 conversations load error:', dbErr);
+          }
+        }
+
+        // 2. Merge with in-memory store
+        const memoryItems = Array.from(conversationsStore.values())
+          .filter((c) => c.owner_id === ownerId);
+        for (const c of memoryItems) {
+          if (!itemsMap.has(c.id)) {
+            itemsMap.set(c.id, {
+              id: c.id,
+              owner_id: c.owner_id,
+              title: c.title,
+              project_id: c.project_id,
+              created_at: c.created_at,
+              updated_at: c.updated_at,
+              message_count: c.messages.length,
+            });
+          }
+        }
+
+        const mergedItems = Array.from(itemsMap.values());
+        mergedItems.sort(
           (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         );
-        return jsonResponse({ items, total: items.length, limit: 50, offset: 0 });
+        return jsonResponse({ items: mergedItems, total: mergedItems.length, limit: 50, offset: 0 });
       }
+
       if (request.method === 'POST') {
         let convBody: any = {};
         try {
           convBody = await request.json();
         } catch {}
         const id = convBody.id || `conv-${Date.now()}`;
+        const nowIso = new Date().toISOString();
         const newConv: StoredConv = {
           id,
           owner_id: ownerId,
           title: convBody.title || 'New Chat',
           project_id: convBody.project_id || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: convBody.created_at || nowIso,
+          updated_at: convBody.updated_at || nowIso,
           messages: [],
         };
         conversationsStore.set(id, newConv);
+
+        if (env.DB && ownerId !== 'guest') {
+          try {
+            await env.DB.prepare(
+              `INSERT INTO user_conversations (id, user_id, title, project_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id, user_id) DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at`
+            ).bind(
+              id,
+              ownerId,
+              newConv.title,
+              newConv.project_id,
+              newConv.created_at,
+              newConv.updated_at
+            ).run();
+          } catch (dbErr) {
+            console.warn('D1 insert conversation error:', dbErr);
+          }
+        }
+
         return jsonResponse(newConv);
       }
+    }
+
+    // Endpoint for devices to sync local-first conversations into Cloudflare D1
+    if (path === '/api/conversations/sync' && request.method === 'POST') {
+      const ownerId = await getRequestOwnerId(request, env);
+      if (ownerId === 'guest') {
+        return jsonResponse({ detail: 'Authentication required to sync conversations.' }, 401);
+      }
+      let body: any = {};
+      try {
+        body = await request.json();
+      } catch {}
+
+      const convsToSync: any[] = Array.isArray(body.conversations) ? body.conversations : [];
+      if (env.DB && convsToSync.length > 0) {
+        try {
+          for (const conv of convsToSync) {
+            if (!conv.id) continue;
+            await env.DB.prepare(
+              `INSERT INTO user_conversations (id, user_id, title, project_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id, user_id) DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at`
+            ).bind(
+              conv.id,
+              ownerId,
+              conv.title || 'Conversation',
+              conv.project_id || null,
+              conv.created_at || new Date().toISOString(),
+              conv.updated_at || new Date().toISOString()
+            ).run();
+
+            if (Array.isArray(conv.messages)) {
+              for (const m of conv.messages) {
+                if (!m.id || !m.content) continue;
+                await env.DB.prepare(
+                  `INSERT INTO user_messages (id, conversation_id, user_id, role, content, attachments, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET content = excluded.content`
+                ).bind(
+                  m.id,
+                  conv.id,
+                  ownerId,
+                  m.role || 'user',
+                  m.content,
+                  m.attachments ? JSON.stringify(m.attachments) : null,
+                  m.created_at || new Date().toISOString()
+                ).run();
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Sync to D1 error:', syncErr);
+        }
+      }
+      return jsonResponse({ status: 'ok', synced: convsToSync.length });
     }
 
     if (path.startsWith('/api/conversations/')) {
@@ -2575,7 +2748,43 @@ export default {
       const id = parts[3];
       const ownerId = await getRequestOwnerId(request, env);
       const conv = conversationsStore.get(id);
+
       if (request.method === 'GET') {
+        // First check D1 database for authenticated user
+        if (env.DB && ownerId !== 'guest') {
+          try {
+            const dbConv = await env.DB.prepare(
+              'SELECT id, user_id, title, project_id, created_at, updated_at FROM user_conversations WHERE id = ? AND user_id = ?'
+            ).bind(id, ownerId).first<any>();
+
+            if (dbConv) {
+              const dbMsgs = await env.DB.prepare(
+                'SELECT id, role, content, attachments, created_at FROM user_messages WHERE conversation_id = ? AND user_id = ? ORDER BY created_at ASC'
+              ).bind(id, ownerId).all<any>();
+
+              const messages = (dbMsgs.results || []).map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                attachments: m.attachments ? JSON.parse(m.attachments) : undefined,
+                created_at: m.created_at,
+              }));
+
+              return jsonResponse({
+                id: dbConv.id,
+                owner_id: dbConv.user_id,
+                title: dbConv.title,
+                project_id: dbConv.project_id || undefined,
+                created_at: dbConv.created_at,
+                updated_at: dbConv.updated_at,
+                messages,
+              });
+            }
+          } catch (dbErr) {
+            console.warn('D1 conversation get error:', dbErr);
+          }
+        }
+
         if (conv && conv.owner_id === ownerId) return jsonResponse(conv);
         return jsonResponse({
           id,
@@ -2586,19 +2795,35 @@ export default {
           messages: [],
         });
       }
+
       if (request.method === 'PATCH') {
         let convBody: any = {};
         try {
           convBody = await request.json();
         } catch {}
+        const nowIso = new Date().toISOString();
+        if (env.DB && ownerId !== 'guest') {
+          try {
+            await env.DB.prepare(
+              'UPDATE user_conversations SET title = COALESCE(?, title), updated_at = ? WHERE id = ? AND user_id = ?'
+            ).bind(convBody.title || null, nowIso, id, ownerId).run();
+          } catch {}
+        }
         if (conv && conv.owner_id === ownerId) {
           if (convBody.title) conv.title = convBody.title;
-          conv.updated_at = new Date().toISOString();
+          conv.updated_at = nowIso;
           return jsonResponse(conv);
         }
         return jsonResponse({ id, title: convBody.title || 'Conversation' });
       }
+
       if (request.method === 'DELETE') {
+        if (env.DB && ownerId !== 'guest') {
+          try {
+            await env.DB.prepare('DELETE FROM user_conversations WHERE id = ? AND user_id = ?').bind(id, ownerId).run();
+            await env.DB.prepare('DELETE FROM user_messages WHERE conversation_id = ? AND user_id = ?').bind(id, ownerId).run();
+          } catch {}
+        }
         if (conv && conv.owner_id === ownerId) {
           conversationsStore.delete(id);
         }

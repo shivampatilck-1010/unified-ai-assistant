@@ -9,6 +9,8 @@ const secret = 'worker-test-signing-key-that-is-at-least-32-characters';
 class MemoryD1 {
   constructor() {
     this.files = new Map();
+    this.conversations = new Map();
+    this.messages = new Map();
   }
 
   prepare(query) {
@@ -18,6 +20,11 @@ class MemoryD1 {
           if (query.startsWith('SELECT file_path, content, sha256')) {
             const [userId, filePath] = values;
             return this.files.get(`${userId}\0${filePath}`) || null;
+          }
+          if (query.startsWith('SELECT id, user_id, title, project_id')) {
+            const [id, userId] = values;
+            const c = this.conversations.get(`${userId}\0${id}`);
+            return c || null;
           }
           if (query.startsWith('SELECT COUNT(*)')) {
             const userId = values[0];
@@ -44,9 +51,44 @@ class MemoryD1 {
                 })),
             };
           }
+          if (query.startsWith('SELECT id, user_id, title, project_id')) {
+            const userId = values[0];
+            return {
+              results: [...this.conversations.values()].filter((row) => row.user_id === userId),
+            };
+          }
+          if (query.startsWith('SELECT id, role, content, attachments')) {
+            const [convId, userId] = values;
+            return {
+              results: [...this.messages.values()].filter((m) => m.conversation_id === convId && m.user_id === userId),
+            };
+          }
           throw new Error(`Unexpected D1 all query: ${query}`);
         },
         run: async () => {
+          if (query.startsWith('INSERT INTO user_conversations')) {
+            const [id, userId, title, projectId, createdAt, updatedAt] = values;
+            const key = `${userId}\0${id}`;
+            this.conversations.set(key, { id, user_id: userId, title, project_id: projectId, created_at: createdAt, updated_at: updatedAt });
+            return { meta: { changes: 1 } };
+          }
+          if (query.startsWith('INSERT INTO user_messages')) {
+            const [id, convId, userId, role, content, attachments, createdAt] = values;
+            this.messages.set(id, { id, conversation_id: convId, user_id: userId, role, content, attachments, created_at: createdAt });
+            return { meta: { changes: 1 } };
+          }
+          if (query.startsWith('DELETE FROM user_conversations')) {
+            const [id, userId] = values;
+            this.conversations.delete(`${userId}\0${id}`);
+            return { meta: { changes: 1 } };
+          }
+          if (query.startsWith('DELETE FROM user_messages')) {
+            const [convId, userId] = values;
+            for (const [key, msg] of this.messages.entries()) {
+              if (msg.conversation_id === convId && msg.user_id === userId) this.messages.delete(key);
+            }
+            return { meta: { changes: 1 } };
+          }
           if (query.startsWith('INSERT')) {
             const [userId, filePath, content, sha256, updatedAt] = values;
             const key = `${userId}\0${filePath}`;

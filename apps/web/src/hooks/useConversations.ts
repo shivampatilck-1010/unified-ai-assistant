@@ -14,6 +14,7 @@ import {
   deleteConversation as apiDeleteConversation,
   getUserStoragePrefix,
   getStoredUser,
+  syncConversations,
 } from '../lib/api';
 import { streamChat } from '../lib/streaming';
 
@@ -248,6 +249,14 @@ export function useConversations(backendConnected: boolean = true) {
                   updated_at: res.items[0].updated_at || new Date().toISOString(),
                   messages: cached,
                 });
+                if (cached.length === 0) {
+                  void fetchConversation(firstId).then((full) => {
+                    if (full && Array.isArray(full.messages) && full.messages.length > 0) {
+                      saveStoredMessages(firstId, full.messages);
+                      setActiveConversation(full);
+                    }
+                  });
+                }
               }
             }
           })
@@ -270,10 +279,32 @@ export function useConversations(backendConnected: boolean = true) {
       setIsLoading(true);
       setError(null);
       const res = await fetchConversations(50, 0);
-      if (res.items) {
-        setConversations(res.items);
-        saveStoredConversations(res.items);
+      const serverItems = res.items || [];
+      const localStored = loadStoredConversations();
+
+      // Multi-device sync: If this device has local conversations missing on server (e.g. created offline or before D1),
+      // proactively upload and sync them to Cloudflare D1 so all other devices receive them
+      const missingOnServer = localStored.filter(
+        (local) => !serverItems.some((srv) => srv.id === local.id)
+      );
+      if (missingOnServer.length > 0) {
+        const payload = missingOnServer.map((c) => ({
+          ...c,
+          messages: loadStoredMessages(c.id),
+        }));
+        void syncConversations(payload).catch(() => {});
       }
+
+      // Merge server items + local items
+      const map = new Map<string, ConversationSummary>();
+      serverItems.forEach((item) => map.set(item.id, item));
+      localStored.forEach((item) => {
+        if (!map.has(item.id)) map.set(item.id, item);
+      });
+      const merged = Array.from(map.values());
+      merged.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      setConversations(merged);
+      saveStoredConversations(merged);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
     } finally {

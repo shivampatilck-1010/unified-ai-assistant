@@ -619,6 +619,20 @@ export async function fetchProviderStatus(signal?: AbortSignal): Promise<Unified
 
 // Conversation Endpoints
 
+export async function syncConversations(conversations: Array<Record<string, unknown>>): Promise<void> {
+  if (!conversations || conversations.length === 0) return;
+  try {
+    const url = buildUrl('/api/conversations/sync');
+    await fetch(url.toString(), {
+      method: 'POST',
+      headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ conversations }),
+    });
+  } catch (err) {
+    console.warn('Sync conversations error:', err);
+  }
+}
+
 export async function fetchConversations(
   limit: number = 50,
   offset: number = 0,
