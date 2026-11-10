@@ -9,11 +9,25 @@ services:
     envVars:
       - key: PORT
         value: 8000
-      - key: APP_ENV
+      - key: ENVIRONMENT
         value: production
+      - key: IS_PRODUCTION
+        value: "true"
+      - key: AUTH_MODE
+        value: jwt
+      - key: ALLOW_DEV_AUTH
+        value: "false"
+      - key: ENABLE_CODING_TESTS
+        value: "false"
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: CORS_ORIGINS
-        value: "https://unified-ai-assistant.pages.dev,http://localhost:5173"
-      - key: DATA_DIR
-        value: /app/services/api/data
+        value: "https://unified-ai-assistant.pages.dev"
+      - key: STORAGE_DIR
+        value: /var/data/storage

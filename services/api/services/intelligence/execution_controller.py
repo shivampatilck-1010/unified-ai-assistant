@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .context_manager import UnifiedContext
 from .task_planner import StructuredPlan
+from config import get_settings
 from services.coding_agent import CodingAgent
 from services.data_analysis import DataAnalysisEngine
 from services.automation_service import AutomationService
@@ -105,19 +106,30 @@ class ExecutionController:
                 if on_step_progress:
                     await on_step_progress("💻 Inspecting workspace & executing code validation...")
 
-                coding_agent = CodingAgent()
-                files = coding_agent.inspect_workspace(max_files=15)
-                # Run pytest validation
-                test_res = await coding_agent.run_tests(timeout_seconds=15)
-                outcome["files_inspected"] = len(files)
-                outcome["tests_passed"] = test_res.passed
-                outcome["result_summary"] = (
-                    f"### 💻 Autonomous Coding Agent Verification\n"
-                    f"- **Files Inspected:** {len(files)} files in authorized workspace\n"
-                    f"- **Test Suite Status:** {'✅ PASSED' if test_res.passed else '❌ FAILED'} (Exit Code {test_res.exit_code}, {test_res.duration_seconds}s)\n\n"
-                    f"```text\n{test_res.stdout[:500]}\n```"
+                settings = get_settings()
+                coding_agent = CodingAgent.for_user(
+                    context.user_id,
+                    settings.coding_workspace_root,
                 )
-                evidence.append({"type": "code_test", "passed": test_res.passed, "exit_code": test_res.exit_code})
+                files = coding_agent.inspect_workspace(max_files=15)
+                outcome["files_inspected"] = len(files)
+                if settings.enable_coding_tests:
+                    test_res = await coding_agent.run_tests(timeout_seconds=15)
+                    outcome["tests_passed"] = test_res.passed
+                    outcome["result_summary"] = (
+                        f"### 💻 Coding Workspace Verification\n"
+                        f"- **Files Inspected:** {len(files)} files in your private workspace\n"
+                        f"- **Test Suite Status:** {'✅ PASSED' if test_res.passed else '❌ FAILED'} (Exit Code {test_res.exit_code}, {test_res.duration_seconds}s)\n\n"
+                        f"```text\n{test_res.stdout[:500]}\n```"
+                    )
+                    evidence.append({"type": "code_test", "passed": test_res.passed, "exit_code": test_res.exit_code})
+                else:
+                    outcome["tests_enabled"] = False
+                    outcome["result_summary"] = (
+                        "### 💻 Coding Workspace\n"
+                        f"- **Files Inspected:** {len(files)} files in your private workspace\n"
+                        "- **Test Suite Status:** Disabled by server configuration."
+                    )
             except Exception as e:
                 logger.error("Coding execution error: %s", e)
                 outcome["status"] = "failed"

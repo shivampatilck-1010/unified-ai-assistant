@@ -42,6 +42,7 @@ class TokenData:
     iss: Optional[str] = None
     aud: Optional[str] = None
     role: str = "user"
+    profile: Optional[Dict[str, str]] = None
 
     def __getitem__(self, item: str) -> Any:
         if item == "sub":
@@ -77,6 +78,7 @@ def create_access_token(
     audience: Optional[str] = "unified-ai-assistant-api",
     role: str = "user",
     algorithm: str = "HS256",
+    profile: Optional[Dict[str, str]] = None,
 ) -> str:
     """Generates a cryptographically signed HMAC-SHA256 JWT access token."""
     if not secret_key or len(secret_key) < 16:
@@ -98,6 +100,7 @@ def create_access_token(
         "iss": issuer,
         "aud": audience,
         "role": role,
+        "profile": profile,
     }
 
     header_b64 = _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
@@ -187,4 +190,5 @@ def decode_and_validate_token(
         iss=payload.get("iss"),
         aud=payload.get("aud"),
         role=payload.get("role", "user"),
+        profile=payload.get("profile") if isinstance(payload.get("profile"), dict) else None,
     )

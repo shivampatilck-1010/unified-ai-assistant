@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from config import get_settings
 from routers.deps import get_current_user_id
 from services.intelligence import IntelligenceCore
 from services.coding_agent import CodingAgent
@@ -24,24 +25,28 @@ class IntelligenceProcessRequest(BaseModel):
 
 
 class CodingInspectRequest(BaseModel):
-    workspace_path: Optional[str] = None
-    max_files: int = 50
+    max_files: int = Field(default=100, ge=1, le=500)
 
 
 class CodingReadRequest(BaseModel):
-    file_path: str
-    max_lines: int = 500
+    file_path: str = Field(min_length=1, max_length=512)
+    max_lines: int = Field(default=500, ge=1, le=5000)
 
 
 class CodingModifyRequest(BaseModel):
-    file_path: str
-    new_content: str
+    file_path: str = Field(min_length=1, max_length=512)
+    new_content: str = Field(max_length=1_000_000)
+    expected_sha256: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
+class CodingPreviewRequest(BaseModel):
+    file_path: str = Field(min_length=1, max_length=512)
+    new_content: str = Field(max_length=1_000_000)
 
 
 class CodingTestRequest(BaseModel):
-    workspace_path: Optional[str] = None
-    test_command: Optional[str] = None
-    timeout_seconds: int = 30
+    test_target: Optional[str] = Field(default=None, max_length=256)
+    timeout_seconds: int = Field(default=30, ge=1, le=120)
 
 
 class DataAnalysisRequest(BaseModel):
@@ -54,6 +59,10 @@ class AutomationCreateRequest(BaseModel):
     capability: str = "report"
     schedule_cron: Optional[str] = None
     interval_hours: Optional[int] = 24
+
+
+def _coding_agent_for_user(user_id: str) -> CodingAgent:
+    return CodingAgent.for_user(user_id, get_settings().coding_workspace_root)
 
 
 @router.post("/process")
@@ -104,20 +113,30 @@ async def get_capabilities():
 
 
 @router.post("/coding/inspect")
-async def inspect_code_workspace(req: CodingInspectRequest):
-    """Lists files and structure of authorized project workspace."""
-    agent = CodingAgent()
+async def inspect_code_workspace(
+    req: CodingInspectRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Lists files in the authenticated user's private coding workspace."""
+    agent = _coding_agent_for_user(user_id)
     try:
-        files = agent.inspect_workspace(req.workspace_path, max_files=req.max_files)
-        return {"files": [f.model_dump() for f in files], "total_count": len(files)}
+        files = agent.inspect_workspace(max_files=req.max_files)
+        return {
+            "files": [f.model_dump() for f in files],
+            "total_count": len(files),
+            "tests_enabled": get_settings().enable_coding_tests,
+        }
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
 
 
 @router.post("/coding/read")
-async def read_code_file(req: CodingReadRequest):
-    """Reads source file content within authorized project workspace."""
-    agent = CodingAgent()
+async def read_code_file(
+    req: CodingReadRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Reads a file inside the authenticated user's private coding workspace."""
+    agent = _coding_agent_for_user(user_id)
     try:
         content = agent.read_source_file(req.file_path, max_lines=req.max_lines)
         return {"file_path": req.file_path, "content": content}
@@ -125,32 +144,73 @@ async def read_code_file(req: CodingReadRequest):
         raise HTTPException(status_code=404, detail=str(fe))
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/coding/preview")
+async def preview_code_modification(
+    req: CodingPreviewRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Returns a diff for explicit review before any workspace file is changed."""
+    agent = _coding_agent_for_user(user_id)
+    try:
+        return agent.preview_modification(req.file_path, req.new_content).model_dump()
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except (IsADirectoryError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.post("/coding/modify")
-async def modify_code_file(req: CodingModifyRequest):
-    """Safely writes or updates source file in authorized project workspace."""
-    agent = CodingAgent()
+async def modify_code_file(
+    req: CodingModifyRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Applies a reviewed edit only if the source still matches its preview."""
+    agent = _coding_agent_for_user(user_id)
     try:
-        result = agent.apply_modification(req.file_path, req.new_content)
+        result = agent.apply_modification(
+            req.file_path,
+            req.new_content,
+            expected_sha256=req.expected_sha256,
+        )
         return result.model_dump()
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (IsADirectoryError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.post("/coding/test")
-async def execute_code_tests(req: CodingTestRequest):
-    """Executes test suite in authorized workspace with timeout safeguards."""
-    agent = CodingAgent()
+async def execute_code_tests(
+    req: CodingTestRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Runs pytest by argument vector inside the authenticated user's workspace."""
+    if not get_settings().enable_coding_tests:
+        raise HTTPException(
+            status_code=503,
+            detail="Code execution is disabled. Enable only for trusted users; this runner is not an OS-level sandbox.",
+        )
+    agent = _coding_agent_for_user(user_id)
     try:
         res = await agent.run_tests(
-            workspace_path=req.workspace_path,
-            test_command=req.test_command,
+            test_target=req.test_target,
             timeout_seconds=req.timeout_seconds,
         )
         return res.model_dump()
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/data-analysis/csv")

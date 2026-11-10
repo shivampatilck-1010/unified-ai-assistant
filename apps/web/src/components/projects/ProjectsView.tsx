@@ -18,10 +18,12 @@ import {
   fetchFiles,
   inspectCodeWorkspace,
   readSourceFile,
+  previewSourceModification,
   modifySourceFile,
   executeCodeTests,
   type WorkspaceFileItem,
   type TestExecutionResponse,
+  type CodeModificationPreview,
 } from '../../lib/api';
 import './ProjectsView.css';
 
@@ -63,6 +65,12 @@ Maintain a polished, professional tone.`,
   },
 ];
 
+interface PendingCodePreview {
+  filePath: string;
+  newContent: string;
+  preview: CodeModificationPreview;
+}
+
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onSelectConversation,
   onOpenChatInProject,
@@ -79,7 +87,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [detailLoading, setDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'conversations' | 'guidance' | 'files' | 'code'>('conversations');
 
-  // Phase 4: Coding Sandbox State
+  // Phase 4: Coding Workspace State
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileItem[]>([]);
   const [codeFilter, setCodeFilter] = useState('');
   const [codeLoading, setCodeLoading] = useState(false);
@@ -88,17 +96,20 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [fileReading, setFileReading] = useState(false);
   const [fileSaving, setFileSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [testCommand, setTestCommand] = useState('pytest tests/test_health.py');
+  const [pendingCodePreview, setPendingCodePreview] = useState<PendingCodePreview | null>(null);
+  const [testTarget, setTestTarget] = useState('');
+  const [codingTestsEnabled, setCodingTestsEnabled] = useState(true);
   const [testRunning, setTestRunning] = useState(false);
   const [testResult, setTestResult] = useState<TestExecutionResponse | null>(null);
 
   const loadWorkspaceFiles = useCallback(async () => {
     try {
       setCodeLoading(true);
-      const res = await inspectCodeWorkspace(undefined, 100);
+      const res = await inspectCodeWorkspace(100);
       setWorkspaceFiles(res.files);
+      setCodingTestsEnabled(res.tests_enabled);
     } catch (err: unknown) {
-      console.error('Failed to inspect workspace:', err);
+      setSaveStatus(err instanceof Error ? err.message : 'Failed to inspect workspace.');
     } finally {
       setCodeLoading(false);
     }
@@ -108,12 +119,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     if (item.is_directory) return;
     try {
       setSelectedFilePath(item.relative_path);
+      setPendingCodePreview(null);
       setFileReading(true);
       setSaveStatus(null);
       const res = await readSourceFile(item.relative_path, 800);
       setSelectedFileContent(res.content);
     } catch (err: unknown) {
-      console.error('Failed to read file:', err);
+      setSaveStatus(err instanceof Error ? err.message : 'Failed to read file.');
     } finally {
       setFileReading(false);
     }
@@ -124,9 +136,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     try {
       setFileSaving(true);
       setSaveStatus(null);
-      await modifySourceFile(selectedFilePath, selectedFileContent);
-      setSaveStatus('Modifications successfully written');
-      setTimeout(() => setSaveStatus(null), 3500);
+      const preview = await previewSourceModification(selectedFilePath, selectedFileContent);
+      setPendingCodePreview({
+        filePath: selectedFilePath,
+        newContent: selectedFileContent,
+        preview,
+      });
+      setSaveStatus('Review the diff, then apply it to your private workspace.');
     } catch (err: unknown) {
       setSaveStatus(err instanceof Error ? err.message : 'Failed to write modification');
     } finally {
@@ -134,14 +150,64 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     }
   };
 
+  const handleApplyCodePreview = async () => {
+    if (!pendingCodePreview) return;
+    const change = pendingCodePreview;
+    try {
+      setFileSaving(true);
+      setTestRunning(true);
+      setTestResult(null);
+      await modifySourceFile(
+        change.filePath,
+        change.newContent,
+        change.preview.original_sha256,
+      );
+      setPendingCodePreview(null);
+      setSelectedFileContent(change.newContent);
+      await loadWorkspaceFiles();
+      if (codingTestsEnabled) {
+        setSaveStatus('Change applied. Running the selected tests…');
+        try {
+          const result = await executeCodeTests(testTarget.trim() || undefined, 45);
+          setTestResult(result);
+          setSaveStatus(
+            result.passed
+              ? 'Change applied and tests passed.'
+              : `Change applied; tests failed with exit code ${result.exit_code}. Review the test output.`,
+          );
+        } catch (err: unknown) {
+          setSaveStatus(
+            `Change applied, but tests could not run: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          );
+        }
+      } else {
+        setSaveStatus('Change applied. Code execution is disabled by the server.');
+      }
+    } catch (err: unknown) {
+      setSaveStatus(err instanceof Error ? err.message : 'Failed to apply the reviewed change.');
+    } finally {
+      setFileSaving(false);
+      setTestRunning(false);
+    }
+  };
+
+  const handleCreateCodeFile = () => {
+    const path = window.prompt('New file path inside your private workspace (for example: src/main.py)');
+    if (!path?.trim()) return;
+    setSelectedFilePath(path.trim());
+    setSelectedFileContent('');
+    setPendingCodePreview(null);
+    setSaveStatus('Add file contents, then preview the change before applying it.');
+  };
+
   const handleRunTests = async () => {
     try {
       setTestRunning(true);
       setTestResult(null);
-      const res = await executeCodeTests(undefined, testCommand, 45);
+      const res = await executeCodeTests(testTarget.trim() || undefined, 45);
       setTestResult(res);
     } catch (err: unknown) {
-      console.error('Failed to run tests:', err);
+      setSaveStatus(err instanceof Error ? err.message : 'Failed to run tests.');
     } finally {
       setTestRunning(false);
     }
@@ -496,7 +562,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   <polyline points="16 18 22 12 16 6" />
                   <polyline points="8 6 2 12 8 18" />
                 </svg>
-                <span>Coding Sandbox</span>
+                <span>Coding Workspace</span>
                 <span className="pv-tab__badge">{workspaceFiles.length > 0 ? workspaceFiles.length : 'Phase 4'}</span>
               </button>
             </div>
@@ -693,16 +759,22 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 )}
               </div>
             ) : (
-              /* Phase 4: Autonomous Coding Sandbox */
+              /* Phase 4: Coding Workspace */
               <div className="pv-section pv-coding-sandbox">
                 <div className="pv-section__header">
                   <div>
-                    <h2 className="pv-section__title">Autonomous Coding Sandbox</h2>
+                    <h2 className="pv-section__title">Coding Workspace</h2>
                     <p className="pv-section__subtitle">
-                      Inspect codebase structure, inspect and edit source code safely, and execute test suites with real-time telemetry.
+                      Work in your private workspace, review diffs before applying edits, and run tests when the server allows it.
                     </p>
                   </div>
                   <div className="pv-sandbox__header-actions">
+                    <button
+                      className="pv-btn pv-btn--secondary"
+                      onClick={handleCreateCodeFile}
+                    >
+                      New File
+                    </button>
                     <button
                       className="pv-btn pv-btn--secondary"
                       onClick={() => void loadWorkspaceFiles()}
@@ -724,16 +796,17 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     <input
                       type="text"
                       className="pv-sandbox__test-input"
-                      value={testCommand}
-                      onChange={(e) => setTestCommand(e.target.value)}
-                      placeholder="e.g. pytest tests/test_health.py"
-                      disabled={testRunning}
+                      value={testTarget}
+                      onChange={(e) => setTestTarget(e.target.value)}
+                      placeholder="pytest target, e.g. tests/"
+                      disabled={testRunning || fileSaving}
+                      aria-label="Workspace-relative pytest target"
                     />
                   </div>
                   <button
                     className="pv-btn pv-btn--primary pv-sandbox__run-btn"
                     onClick={() => void handleRunTests()}
-                    disabled={testRunning}
+                    disabled={testRunning || fileSaving || !codingTestsEnabled}
                   >
                     {testRunning ? (
                       <>
@@ -745,11 +818,16 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polygon points="5 3 19 12 5 21 5 3" />
                         </svg>
-                        <span>Execute Test Suite</span>
+                        <span>{codingTestsEnabled ? 'Execute Test Suite' : 'Tests Disabled'}</span>
                       </>
                     )}
                   </button>
                 </div>
+                <p className="pv-sandbox__execution-notice">
+                  {codingTestsEnabled
+                    ? 'Tests execute as the API service account and are not an OS-level sandbox. Run code only from workspaces you trust.'
+                    : 'Code execution is disabled by the server. Changes can still be reviewed and applied.'}
+                </p>
 
                 {/* Test Results Output Banner if Available */}
                 {testResult && (
@@ -827,18 +905,46 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       {selectedFilePath && (
                         <div className="pv-sandbox__editor-actions">
                           {saveStatus && (
-                            <span className="pv-sandbox__save-feedback">{saveStatus}</span>
+                            <span className="pv-sandbox__save-feedback" role="status">{saveStatus}</span>
                           )}
                           <button
                             className="pv-btn pv-btn--primary pv-btn--sm"
                             onClick={() => void handleSaveFile()}
-                            disabled={fileSaving || fileReading}
+                            disabled={fileSaving || fileReading || !selectedFilePath}
                           >
-                            {fileSaving ? 'Writing...' : 'Save Modifications'}
+                            {fileSaving ? 'Preparing…' : 'Preview Change'}
                           </button>
                         </div>
                       )}
                     </div>
+
+                    {pendingCodePreview && (
+                      <div className="pv-sandbox__diff-review">
+                        <div className="pv-sandbox__diff-review-header">
+                          <strong>{pendingCodePreview.preview.status === 'created' ? 'Create' : 'Review'} {pendingCodePreview.filePath}</strong>
+                          <span>
+                            +{pendingCodePreview.preview.lines_added} / -{pendingCodePreview.preview.lines_removed} lines
+                          </span>
+                        </div>
+                        <pre className="pv-sandbox__diff">{pendingCodePreview.preview.diff || 'No text changes in this preview.'}</pre>
+                        <div className="pv-sandbox__diff-actions">
+                          <button
+                            className="pv-btn pv-btn--ghost pv-btn--sm"
+                            onClick={() => setPendingCodePreview(null)}
+                            disabled={fileSaving}
+                          >
+                            Discard Preview
+                          </button>
+                          <button
+                            className="pv-btn pv-btn--primary pv-btn--sm"
+                            onClick={() => void handleApplyCodePreview()}
+                            disabled={fileSaving}
+                          >
+                            {fileSaving ? 'Applying…' : codingTestsEnabled ? 'Apply & Run Tests' : 'Apply Change'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="pv-sandbox__editor-body">
                       {fileReading ? (
@@ -847,7 +953,10 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                         <textarea
                           className="pv-sandbox__textarea"
                           value={selectedFileContent}
-                          onChange={(e) => setSelectedFileContent(e.target.value)}
+                          onChange={(e) => {
+                            setSelectedFileContent(e.target.value);
+                            setPendingCodePreview(null);
+                          }}
                           spellCheck={false}
                         />
                       ) : (

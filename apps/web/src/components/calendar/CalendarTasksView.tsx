@@ -902,7 +902,7 @@ export function CalendarTasksView() {
                   >
                     <option value="report">Autonomous Research & Report</option>
                     <option value="browser">Autonomous Browser Task</option>
-                    <option value="code_audit">Coding Sandbox Audit</option>
+                    <option value="code_audit">Coding Workspace Audit</option>
                     <option value="summary">File Intelligence Digest</option>
                   </select>
                 </div>

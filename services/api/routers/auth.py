@@ -1,10 +1,13 @@
-import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from google.auth.exceptions import GoogleAuthError, TransportError
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
-from auth import _b64url_decode, create_access_token
+from auth import create_access_token, decode_and_validate_token
 from config import get_settings
 from routers.deps import get_current_user_id
 
@@ -14,11 +17,7 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 class GoogleAuthRequest(BaseModel):
-    credential: Optional[str] = Field(default=None, description="Google ID Token JWT")
-    email: Optional[str] = Field(default=None, description="User email address")
-    name: Optional[str] = Field(default=None, description="User full display name")
-    picture: Optional[str] = Field(default=None, description="Profile picture URL")
-    sub: Optional[str] = Field(default=None, description="Google Subject identifier")
+    credential: str = Field(min_length=1, max_length=8192, description="Google ID Token JWT")
 
 
 class UserProfile(BaseModel):
@@ -35,58 +34,87 @@ class AuthResponse(BaseModel):
     user: UserProfile
 
 
+class BoundedGoogleRequest(GoogleRequest):
+    def __call__(self, url, method="GET", body=None, headers=None, timeout=5, **kwargs):
+        return super().__call__(
+            url,
+            method=method,
+            body=body,
+            headers=headers,
+            timeout=min(timeout, 5),
+            **kwargs,
+        )
+
+
 @router.post("/google", response_model=AuthResponse)
 async def authenticate_google(payload: GoogleAuthRequest) -> AuthResponse:
-    """Authenticates a user via Google Account (Identity Services / OAuth2).
-
-    Validates ID token or user payload, registers/recognizes identity,
-    and returns a signed JWT access token for persistent sessions.
-    """
+    """Validates a Google ID token before creating an application session."""
     settings = get_settings()
-    secret = settings.jwt_secret_key or "unified-ai-assistant-super-secure-production-signing-key-32chars"
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured.",
+        )
+    if not settings.jwt_secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Session signing is not configured.",
+        )
 
-    email = payload.email
-    name = payload.name
-    picture = payload.picture
-    sub = payload.sub
+    try:
+        claims = await run_in_threadpool(
+            id_token.verify_oauth2_token,
+            payload.credential,
+            BoundedGoogleRequest(),
+            settings.google_client_id,
+        )
+    except TransportError as exc:
+        logger.warning("Google ID-token verification is unavailable: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in verification is temporarily unavailable.",
+        ) from exc
+    except (ValueError, GoogleAuthError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google ID token is invalid or expired.",
+        ) from exc
 
-    # If raw Google ID token (credential) was provided, extract claims from JWT payload
-    if payload.credential:
-        try:
-            parts = payload.credential.split(".")
-            if len(parts) >= 2:
-                payload_json = _b64url_decode(parts[1]).decode("utf-8")
-                claims = json.loads(payload_json)
-                email = claims.get("email") or email
-                name = claims.get("name") or claims.get("given_name") or name
-                picture = claims.get("picture") or picture
-                sub = claims.get("sub") or sub
-        except Exception as exc:
-            logger.warning(f"Could not parse Google ID token claims: {exc}")
+    if not isinstance(claims, dict) or (
+        claims.get("aud") != settings.google_client_id
+        or claims.get("iss") not in {"accounts.google.com", "https://accounts.google.com"}
+        or claims.get("email_verified") is not True
+        or not claims.get("sub")
+        or not claims.get("email")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google ID token claims are invalid.",
+        )
 
-    if not email and not sub:
-        # Fallback to demo Google user if testing without live Google Client ID
-        email = "user@gmail.com"
-        name = "Google User"
-        sub = "demo-google-user"
-
-    user_id = f"google_{sub or email.replace('@', '_').replace('.', '_')}"
-    display_name = name or (email.split("@")[0].capitalize() if email else "Google User")
+    email = claims["email"]
+    display_name = claims.get("name") or email.split("@")[0]
+    user_id = f"google_{claims['sub']}"
 
     # Generate cryptographically signed HMAC-SHA256 JWT
     token = create_access_token(
         user_id=user_id,
-        secret_key=secret,
+        secret_key=settings.jwt_secret_key,
         issuer=settings.jwt_issuer,
         audience=settings.jwt_audience,
         role="user",
+        profile={
+            "email": email,
+            "name": display_name,
+            "picture": claims.get("picture") or "",
+        },
     )
 
     user_profile = UserProfile(
         id=user_id,
-        email=email or f"{user_id}@gmail.com",
+        email=email,
         name=display_name,
-        picture=picture or "",
+        picture=claims.get("picture") or "",
         provider="google",
     )
 
@@ -94,8 +122,28 @@ async def authenticate_google(payload: GoogleAuthRequest) -> AuthResponse:
 
 
 @router.get("/me", response_model=UserProfile)
-async def get_current_user_profile(user_id: str = Depends(get_current_user_id)) -> UserProfile:
+async def get_current_user_profile(
+    user_id: str = Depends(get_current_user_id),
+    authorization: Optional[str] = Header(default=None),
+) -> UserProfile:
     """Returns the authenticated user profile."""
+    settings = get_settings()
+    if authorization and authorization.startswith("Bearer ") and settings.jwt_secret_key:
+        token_data = decode_and_validate_token(
+            token=authorization[7:].strip(),
+            secret_key=settings.jwt_secret_key,
+            expected_issuer=settings.jwt_issuer,
+            expected_audience=settings.jwt_audience,
+        )
+        if token_data.profile:
+            return UserProfile(
+                id=user_id,
+                email=token_data.profile.get("email", ""),
+                name=token_data.profile.get("name", ""),
+                picture=token_data.profile.get("picture", ""),
+                provider="google",
+            )
+
     # Format user details from identity
     clean_id = user_id
     if user_id.startswith("google_"):

@@ -71,6 +71,12 @@
   color: #a1a1aa;
 }
 
+.google-modal__google-button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
 .google-modal__primary-btn {
   width: 100%;
   display: flex;

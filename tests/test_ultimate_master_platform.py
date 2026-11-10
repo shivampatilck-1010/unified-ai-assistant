@@ -180,7 +180,14 @@ async def test_coding_agent_workspace_inspection_and_test_execution(tmp_path):
     assert "def add(a, b):" in src
 
     # 4. Modify source file safely
-    mod_res = agent.apply_modification("calculator.py", "def add(a, b):\n    return a + b\n\ndef subtract(a, b):\n    return a - b\n")
+    proposed = "def add(a, b):\n    return a + b\n\ndef subtract(a, b):\n    return a - b\n"
+    preview = agent.preview_modification("calculator.py", proposed)
+    assert "subtract" in preview.diff
+    mod_res = agent.apply_modification(
+        "calculator.py",
+        proposed,
+        expected_sha256=preview.original_sha256,
+    )
     assert mod_res.status == "modified"
     assert mod_res.lines_added >= 1
 

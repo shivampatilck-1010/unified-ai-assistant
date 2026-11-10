@@ -65,10 +65,14 @@ class Settings:
             or os.getenv("IS_PRODUCTION", "false").lower() in ("true", "1", "yes")
         )
         self.auth_mode: str = os.getenv("AUTH_MODE", "jwt" if self.is_production else "dev_fallback")
-        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY", "unified-ai-assistant-super-secure-production-signing-key-32chars")
+        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
         self.jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
         self.jwt_issuer: str = os.getenv("JWT_ISSUER", "unified-ai-assistant")
         self.jwt_audience: str = os.getenv("JWT_AUDIENCE", "unified-ai-assistant-api")
+        self.google_client_id: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
+        self.enable_coding_tests: bool = os.getenv(
+            "ENABLE_CODING_TESTS", "false" if self.is_production else "true"
+        ).lower() in ("true", "1", "yes")
         self.allow_dev_auth: bool = os.getenv(
             "ALLOW_DEV_AUTH", "false" if self.is_production else "true"
         ).lower() in ("true", "1", "yes")
@@ -86,6 +90,10 @@ class Settings:
                 raise ValueError(
                     "Production configuration error: JWT_SECRET_KEY must be provided and at least 32 characters in production."
                 )
+            if not self.google_client_id:
+                raise ValueError("Production configuration error: GOOGLE_CLIENT_ID must be configured.")
+            if not self.database_url.startswith("postgresql+asyncpg://"):
+                raise ValueError("Production configuration error: DATABASE_URL must use PostgreSQL.")
 
         # Browser Agent Worker settings
         self.browser_headless: bool = os.getenv("BROWSER_HEADLESS", "true").lower() in ("true", "1", "yes")
@@ -100,6 +108,10 @@ class Settings:
         self.max_user_storage_bytes: int = int(os.getenv("MAX_USER_STORAGE_BYTES", str(100 * 1024 * 1024)))  # 100 MB
         self.max_user_file_count: int = int(os.getenv("MAX_USER_FILE_COUNT", "50"))
         self.max_extraction_chars: int = int(os.getenv("MAX_EXTRACTION_CHARS", "2000000"))
+        self.coding_workspace_root: str = os.getenv(
+            "CODING_WORKSPACE_ROOT",
+            os.path.join(self.storage_dir, "coding_workspaces"),
+        )
 
 
 @lru_cache()

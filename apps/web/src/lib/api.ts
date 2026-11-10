@@ -284,11 +284,7 @@ export function getAuthToken(): string | null {
 }
 
 export async function loginWithGoogle(payload: {
-  credential?: string;
-  email?: string;
-  name?: string;
-  picture?: string;
-  sub?: string;
+  credential: string;
 }): Promise<{ access_token: string; token_type: string; user: UserProfile }> {
   const url = buildUrl('/api/auth/google');
   const response = await fetch(url.toString(), {
@@ -1972,7 +1968,7 @@ export async function clearEsp32Calibration(signal?: AbortSignal): Promise<Esp32
   return safeParseJson<Esp32HardwareStatus>(response);
 }
 
-// --- Phase 4 & Phase 8: Autonomous Coding Sandbox & Intelligence APIs ---
+// --- Phase 4 & Phase 8: Coding Workspace & Intelligence APIs ---
 
 export interface WorkspaceFileItem {
   path: string;
@@ -1984,6 +1980,7 @@ export interface WorkspaceFileItem {
 export interface WorkspaceInspectResponse {
   files: WorkspaceFileItem[];
   total_count: number;
+  tests_enabled: boolean;
 }
 
 export interface CodeReadResponse {
@@ -1998,6 +1995,15 @@ export interface CodeModifyResponse {
   lines_removed: number;
   diff_summary: string;
   error?: string | null;
+}
+
+export interface CodeModificationPreview {
+  file_path: string;
+  status: string;
+  original_sha256: string | null;
+  diff: string;
+  lines_added: number;
+  lines_removed: number;
 }
 
 export interface TestExecutionResponse {
@@ -2022,8 +2028,19 @@ export interface AutomationItem {
   next_run_at?: string | null;
 }
 
+async function codingRequestError(response: Response, action: string): Promise<Error> {
+  const body = await response.text();
+  let detail = body;
+  try {
+    const parsed = JSON.parse(body) as { detail?: string };
+    detail = parsed.detail || body;
+  } catch {
+    detail = body;
+  }
+  return new Error(`${action} (${response.status}): ${detail || response.statusText}`);
+}
+
 export async function inspectCodeWorkspace(
-  workspacePath?: string,
   maxFiles = 50,
   signal?: AbortSignal
 ): Promise<WorkspaceInspectResponse> {
@@ -2031,10 +2048,10 @@ export async function inspectCodeWorkspace(
     method: 'POST',
     signal,
     headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ workspace_path: workspacePath, max_files: maxFiles }),
+    body: JSON.stringify({ max_files: maxFiles }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to inspect workspace: ${response.status}`);
+    throw await codingRequestError(response, 'Failed to inspect workspace');
   }
   return safeParseJson<WorkspaceInspectResponse>(response);
 }
@@ -2051,7 +2068,7 @@ export async function readSourceFile(
     body: JSON.stringify({ file_path: filePath, max_lines: maxLines }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to read source file: ${response.status}`);
+    throw await codingRequestError(response, 'Failed to read source file');
   }
   return safeParseJson<CodeReadResponse>(response);
 }
@@ -2059,23 +2076,44 @@ export async function readSourceFile(
 export async function modifySourceFile(
   filePath: string,
   newContent: string,
+  expectedSha256: string | null,
   signal?: AbortSignal
 ): Promise<CodeModifyResponse> {
   const response = await fetch(`${API_BASE}/api/intelligence/coding/modify`, {
     method: 'POST',
     signal,
     headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ file_path: filePath, new_content: newContent }),
+    body: JSON.stringify({
+      file_path: filePath,
+      new_content: newContent,
+      expected_sha256: expectedSha256,
+    }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to modify source file: ${response.status}`);
+    throw await codingRequestError(response, 'Failed to apply modification');
   }
   return safeParseJson<CodeModifyResponse>(response);
 }
 
+export async function previewSourceModification(
+  filePath: string,
+  newContent: string,
+  signal?: AbortSignal
+): Promise<CodeModificationPreview> {
+  const response = await fetch(`${API_BASE}/api/intelligence/coding/preview`, {
+    method: 'POST',
+    signal,
+    headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ file_path: filePath, new_content: newContent }),
+  });
+  if (!response.ok) {
+    throw await codingRequestError(response, 'Failed to preview modification');
+  }
+  return safeParseJson<CodeModificationPreview>(response);
+}
+
 export async function executeCodeTests(
-  workspacePath?: string,
-  testCommand?: string,
+  testTarget?: string,
   timeoutSeconds = 30,
   signal?: AbortSignal
 ): Promise<TestExecutionResponse> {
@@ -2084,13 +2122,12 @@ export async function executeCodeTests(
     signal,
     headers: getBaseHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
-      workspace_path: workspacePath,
-      test_command: testCommand,
+      test_target: testTarget,
       timeout_seconds: timeoutSeconds,
     }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to execute tests: ${response.status}`);
+    throw await codingRequestError(response, 'Failed to execute tests');
   }
   return safeParseJson<TestExecutionResponse>(response);
 }
@@ -2128,4 +2165,3 @@ export async function createAutomation(
   }
   return safeParseJson<AutomationItem>(response);
 }
-

@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-unified_ai}
       POSTGRES_USER: ${POSTGRES_USER:-unified_ai}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -34,11 +34,12 @@ services:
     env_file:
       - .env.production
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-unified_ai}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-unified_ai}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
       ENVIRONMENT: "production"
       IS_PRODUCTION: "true"
       AUTH_MODE: "jwt"
       ALLOW_DEV_AUTH: "false"
+      ENABLE_CODING_TESTS: ${ENABLE_CODING_TESTS:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
@@ -70,7 +71,7 @@ services:
     env_file:
       - .env.production
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-unified_ai}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-unified_ai}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
       ENVIRONMENT: "production"
       IS_PRODUCTION: "true"
       BROWSER_HEADLESS: "true"
@@ -87,17 +88,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env.production}
     restart: always
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
       api:
         condition: service_healthy
-    volumes:
-      - certbot_www:/var/www/certbot:ro
-      - certbot_certs:/etc/letsencrypt:ro
-      - nginx_conf:/etc/nginx/conf.d
     networks:
       - frontend-net
     deploy:
@@ -111,13 +109,6 @@ volumes:
     driver: local
   storage_data:
     driver: local
-  certbot_www:
-    driver: local
-  certbot_certs:
-    driver: local
-  nginx_conf:
-    driver: local
-
 networks:
   frontend-net:
     driver: bridge
