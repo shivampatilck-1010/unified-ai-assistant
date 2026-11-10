@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createCalendarEvent, createTask } from '../../lib/api';
+import { createCalendarEvent, createTask, getUserStoragePrefix } from '../../lib/api';
 import './CalendarReminderCard.css';
 
 export interface CalendarReminderData {
@@ -79,9 +79,10 @@ export function CalendarReminderCard({
         });
       }
 
-      // Also persist to localStorage for instant offline/reload retention
+      // Also persist to user-scoped localStorage for instant offline/reload retention
       try {
-        const localKey = type === 'task' ? 'unified_ai_tasks_v1' : 'unified_ai_calendar_events_v1';
+        const prefix = getUserStoragePrefix();
+        const localKey = type === 'task' ? `${prefix}tasks_v1` : `${prefix}calendar_events_v1`;
         const existingRaw = localStorage.getItem(localKey);
         const list = existingRaw ? JSON.parse(existingRaw) : [];
         list.unshift(saved || {
@@ -114,9 +115,10 @@ export function CalendarReminderCard({
       }, 1300);
     } catch (err) {
       console.error('Failed to create calendar/task item:', err);
-      // Fallback: save to localStorage anyway
+      // Fallback: save to user-scoped localStorage anyway
       try {
-        const localKey = type === 'task' ? 'unified_ai_tasks_v1' : 'unified_ai_calendar_events_v1';
+        const prefix = getUserStoragePrefix();
+        const localKey = type === 'task' ? `${prefix}tasks_v1` : `${prefix}calendar_events_v1`;
         const existingRaw = localStorage.getItem(localKey);
         const list = existingRaw ? JSON.parse(existingRaw) : [];
         list.unshift({

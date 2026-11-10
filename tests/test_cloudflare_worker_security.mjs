@@ -259,3 +259,66 @@ test('coding workspace edits require auth, stay user-scoped, and reject stale pr
   const testsDisabled = await post(env, '/api/intelligence/coding/test', {}, firstToken);
   assert.equal(testsDisabled.status, 503);
 });
+
+test('chat conversations are strictly isolated per user account', async () => {
+  const env = makeEnv();
+  const { body: loginA } = await login(env, 'user_A');
+  const { body: loginB } = await login(env, 'user_B');
+  const tokenA = loginA.access_token;
+  const tokenB = loginB.access_token;
+
+  // User A creates conversation
+  const createA = await worker.fetch(
+    new Request('https://worker.test/api/conversations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenA}`,
+      },
+      body: JSON.stringify({ title: "User A's Secret Project" }),
+    }),
+    env,
+  );
+  assert.equal(createA.status, 200);
+  const convA = await createA.json();
+  assert.equal(convA.owner_id, 'google_user_A');
+
+  // User B lists conversations -> should NOT see User A's conversation
+  const listB = await worker.fetch(
+    new Request('https://worker.test/api/conversations', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${tokenB}`,
+      },
+    }),
+    env,
+  );
+  assert.equal(listB.status, 200);
+  const listBBody = await listB.json();
+  assert.equal(listBBody.items.some((c) => c.id === convA.id), false);
+
+  // User A lists conversations -> sees their conversation
+  const listA = await worker.fetch(
+    new Request('https://worker.test/api/conversations', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${tokenA}`,
+      },
+    }),
+    env,
+  );
+  assert.equal(listA.status, 200);
+  const listABody = await listA.json();
+  assert.equal(listABody.items.some((c) => c.id === convA.id), true);
+
+  // Guest lists conversations -> cannot see User A's conversation
+  const listGuest = await worker.fetch(
+    new Request('https://worker.test/api/conversations', {
+      method: 'GET',
+    }),
+    env,
+  );
+  assert.equal(listGuest.status, 200);
+  const listGuestBody = await listGuest.json();
+  assert.equal(listGuestBody.items.some((c) => c.id === convA.id), false);
+});

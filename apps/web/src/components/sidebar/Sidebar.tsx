@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { type NavigationSection } from '../../types';
 import { UnifiedLogo } from '../brand/UnifiedLogo';
 import { GoogleLoginModal } from '../auth/GoogleLoginModal';
@@ -135,6 +135,14 @@ export function Sidebar({
   const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
 
+  useEffect(() => {
+    const handleAuthChange = (e: any) => {
+      setUser(e.detail?.user !== undefined ? e.detail.user : getStoredUser());
+    };
+    window.addEventListener('unified-ai-auth-change', handleAuthChange);
+    return () => window.removeEventListener('unified-ai-auth-change', handleAuthChange);
+  }, []);
+
   const handleNavClick = (id: NavigationSection) => {
     if (id === 'chat') {
       onNewChat();
@@ -169,7 +177,7 @@ export function Sidebar({
                 title="New conversation"
               >
                 <span className="sidebar__brand-icon" aria-hidden="true" style={{ display: 'flex', alignItems: 'center' }}>
-                  <UnifiedLogo size={28} />
+                  <UnifiedLogo size={28} animated />
                 </span>
                 <span className="sidebar__brand-name">Unified AI</span>
               </div>

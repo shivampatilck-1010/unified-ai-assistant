@@ -24,6 +24,7 @@ import {
   fetchAutomations,
   createAutomation,
   type AutomationItem,
+  getUserStoragePrefix,
 } from '../../lib/api';
 import './CalendarTasksView.css';
 
@@ -130,7 +131,8 @@ export function CalendarTasksView() {
       setTasks(res.items);
       let localTasks: Task[] = [];
       try {
-        const raw = localStorage.getItem('unified_ai_tasks_v1');
+        const prefix = getUserStoragePrefix();
+        const raw = localStorage.getItem(`${prefix}tasks_v1`) || (prefix === 'guest_' ? localStorage.getItem('unified_ai_tasks_v1') : null);
         if (raw) localTasks = JSON.parse(raw);
       } catch {}
       if (localTasks.length > 0) {
@@ -156,7 +158,8 @@ export function CalendarTasksView() {
       setEvents(res.events || []);
       setOccurrences(res.occurrences || []);
       try {
-        const raw = localStorage.getItem('unified_ai_calendar_events_v1');
+        const prefix = getUserStoragePrefix();
+        const raw = localStorage.getItem(`${prefix}calendar_events_v1`) || (prefix === 'guest_' ? localStorage.getItem('unified_ai_calendar_events_v1') : null);
         if (raw) {
           const localEvents = JSON.parse(raw);
           if (Array.isArray(localEvents) && localEvents.length > 0) {
@@ -218,9 +221,11 @@ export function CalendarTasksView() {
 
     window.addEventListener('calendar-updated', handleSync);
     window.addEventListener('task-updated', handleSync);
+    window.addEventListener('unified-ai-auth-change', handleSync);
     return () => {
       window.removeEventListener('calendar-updated', handleSync);
       window.removeEventListener('task-updated', handleSync);
+      window.removeEventListener('unified-ai-auth-change', handleSync);
     };
   }, [loadTasks, loadCalendar, loadReminders]);
 

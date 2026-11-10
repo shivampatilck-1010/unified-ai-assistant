@@ -255,6 +255,21 @@ export function getStoredUser(): UserProfile | null {
   }
 }
 
+export function getUserStoragePrefix(): string {
+  const user = getStoredUser();
+  if (user && user.id) {
+    const safeId = user.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return `u_${safeId}_`;
+  }
+  return 'guest_';
+}
+
+export function notifyAuthChange(user: UserProfile | null): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('unified-ai-auth-change', { detail: { user } }));
+  }
+}
+
 export function setStoredUser(user: UserProfile | null): void {
   if (typeof window === 'undefined') return;
   if (user) {
@@ -262,6 +277,7 @@ export function setStoredUser(user: UserProfile | null): void {
   } else {
     localStorage.removeItem('unified_ai_user');
   }
+  notifyAuthChange(user);
 }
 
 export function setAuthToken(token: string | null): void {

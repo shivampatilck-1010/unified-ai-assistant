@@ -233,6 +233,19 @@
   box-sizing: border-box;
 }
 
+.chat-view__capability-card {
+  width: 100%;
+  cursor: default;
+}
+
+.chat-view__capability-card .chat-view__capability {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: clamp(8px, 1.4vh, 10px) clamp(12px, 2.8vw, 16px);
+  color: var(--text-primary);
+}
+
 .chat-view__capability {
   display: flex;
   align-items: center;

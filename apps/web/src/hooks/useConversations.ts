@@ -12,19 +12,37 @@ import {
   fetchConversation,
   renameConversation as apiRenameConversation,
   deleteConversation as apiDeleteConversation,
+  getUserStoragePrefix,
 } from '../lib/api';
 import { streamChat } from '../lib/streaming';
 
-const STORAGE_KEY_CONVS = 'unified_ai_conversations_v2';
-const STORAGE_KEY_ACTIVE_ID = 'unified_ai_active_id_v2';
-const STORAGE_PREFIX_MSGS = 'unified_ai_conv_messages_v2_';
+function getStorageKeys() {
+  const prefix = getUserStoragePrefix();
+  return {
+    convs: `${prefix}conversations_v2`,
+    activeId: `${prefix}active_id_v2`,
+    msgPrefix: `${prefix}conv_messages_v2_`,
+  };
+}
 
 function loadStoredConversations(): ConversationSummary[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_CONVS);
+    const { convs: key } = getStorageKeys();
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    // Backward compatibility: If guest has legacy un-scoped conversations, migrate them to guest
+    if (key === 'guest_conversations_v2') {
+      const legacyRaw = localStorage.getItem('unified_ai_conversations_v2');
+      if (legacyRaw) {
+        const parsed = JSON.parse(legacyRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localStorage.setItem(key, legacyRaw);
+          return parsed;
+        }
+      }
     }
   } catch {}
   return [];
@@ -32,16 +50,26 @@ function loadStoredConversations(): ConversationSummary[] {
 
 function saveStoredConversations(list: ConversationSummary[]) {
   try {
-    localStorage.setItem(STORAGE_KEY_CONVS, JSON.stringify(list));
+    const { convs: key } = getStorageKeys();
+    localStorage.setItem(key, JSON.stringify(list));
   } catch {}
 }
 
 function loadStoredMessages(convId: string): ChatMessage[] {
   try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX_MSGS}${convId}`);
+    const { msgPrefix } = getStorageKeys();
+    const raw = localStorage.getItem(`${msgPrefix}${convId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
+    }
+    // Backward compatibility for guest
+    if (msgPrefix.startsWith('guest_')) {
+      const legacyRaw = localStorage.getItem(`unified_ai_conv_messages_v2_${convId}`);
+      if (legacyRaw) {
+        const parsed = JSON.parse(legacyRaw);
+        if (Array.isArray(parsed)) return parsed;
+      }
     }
   } catch {}
   return [];
@@ -69,21 +97,23 @@ function sanitizeMessagesForStorage(msgs: ChatMessage[]): ChatMessage[] {
 function saveStoredMessages(convId: string, msgs: ChatMessage[]) {
   if (!convId) return;
   try {
+    const { msgPrefix } = getStorageKeys();
     const sanitized = sanitizeMessagesForStorage(msgs);
-    localStorage.setItem(`${STORAGE_PREFIX_MSGS}${convId}`, JSON.stringify(sanitized));
+    localStorage.setItem(`${msgPrefix}${convId}`, JSON.stringify(sanitized));
   } catch (err) {
     console.warn('LocalStorage save failed, recovering quota:', err);
     try {
+      const { msgPrefix } = getStorageKeys();
       const convs = loadStoredConversations();
       if (convs.length > 3) {
         const oldest = [...convs].reverse().slice(0, 3);
         oldest.forEach((c) => {
           if (c.id !== convId) {
-            localStorage.removeItem(`${STORAGE_PREFIX_MSGS}${c.id}`);
+            localStorage.removeItem(`${msgPrefix}${c.id}`);
           }
         });
         localStorage.setItem(
-          `${STORAGE_PREFIX_MSGS}${convId}`,
+          `${msgPrefix}${convId}`,
           JSON.stringify(sanitizeMessagesForStorage(msgs))
         );
       }
@@ -97,14 +127,16 @@ export function useConversations(backendConnected: boolean = true) {
   });
 
   const [activeId, setActiveId] = useState<string | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
+    const { activeId: activeKey } = getStorageKeys();
+    const saved = localStorage.getItem(activeKey);
     const stored = loadStoredConversations();
     if (saved && stored.some((c) => c.id === saved)) return saved;
     return stored[0]?.id || null;
   });
 
   const [activeConversation, setActiveConversation] = useState<ConversationDetail | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
+    const { activeId: activeKey } = getStorageKeys();
+    const saved = localStorage.getItem(activeKey);
     const stored = loadStoredConversations();
     const effectiveId = saved || stored[0]?.id;
     if (effectiveId) {
@@ -162,19 +194,73 @@ export function useConversations(backendConnected: boolean = true) {
     });
   }, []);
 
-  // Sync activeId to localStorage
+  // Sync activeId to user-scoped localStorage
   useEffect(() => {
     if (activeId) {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_ID, activeId);
+      const { activeId: key } = getStorageKeys();
+      localStorage.setItem(key, activeId);
     }
   }, [activeId]);
 
-  // Sync conversations list to localStorage
+  // Sync conversations list to user-scoped localStorage
   useEffect(() => {
     if (conversations.length > 0) {
       saveStoredConversations(conversations);
     }
   }, [conversations]);
+
+  // Listen for login/logout/account-switch events to cleanly swap user conversations
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const freshConvs = loadStoredConversations();
+      setConversations(freshConvs);
+      const { activeId: key } = getStorageKeys();
+      const savedActive = localStorage.getItem(key);
+      const nextId = (savedActive && freshConvs.some((c) => c.id === savedActive))
+        ? savedActive
+        : freshConvs[0]?.id || null;
+      setActiveId(nextId);
+      if (nextId) {
+        const cached = loadStoredMessages(nextId);
+        setActiveConversation({
+          id: nextId,
+          owner_id: freshConvs.find((c) => c.id === nextId)?.owner_id || 'default_user',
+          title: freshConvs.find((c) => c.id === nextId)?.title || 'Conversation',
+          created_at: freshConvs.find((c) => c.id === nextId)?.created_at || new Date().toISOString(),
+          updated_at: freshConvs.find((c) => c.id === nextId)?.updated_at || new Date().toISOString(),
+          messages: cached,
+        });
+      } else {
+        setActiveConversation(null);
+      }
+      if (backendConnected) {
+        void fetchConversations(50, 0)
+          .then((res) => {
+            if (res.items) {
+              setConversations(res.items);
+              saveStoredConversations(res.items);
+              if (res.items.length > 0 && !nextId) {
+                const firstId = res.items[0].id;
+                setActiveId(firstId);
+                const cached = loadStoredMessages(firstId);
+                setActiveConversation({
+                  id: firstId,
+                  owner_id: res.items[0].owner_id || 'default_user',
+                  title: res.items[0].title || 'Conversation',
+                  created_at: res.items[0].created_at || new Date().toISOString(),
+                  updated_at: res.items[0].updated_at || new Date().toISOString(),
+                  messages: cached,
+                });
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    window.addEventListener('unified-ai-auth-change', handleAuthChange);
+    return () => window.removeEventListener('unified-ai-auth-change', handleAuthChange);
+  }, [backendConnected]);
 
   // Load conversation list from backend and merge with local store
   const refreshList = useCallback(async () => {
@@ -235,7 +321,7 @@ export function useConversations(backendConnected: boolean = true) {
       // 3. Immediately set active ID
       setActiveId(id);
       try {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_ID, id);
+        localStorage.setItem(getStorageKeys().activeId, id);
       } catch {}
 
       // 4. Synchronously load and render selected chat from localStorage (instant 0ms switch)
@@ -318,7 +404,7 @@ export function useConversations(backendConnected: boolean = true) {
     const newDraftId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setActiveId(newDraftId);
     try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_ID, newDraftId);
+      localStorage.setItem(getStorageKeys().activeId, newDraftId);
     } catch {}
 
     const initialDetail: ConversationDetail = {
@@ -383,7 +469,7 @@ export function useConversations(backendConnected: boolean = true) {
       } catch {
         // Fallback
       }
-      localStorage.removeItem(`${STORAGE_PREFIX_MSGS}${id}`);
+      localStorage.removeItem(`${getStorageKeys().msgPrefix}${id}`);
       setConversations((prev) => {
         const next = prev.filter((c) => c.id !== id);
         saveStoredConversations(next);

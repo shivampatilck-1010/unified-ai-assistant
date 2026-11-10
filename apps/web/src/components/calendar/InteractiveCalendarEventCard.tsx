@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { createCalendarEvent, createTask } from '../../lib/api';
+import { createCalendarEvent, createTask, getUserStoragePrefix } from '../../lib/api';
 import './InteractiveCalendarEventCard.css';
 
 export interface CalendarEventDetails {
@@ -104,8 +104,8 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
       const startDt = new Date(y, m - 1, d, sh || 9, sm || 0);
       const endDt = new Date(y, m - 1, d, eh || 12, em || 0);
 
-      // Save to LocalStorage
-      const localKey = 'unified_ai_calendar_events_v1';
+      // Save to user-scoped LocalStorage
+      const localKey = `${getUserStoragePrefix()}calendar_events_v1`;
       const existingRaw = localStorage.getItem(localKey);
       const list = existingRaw ? JSON.parse(existingRaw) : [];
 
@@ -246,7 +246,7 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
   const handleSaveAsTask = async () => {
     try {
       setIsSavedAsTask(true);
-      const localKey = 'unified_ai_tasks_v1';
+      const localKey = `${getUserStoragePrefix()}tasks_v1`;
       const existingRaw = localStorage.getItem(localKey);
       const list = existingRaw ? JSON.parse(existingRaw) : [];
       const newTask = {

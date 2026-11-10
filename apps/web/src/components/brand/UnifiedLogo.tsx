@@ -1,4 +1,5 @@
 import React from 'react';
+import { LiquidChromeLogo } from '../vibe/LiquidChromeLogo';
 import './UnifiedLogo.css';
 
 export interface UnifiedLogoProps {
@@ -10,9 +11,25 @@ export interface UnifiedLogoProps {
 
 export const UnifiedLogo: React.FC<UnifiedLogoProps> = ({
   size = 32,
+  animated = false,
   className = '',
   onClick,
 }) => {
+  if (animated) {
+    return (
+      <div
+        className={`unified-logo unified-logo--animated ${className}`}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+        }}
+        onClick={onClick}
+      >
+        <LiquidChromeLogo size={size} onClick={onClick} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`unified-logo ${className}`}

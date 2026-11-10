@@ -50,6 +50,7 @@ const conversationsStore = new Map<string, StoredConv>();
 
 interface StoredProject {
   id: string;
+  owner_id?: string;
   name: string;
   description: string;
   color?: string;
@@ -626,6 +627,18 @@ async function authenticatedProfile(
     return { response: jsonResponse({ detail: 'Authentication token is invalid or expired.' }, 401) };
   }
   return { profile };
+}
+
+async function getRequestOwnerId(request: Request, env: Env): Promise<string> {
+  const authorization = request.headers.get('Authorization') || '';
+  if (authorization.startsWith('Bearer ') && env.JWT_SECRET_KEY && env.JWT_SECRET_KEY.length >= 32) {
+    const token = authorization.slice(7).trim();
+    try {
+      const profile = await verifySessionToken(token, env.JWT_SECRET_KEY);
+      if (profile?.id) return profile.id;
+    } catch {}
+  }
+  return 'guest';
 }
 
 function codingWorkspacePath(value: unknown): string | null {
@@ -1624,6 +1637,7 @@ export default {
 
     // Chat SSE Streaming Endpoint
     if (path === '/api/chat/stream' && request.method === 'POST') {
+      const streamOwnerId = await getRequestOwnerId(request, env);
       let body: {
         conversation_id?: string;
         message?: string;
@@ -2448,13 +2462,15 @@ export default {
             if (!conv) {
               conv = {
                 id: conversationId,
-                owner_id: 'default_user',
+                owner_id: streamOwnerId,
                 title: (userMessage || 'Chat').slice(0, 36).trim(),
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 messages: [],
               };
               conversationsStore.set(conversationId, conv);
+            } else if (conv.owner_id === 'guest' && streamOwnerId !== 'guest') {
+              conv.owner_id = streamOwnerId;
             }
             conv.updated_at = new Date().toISOString();
             if (userMessage || (body.attachments && body.attachments.length > 0)) {
@@ -2516,16 +2532,19 @@ export default {
 
     // Conversations stateful endpoints
     if (path === '/api/conversations') {
+      const ownerId = await getRequestOwnerId(request, env);
       if (request.method === 'GET') {
-        const items = Array.from(conversationsStore.values()).map((c) => ({
-          id: c.id,
-          owner_id: c.owner_id,
-          title: c.title,
-          project_id: c.project_id,
-          created_at: c.created_at,
-          updated_at: c.updated_at,
-          message_count: c.messages.length,
-        }));
+        const items = Array.from(conversationsStore.values())
+          .filter((c) => c.owner_id === ownerId)
+          .map((c) => ({
+            id: c.id,
+            owner_id: c.owner_id,
+            title: c.title,
+            project_id: c.project_id,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+            message_count: c.messages.length,
+          }));
         items.sort(
           (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         );
@@ -2539,7 +2558,7 @@ export default {
         const id = convBody.id || `conv-${Date.now()}`;
         const newConv: StoredConv = {
           id,
-          owner_id: 'default_user',
+          owner_id: ownerId,
           title: convBody.title || 'New Chat',
           project_id: convBody.project_id || null,
           created_at: new Date().toISOString(),
@@ -2554,12 +2573,13 @@ export default {
     if (path.startsWith('/api/conversations/')) {
       const parts = path.split('/');
       const id = parts[3];
+      const ownerId = await getRequestOwnerId(request, env);
+      const conv = conversationsStore.get(id);
       if (request.method === 'GET') {
-        const conv = conversationsStore.get(id);
-        if (conv) return jsonResponse(conv);
+        if (conv && conv.owner_id === ownerId) return jsonResponse(conv);
         return jsonResponse({
           id,
-          owner_id: 'default_user',
+          owner_id: ownerId,
           title: 'Conversation',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -2571,8 +2591,7 @@ export default {
         try {
           convBody = await request.json();
         } catch {}
-        const conv = conversationsStore.get(id);
-        if (conv) {
+        if (conv && conv.owner_id === ownerId) {
           if (convBody.title) conv.title = convBody.title;
           conv.updated_at = new Date().toISOString();
           return jsonResponse(conv);
@@ -2580,7 +2599,9 @@ export default {
         return jsonResponse({ id, title: convBody.title || 'Conversation' });
       }
       if (request.method === 'DELETE') {
-        conversationsStore.delete(id);
+        if (conv && conv.owner_id === ownerId) {
+          conversationsStore.delete(id);
+        }
         return jsonResponse({ status: 'ok', id });
       }
     }
@@ -2589,17 +2610,20 @@ export default {
     // PROJECTS API (Full CRUD, Pin/Unpin Files, Linked Conversations)
     // =========================================================================
     if (path === '/api/projects') {
+      const ownerId = await getRequestOwnerId(request, env);
       if (request.method === 'GET') {
-        const items = Array.from(projectsStore.values()).map((p) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          created_at: p.created_at,
-          updated_at: p.updated_at,
-          conversation_count: p.conversations?.length || 0,
-          file_count: p.pinned_files?.length || 0,
-          pinned_file_count: p.pinned_files?.length || 0,
-        }));
+        const items = Array.from(projectsStore.values())
+          .filter((p) => (p.owner_id || 'guest') === ownerId)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            conversation_count: p.conversations?.length || 0,
+            file_count: p.pinned_files?.length || 0,
+            pinned_file_count: p.pinned_files?.length || 0,
+          }));
         return jsonResponse({ items, total: items.length, limit: 50, offset: 0 });
       }
       if (request.method === 'POST') {
@@ -2610,6 +2634,7 @@ export default {
         const id = pBody.id || `proj-${Date.now()}`;
         const newProj: StoredProject = {
           id,
+          owner_id: ownerId,
           name: pBody.name || 'New Project Workspace',
           description: pBody.description || '',
           color: pBody.color || '#38bdf8',
@@ -2636,6 +2661,7 @@ export default {
       const parts = path.split('/');
       const projId = parts[3];
       const subAction = parts[4];
+      const ownerId = await getRequestOwnerId(request, env);
 
       const proj = projectsStore.get(projId);
 
@@ -2661,7 +2687,7 @@ export default {
           // Also register in conversationsStore
           conversationsStore.set(newConvId, {
             id: newConvId,
-            owner_id: 'default_user',
+            owner_id: proj?.owner_id || ownerId,
             title: newConvItem.title,
             project_id: projId,
             created_at: newConvItem.created_at,
