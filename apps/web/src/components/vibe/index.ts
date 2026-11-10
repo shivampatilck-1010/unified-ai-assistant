@@ -9,3 +9,6 @@ export type { LiquidChromeLogoProps } from './LiquidChromeLogo';
 
 export { NeuralThreeOrb } from './NeuralThreeOrb';
 export type { NeuralThreeOrbProps } from './NeuralThreeOrb';
+
+export { BmwChassisVisualizer3D } from './BmwChassisVisualizer3D';
+export type { BmwChassisVisualizer3DProps } from './BmwChassisVisualizer3D';

@@ -13,8 +13,8 @@ import { CouncilDeliberationCard, type CouncilParticipant, type CouncilRound } f
 import { InteractiveCalendarEventCard } from '../calendar/InteractiveCalendarEventCard';
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
-import { CompanyLogo } from '../brand/CompanyLogo';
 import { replaceEmojisWithCustom } from '../common/CustomEmoji';
+import { BmwChassisVisualizer3D } from '../vibe';
 import './MarkdownContent.css';
 
 // Initialize Mermaid once with dark theme
@@ -365,83 +365,42 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
     taskDomain = domainMatch[1].replace(/[\[\]]/g, '').trim();
   }
 
-  // Determine provider for vector logo
-  const lower = (targetModel + ' ' + stripped).toLowerCase();
-  let provider = 'google';
-  let modelId = 'gemini-2.5-flash';
-  let themeColor = '#38bdf8';
-  let accentBorder = 'rgba(56, 189, 248, 0.35)';
-
-  if (lower.includes('nemotron') || lower.includes('nvidia')) {
-    provider = 'nvidia';
-    modelId = 'nemotron';
-  } else if (lower.includes('deepseek')) {
-    provider = 'deepseek';
-    modelId = 'deepseek-r1';
-    themeColor = '#4f46e5';
-    accentBorder = 'rgba(79, 70, 229, 0.35)';
-  } else if (lower.includes('groq') || lower.includes('gpt-oss') || lower.includes('lpu')) {
-    provider = 'groq';
-    modelId = lower.includes('qwen') ? 'qwen' : 'gpt-oss-120b';
-  } else if (lower.includes('qwen')) {
-    provider = 'qwen';
-    modelId = 'qwen';
-  } else if (lower.includes('cohere') || lower.includes('north')) {
-    provider = 'cohere';
-    modelId = 'north-mini-code';
-  } else if (lower.includes('openai') || lower.includes('gpt-4') || lower.includes('gpt-5') || lower.includes('o3-mini') || lower.includes('o1')) {
-    provider = 'openai';
-    modelId = 'gpt-4o';
-    themeColor = '#10a37f';
-    accentBorder = 'rgba(16, 163, 127, 0.35)';
-  } else if (lower.includes('anthropic') || lower.includes('claude')) {
-    provider = 'anthropic';
-    modelId = 'claude';
-    themeColor = '#D97757';
-    accentBorder = 'rgba(217, 119, 87, 0.35)';
-  } else if (lower.includes('gemini') || lower.includes('google')) {
-    provider = 'google';
-    modelId = lower.includes('pro') ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-    themeColor = '#38bdf8';
-    accentBorder = 'rgba(56, 189, 248, 0.35)';
-  }
-
   return (
     <div
-      className="md-autoroute-banner"
-      style={{
-        '--autoroute-accent': themeColor,
-        '--autoroute-border': accentBorder,
-      } as React.CSSProperties}
+      className="md-autoroute-bar"
+      title={`Intelligently routed to ${targetModel}${taskDomain ? ` · ${taskDomain}` : ''}`}
     >
-      <div className="md-autoroute-banner__glow" aria-hidden="true" />
-      <div className="md-autoroute-banner__left">
-        <div className="md-autoroute-banner__logo">
-          <div className="md-autoroute-banner__logo-aura" aria-hidden="true" />
-          <CompanyLogo provider={provider} modelId={modelId} size={19} />
-        </div>
-        <div className="md-autoroute-banner__info">
-          <div className="md-autoroute-banner__title">
-            <span className="md-autoroute-banner__badge">
-              <span className="md-autoroute-banner__pulse-dot" />
-              AUTO-ROUTED
-            </span>
-            <span className="md-autoroute-banner__arrow">→</span>
-            <strong className="md-autoroute-banner__name">{targetModel}</strong>
-          </div>
+      <div className="md-autoroute-bar__left">
+        <span className="md-autoroute-bar__icon-wrap" aria-hidden="true">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="md-autoroute-bar__icon"
+          >
+            <circle cx="12" cy="12" r="10" stroke="rgba(56, 189, 248, 0.45)" strokeWidth="1.5" />
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="#38bdf8" stroke="#38bdf8" />
+          </svg>
+        </span>
+        <div className="md-autoroute-bar__body">
+          <span className="md-autoroute-bar__prefix">Routed to</span>
+          <strong className="md-autoroute-bar__model">{targetModel}</strong>
           {taskDomain && (
-            <div className="md-autoroute-banner__subtitle">
-              <span className="md-autoroute-banner__tag">{taskDomain}</span>
-              <span className="md-autoroute-banner__meta">· Dynamically selected for peak effectiveness</span>
-            </div>
+            <>
+              <span className="md-autoroute-bar__sep" aria-hidden="true">·</span>
+              <span className="md-autoroute-bar__domain">{taskDomain}</span>
+            </>
           )}
         </div>
       </div>
-      <div className="md-autoroute-banner__status">
-        <span className="md-autoroute-banner__status-pill">
-          <span className="md-autoroute-banner__ping" />
-          Optimal Route
-        </span>
+      <div className="md-autoroute-bar__right">
+        <span className="ghost-completed-chip md-autoroute-bar__chip-route">AUTO-ROUTED</span>
+        <span className="ghost-completed-chip md-autoroute-bar__chip-optimal">OPTIMAL</span>
       </div>
     </div>
   );
@@ -896,6 +855,22 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
         diagType = 'architecture';
       }
 
+      // 3D Mechanical Digital Twin: Auto-upgrade automotive/BMW chassis & powertrain schematics to interactive 3D WebGL!
+      if (
+        /bmw|longitudinal.*chassis|powertrain.*skeleton|transmission.*zf|b58.*engine|rwd.*chassis|50:50.*mass/i.test(code) ||
+        /bmw|chassis.*skeleton|longitudinal.*powertrain/i.test(diagTitle || '') ||
+        lowerLang === 'bmw-chassis' ||
+        lowerLang === 'bmw' ||
+        lowerLang === 'powertrain-3d' ||
+        lowerLang === 'chassis-3d'
+      ) {
+        return (
+          <BmwChassisVisualizer3D
+            title={diagTitle || "BMW Longitudinal Chassis & Powertrain Architecture (CLAR)"}
+          />
+        );
+      }
+
       // Direct seamless routing for SVG schematics & illustrations: render borderless EmbeddedFigure!
       if (
         (lowerLang === 'svg' || code.trim().startsWith('<svg')) &&
@@ -918,6 +893,20 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
           title={diagTitle}
           code={code}
           element={diagElement}
+        />
+      );
+    }
+
+    if (
+      lowerLang === 'bmw-chassis' ||
+      lowerLang === 'bmw' ||
+      lowerLang === 'powertrain' ||
+      lowerLang === 'chassis-3d' ||
+      lowerLang === 'powertrain-3d'
+    ) {
+      return (
+        <BmwChassisVisualizer3D
+          title="BMW Longitudinal Chassis & Powertrain Architecture (CLAR)"
         />
       );
     }
@@ -1759,7 +1748,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
               nextL.startsWith('*Task Domain:') ||
               nextL.startsWith('Task Domain:') ||
               nextL.startsWith('*[Model:') ||
-              nextL.startsWith('[Model:')
+              nextL.startsWith('[Model:') ||
+              nextL.includes('Dynamically selected') ||
+              nextL.includes('Conversational Inference') ||
+              nextL.includes('peak effectiveness') ||
+              nextL.includes('Optimal Route') ||
+              (nextL.startsWith('*') && (nextL.includes('Domain') || nextL.includes('Inference') || nextL.includes('Model')))
             ) {
               bannerLines.push(lines[i + 1]);
               i++;
