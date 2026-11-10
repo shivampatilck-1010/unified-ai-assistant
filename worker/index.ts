@@ -455,7 +455,7 @@ interface CodingWorkspaceFileRow {
 
 const JWT_ISSUER = 'unified-ai-assistant';
 const JWT_AUDIENCE = 'unified-ai-assistant-api';
-const JWT_LIFETIME_SECONDS = 60 * 60;
+const JWT_LIFETIME_SECONDS = 90 * 24 * 60 * 60; // 90-day persistent session
 const MAX_CODING_FILE_BYTES = 1_000_000;
 const MAX_CODING_WORKSPACE_FILES = 500;
 const MAX_CODING_WORKSPACE_BYTES = 25_000_000;
@@ -538,10 +538,14 @@ async function verifySessionToken(token: string, secret: string): Promise<Google
       aud?: string;
       profile?: { email?: string; name?: string; picture?: string };
     };
+    const now = Math.floor(Date.now() / 1000);
+    const iat = typeof payload.iat === 'number' ? payload.iat : 0;
+    const isWithinGracePeriod = iat > 0 && (now - iat) <= 90 * 24 * 60 * 60;
+    const isExpired = typeof payload.exp !== 'number' || payload.exp <= now;
+
     if (
       !payload.sub ||
-      typeof payload.exp !== 'number' ||
-      payload.exp <= Math.floor(Date.now() / 1000) ||
+      (isExpired && !isWithinGracePeriod) ||
       payload.iss !== JWT_ISSUER ||
       payload.aud !== JWT_AUDIENCE ||
       !payload.profile?.email ||
@@ -583,8 +587,9 @@ async function verifyGoogleCredential(
     picture?: string;
   };
   const expiresAt = Number(claims.exp);
+  const cleanClientId = clientId.trim();
   if (
-    claims.aud !== clientId ||
+    claims.aud !== cleanClientId ||
     !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss || '') ||
     (claims.email_verified !== true && claims.email_verified !== 'true') ||
     !claims.sub ||
@@ -2700,10 +2705,13 @@ export default {
       } catch {}
 
       const convsToSync: any[] = Array.isArray(body.conversations) ? body.conversations : [];
+      let savedConvs = 0;
+      let savedMsgs = 0;
       if (env.DB && convsToSync.length > 0) {
         try {
           for (const conv of convsToSync) {
             if (!conv.id) continue;
+            const nowIso = new Date().toISOString();
             await env.DB.prepare(
               `INSERT INTO user_conversations (id, user_id, title, project_id, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?)
@@ -2713,26 +2721,42 @@ export default {
               ownerId,
               conv.title || 'Conversation',
               conv.project_id || null,
-              conv.created_at || new Date().toISOString(),
-              conv.updated_at || new Date().toISOString()
+              conv.created_at || nowIso,
+              conv.updated_at || nowIso
             ).run();
+            savedConvs++;
+
+            // Also keep in-memory store in sync
+            if (!conversationsStore.has(conv.id)) {
+              conversationsStore.set(conv.id, {
+                id: conv.id,
+                owner_id: ownerId,
+                title: conv.title || 'Conversation',
+                project_id: conv.project_id || null,
+                created_at: conv.created_at || nowIso,
+                updated_at: conv.updated_at || nowIso,
+                messages: Array.isArray(conv.messages) ? conv.messages : [],
+              });
+            }
 
             if (Array.isArray(conv.messages)) {
               for (const m of conv.messages) {
-                if (!m.id || !m.content) continue;
+                if (!m.content) continue;
+                const msgId = m.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
                 await env.DB.prepare(
                   `INSERT INTO user_messages (id, conversation_id, user_id, role, content, attachments, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(id) DO UPDATE SET content = excluded.content`
                 ).bind(
-                  m.id,
+                  msgId,
                   conv.id,
                   ownerId,
                   m.role || 'user',
                   m.content,
                   m.attachments ? JSON.stringify(m.attachments) : null,
-                  m.created_at || new Date().toISOString()
+                  m.created_at || nowIso
                 ).run();
+                savedMsgs++;
               }
             }
           }
@@ -2740,7 +2764,7 @@ export default {
           console.warn('Sync to D1 error:', syncErr);
         }
       }
-      return jsonResponse({ status: 'ok', synced: convsToSync.length });
+      return jsonResponse({ status: 'ok', synced: convsToSync.length, savedConvs, savedMsgs });
     }
 
     if (path.startsWith('/api/conversations/')) {

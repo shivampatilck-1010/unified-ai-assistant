@@ -2,6 +2,9 @@ name = "unified-ai-assistant"
 main = "./worker/index.ts"
 compatibility_date = "2026-03-01"
 
+[vars]
+GOOGLE_CLIENT_ID = "79278865859-n50j7civq2lcr93b353u9ue5th5csubm.apps.googleusercontent.com"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "unified-ai-assistant-prod-db"

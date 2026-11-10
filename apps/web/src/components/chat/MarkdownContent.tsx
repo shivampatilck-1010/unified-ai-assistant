@@ -15,6 +15,8 @@ import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import { replaceEmojisWithCustom } from '../common/CustomEmoji';
 import { BmwChassisVisualizer3D } from '../vibe';
+import { InteractiveModel3D } from './InteractiveModel3D';
+import { parseInteractiveModel } from './interactiveModelSchema';
 import './MarkdownContent.css';
 
 // Initialize Mermaid once with dark theme
@@ -527,9 +529,26 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
   const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, code }) => {
     const [copied, setCopied] = useState<boolean>(false);
     const lowerLang = (language || '').toLowerCase().trim();
+    const highlighted = React.useMemo(() => highlightCode(code, language), [code, language]);
 
     if (lowerLang === 'mermaid') {
       return <MermaidDiagram code={code} />;
+    }
+
+    if (lowerLang === 'interactive-3d' || lowerLang === '3d-model' || lowerLang === 'anatomy-3d') {
+      const parsed = parseInteractiveModel(code);
+      if (parsed.ok) {
+        return <InteractiveModel3D model={parsed.model} />;
+      }
+      return (
+        <div className="code-block-container" role="alert">
+          <div className="code-block-header">
+            <span className="code-block-lang">3D model could not be rendered</span>
+          </div>
+          <p style={{ padding: '0 14px', color: '#ffc3aa', fontSize: '13px' }}>{parsed.error}</p>
+          <pre className="code-block-pre"><code>{code}</code></pre>
+        </div>
+      );
     }
 
     // Interactive Animated Calendar & Task Event Block
@@ -1131,10 +1150,6 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     };
-
-    const highlighted = React.useMemo(() => {
-      return highlightCode(code, language);
-    }, [code, language]);
 
     return (
       <div className="code-block-container">

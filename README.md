@@ -70,6 +70,7 @@ Understand ➔ Plan ➔ Observe ➔ Act ➔ Verify ➔ Recover ➔ Complete
 ### 4.  Mathematical Notation & Visual Diagrams
 * **KaTeX 0.19 Rendering**: Full rendering of inline equations (`$E = mc^2$`, `\(...\)`) and standalone display equation blocks (`$$...$$`, `\[...\]`).
 * **Mermaid 12.2 Interactive Diagrams**: Live generation of flowcharts, sequence diagrams, class models, state machines, and Gantt charts with one-click **SVG Download** and code copying.
+* **Interactive 3D Learning Models**: The chat can render validated, declarative 3D models with selectable parts, explanations, cross-section and exploded views, and GLB export. Models are simplified educational schematics; they are not medical references, diagnostic tools, or manufacturing-ready CAD.
 
 ### 5.  Interactive Canvas Animation
 * **Image Generating Particle Canvas**: Pitch-black canvas (`#050507`) with 75 floating gray ambient particles.

@@ -301,36 +301,94 @@ export function claimGuestDataToUser(user: UserProfile): void {
     const userPrefix = `u_${safeUserId}_`;
     const userConvsKey = `${userPrefix}conversations_v2`;
 
-    // 1. Claim guest conversations
-    const guestConvsRaw = localStorage.getItem('guest_conversations_v2') || localStorage.getItem('unified_ai_conversations_v2');
-    if (guestConvsRaw) {
-      try {
-        const guestConvs = JSON.parse(guestConvsRaw);
-        if (Array.isArray(guestConvs) && guestConvs.length > 0) {
-          const userConvsRaw = localStorage.getItem(userConvsKey);
-          const userConvs = userConvsRaw ? JSON.parse(userConvsRaw) : [];
-          const userConvsMap = new Map<string, unknown>(userConvs.map((c: { id: string }) => [c.id, c]));
+    // 1. Claim all local conversations from guest, default_user, or legacy stores
+    const userConvsRaw = localStorage.getItem(userConvsKey);
+    const userConvs: any[] = userConvsRaw ? JSON.parse(userConvsRaw) : [];
+    const userConvsMap = new Map<string, any>(userConvs.map((c: any) => [c.id, c]));
 
-          for (const conv of guestConvs) {
+    const sourceKeys: string[] = [
+      'guest_conversations_v2',
+      'unified_ai_conversations_v2',
+      'u_default_user_conversations_v2',
+    ];
+
+    // Scan any additional legacy conversation keys in localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.endsWith('_conversations_v2') || k.endsWith('conversations_v2')) && k !== userConvsKey) {
+        if (!sourceKeys.includes(k)) {
+          sourceKeys.push(k);
+        }
+      }
+    }
+
+    const claimedPayload: Array<Record<string, unknown>> = [];
+
+    for (const srcKey of sourceKeys) {
+      const raw = localStorage.getItem(srcKey);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          for (const conv of parsed) {
+            if (!conv || !conv.id) continue;
             const updatedConv = { ...conv, owner_id: user.id };
             userConvsMap.set(conv.id, updatedConv);
 
-            // Move messages
-            const msgKeys = [
-              `guest_conv_messages_v2_${conv.id}`,
-              `unified_ai_conv_messages_v2_${conv.id}`,
-            ];
-            for (const mk of msgKeys) {
-              const msgsRaw = localStorage.getItem(mk);
-              if (msgsRaw) {
-                localStorage.setItem(`${userPrefix}conv_messages_v2_${conv.id}`, msgsRaw);
-                localStorage.removeItem(mk);
+            // Locate messages for this conversation across all possible keys
+            const targetMsgKey = `${userPrefix}conv_messages_v2_${conv.id}`;
+            let msgsRaw = localStorage.getItem(targetMsgKey);
+            if (!msgsRaw) {
+              const msgCandidates = [
+                `u_default_user_conv_messages_v2_${conv.id}`,
+                `guest_conv_messages_v2_${conv.id}`,
+                `unified_ai_conv_messages_v2_${conv.id}`,
+              ];
+              for (const mc of msgCandidates) {
+                const found = localStorage.getItem(mc);
+                if (found) {
+                  msgsRaw = found;
+                  localStorage.setItem(targetMsgKey, found);
+                  break;
+                }
+              }
+              if (!msgsRaw) {
+                for (let j = 0; j < localStorage.length; j++) {
+                  const lk = localStorage.key(j);
+                  if (lk && lk.includes('conv_messages') && lk.endsWith(conv.id)) {
+                    const found = localStorage.getItem(lk);
+                    if (found) {
+                      msgsRaw = found;
+                      localStorage.setItem(targetMsgKey, found);
+                      break;
+                    }
+                  }
+                }
               }
             }
+
+            let parsedMessages: any[] = [];
+            if (msgsRaw) {
+              try {
+                parsedMessages = JSON.parse(msgsRaw);
+              } catch {}
+            }
+
+            claimedPayload.push({
+              ...updatedConv,
+              messages: parsedMessages,
+            });
           }
-          localStorage.setItem(userConvsKey, JSON.stringify(Array.from(userConvsMap.values())));
         }
       } catch {}
+    }
+
+    if (userConvsMap.size > 0) {
+      const allConvs = Array.from(userConvsMap.values());
+      localStorage.setItem(userConvsKey, JSON.stringify(allConvs));
+      if (claimedPayload.length > 0) {
+        void syncConversations(claimedPayload).catch(() => {});
+      }
     }
 
     // 2. Claim guest tasks

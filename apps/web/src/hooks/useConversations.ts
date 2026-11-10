@@ -29,7 +29,8 @@ function getStorageKeys() {
 
 function loadStoredConversations(): ConversationSummary[] {
   // If not authenticated, guest session has NO persistent recent conversations
-  if (!getStoredUser()) {
+  const user = getStoredUser();
+  if (!user) {
     return [];
   }
   try {
@@ -38,6 +39,42 @@ function loadStoredConversations(): ConversationSummary[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+
+    // Auto-heal: scan legacy/guest storage keys if user store is currently empty
+    const fallbackKeys = [
+      'u_default_user_conversations_v2',
+      'guest_conversations_v2',
+      'unified_ai_conversations_v2',
+    ];
+    for (const fbKey of fallbackKeys) {
+      const fbRaw = localStorage.getItem(fbKey);
+      if (fbRaw) {
+        try {
+          const parsed = JSON.parse(fbRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localStorage.setItem(key, fbRaw);
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+
+    // Deep scan: scan any localStorage key ending with conversations_v2
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.endsWith('conversations_v2') && k !== key) {
+        const val = localStorage.getItem(k);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localStorage.setItem(key, val);
+              return parsed;
+            }
+          } catch {}
+        }
+      }
     }
   } catch {}
   return [];
@@ -55,10 +92,47 @@ function saveStoredConversations(list: ConversationSummary[]) {
 function loadStoredMessages(convId: string): ChatMessage[] {
   try {
     const { msgPrefix } = getStorageKeys();
-    const raw = localStorage.getItem(`${msgPrefix}${convId}`);
+    const targetKey = `${msgPrefix}${convId}`;
+    const raw = localStorage.getItem(targetKey);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+
+    // Fallback: search across all message storage keys in localStorage for this convId
+    const fallbackPrefixes = [
+      'u_default_user_conv_messages_v2_',
+      'guest_conv_messages_v2_',
+      'unified_ai_conv_messages_v2_',
+    ];
+    for (const fb of fallbackPrefixes) {
+      const fbRaw = localStorage.getItem(`${fb}${convId}`);
+      if (fbRaw) {
+        try {
+          const parsed = JSON.parse(fbRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localStorage.setItem(targetKey, fbRaw);
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+
+    // Deep scan for any localStorage key matching convId
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.includes('conv_messages') && k.endsWith(convId)) {
+        const val = localStorage.getItem(k);
+        if (val) {
+          try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localStorage.setItem(targetKey, val);
+              return parsed;
+            }
+          } catch {}
+        }
+      }
     }
   } catch {}
   return [];
@@ -271,7 +345,8 @@ export function useConversations(backendConnected: boolean = true) {
   // Load conversation list from backend and merge with local store
   const refreshList = useCallback(async () => {
     if (!backendConnected) return;
-    if (!getStoredUser()) {
+    const user = getStoredUser();
+    if (!user) {
       setConversations([]);
       return;
     }
@@ -292,7 +367,7 @@ export function useConversations(backendConnected: boolean = true) {
           ...c,
           messages: loadStoredMessages(c.id),
         }));
-        void syncConversations(payload).catch(() => {});
+        await syncConversations(payload);
       }
 
       // Merge server items + local items
@@ -305,12 +380,39 @@ export function useConversations(backendConnected: boolean = true) {
       merged.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setConversations(merged);
       saveStoredConversations(merged);
+
+      // Auto-load most recent conversation on newly opened devices if no conversation is currently loaded
+      if (!activeConversationRef.current && merged.length > 0) {
+        const targetId = activeId || merged[0].id;
+        setActiveId(targetId);
+        let cached = loadStoredMessages(targetId);
+        if (cached.length === 0) {
+          try {
+            const detail = await fetchConversation(targetId);
+            if (detail && Array.isArray(detail.messages) && detail.messages.length > 0) {
+              saveStoredMessages(targetId, detail.messages);
+              cached = detail.messages;
+            }
+          } catch {}
+        }
+        const summary = merged.find((c) => c.id === targetId) || merged[0];
+        const detailObj: ConversationDetail = {
+          id: targetId,
+          owner_id: summary.owner_id || user.id,
+          title: summary.title || 'Conversation',
+          created_at: summary.created_at || new Date().toISOString(),
+          updated_at: summary.updated_at || new Date().toISOString(),
+          messages: cached,
+        };
+        setActiveConversation(detailObj);
+        activeConversationRef.current = detailObj;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
     } finally {
       setIsLoading(false);
     }
-  }, [backendConnected]);
+  }, [backendConnected, activeId]);
 
   useEffect(() => {
     if (backendConnected) {

@@ -577,6 +577,26 @@ INTERACTION GUIDELINES:
 """
             conversation_history.insert(0, {"role": "system", "content": base_system_prompt})
 
+        visual_request = bool(
+            re.search(
+                r"\b(?:cross[\s-]?section|anatom(?:y|ical|ic)|3d|three[\s-]?dimensional|"
+                r"interactive\s+(?:visual|model|diagram)|cutaway|dissect|visuali[sz]e|explore|"
+                r"draw(?:ing)?|illustrat(?:e|ion)|design|render|prototype|poster|logo|icon|"
+                r"infographic|wireframe|mockup|interface|mascot|artwork|diagram|"
+                r"model(?:ling|ing)?|image)\b",
+                request.message,
+                re.IGNORECASE,
+            )
+        )
+        if visual_request:
+            visual_prompt = """VISUAL DESIGN AND INTERACTIVE LEARNING:
+- For a requested interactive 3D model, anatomy view, or cross-section, produce a `interactive-3d` fenced JSON block with `title`, `subject`, optional `note`, and 2-24 `parts`. Each part must have `id` (unique short identifier), `name`, `shape` (`sphere`, `ellipsoid`, `capsule`, `cylinder`, `box`, or `torus`), `position` and `scale` (three-number arrays), `color` (six-digit hex), `layer` (use `outer` for a surface that should become translucent in section view; use `inner` or a meaningful structure name for internal parts), `description`, and optional `function`. Keep positions within -4..4 and scale values greater than 0 and at most 3. The application renders this structured data in an interactive WebGL viewer; never put HTML, JavaScript, or executable code in this block.
+- Make the model educational and internally coherent: arrange shapes to communicate their relationships, label parts clearly, and explain each part in accurate, plain language. For human anatomy, label it a simplified educational schematic, not to scale or suitable for diagnosis/treatment. Avoid claiming fine-grained anatomical accuracy that the simple geometry cannot show.
+- For a 2D design or illustration, provide a self-contained, polished SVG in an `svg` fenced block when appropriate; for process or system diagrams, use Mermaid. Do not invent that a file or image was created if only descriptive text was produced.
+- Use the model selected by the user. Do not claim to have called another provider or an image-generation service unless the application actually did so. If web research is enabled, ground factual claims in its results; otherwise do not fabricate citations.
+"""
+            conversation_history.insert(0, {"role": "system", "content": visual_prompt})
+
         # Inject Project Workspace instructions if active
         if project_obj and project_obj.system_prompt:
             project_scope_prompt = f"""=== PROJECT WORKSPACE CONTEXT: {project_obj.name} ===
