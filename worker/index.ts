@@ -2,6 +2,9 @@ export interface Env {
   ASSETS: {
     fetch: (request: Request | string) => Promise<Response>;
   };
+  DB?: CodingWorkspaceDatabase;
+  GOOGLE_CLIENT_ID?: string;
+  JWT_SECRET_KEY?: string;
   GEMINI_API_KEY?: string;
   GOOGLE_API_KEY?: string;
   GROQ_API_KEY?: string;
@@ -421,6 +424,461 @@ function jsonResponse(data: unknown, status = 200): Response {
       ...CORS_HEADERS,
     },
   });
+}
+
+interface CodingWorkspaceStatement {
+  bind(...values: unknown[]): CodingWorkspaceStatement;
+  first<T = Record<string, unknown>>(): Promise<T | null>;
+  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
+  run(): Promise<{ meta?: { changes?: number } }>;
+}
+
+interface CodingWorkspaceDatabase {
+  prepare(query: string): CodingWorkspaceStatement;
+}
+
+interface GoogleProfile {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+  provider: 'google';
+}
+
+interface CodingWorkspaceFileRow {
+  file_path: string;
+  content: string;
+  sha256: string;
+  size_bytes?: number;
+}
+
+const JWT_ISSUER = 'unified-ai-assistant';
+const JWT_AUDIENCE = 'unified-ai-assistant-api';
+const JWT_LIFETIME_SECONDS = 60 * 60;
+const MAX_CODING_FILE_BYTES = 1_000_000;
+const MAX_CODING_WORKSPACE_FILES = 500;
+const MAX_CODING_WORKSPACE_BYTES = 25_000_000;
+
+const textEncoder = new TextEncoder();
+
+function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function encodeJsonBase64Url(value: unknown): string {
+  return encodeBase64Url(textEncoder.encode(JSON.stringify(value)));
+}
+
+function decodeBase64Url(value: string): Uint8Array {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function importJwtKey(secret: string, usage: KeyUsage[]): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    usage,
+  );
+}
+
+async function createSessionToken(profile: GoogleProfile, secret: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = encodeJsonBase64Url({ alg: 'HS256', typ: 'JWT' });
+  const payload = encodeJsonBase64Url({
+    sub: profile.id,
+    iat: now,
+    exp: now + JWT_LIFETIME_SECONDS,
+    iss: JWT_ISSUER,
+    aud: JWT_AUDIENCE,
+    profile: {
+      email: profile.email,
+      name: profile.name,
+      picture: profile.picture,
+    },
+  });
+  const signingInput = `${header}.${payload}`;
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    await importJwtKey(secret, ['sign']),
+    textEncoder.encode(signingInput),
+  );
+  return `${signingInput}.${encodeBase64Url(new Uint8Array(signature))}`;
+}
+
+async function verifySessionToken(token: string, secret: string): Promise<GoogleProfile | null> {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+
+  try {
+    const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0]))) as {
+      alg?: string;
+      typ?: string;
+    };
+    if (header.alg !== 'HS256' || header.typ !== 'JWT') return null;
+
+    const verified = await crypto.subtle.verify(
+      'HMAC',
+      await importJwtKey(secret, ['verify']),
+      decodeBase64Url(parts[2]),
+      textEncoder.encode(`${parts[0]}.${parts[1]}`),
+    );
+    if (!verified) return null;
+
+    const payload = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1]))) as {
+      sub?: string;
+      exp?: number;
+      iss?: string;
+      aud?: string;
+      profile?: { email?: string; name?: string; picture?: string };
+    };
+    if (
+      !payload.sub ||
+      typeof payload.exp !== 'number' ||
+      payload.exp <= Math.floor(Date.now() / 1000) ||
+      payload.iss !== JWT_ISSUER ||
+      payload.aud !== JWT_AUDIENCE ||
+      !payload.profile?.email ||
+      !payload.profile.name
+    ) {
+      return null;
+    }
+
+    return {
+      id: payload.sub,
+      email: payload.profile.email,
+      name: payload.profile.name,
+      picture: payload.profile.picture || '',
+      provider: 'google',
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function verifyGoogleCredential(
+  credential: string,
+  clientId: string,
+): Promise<GoogleProfile | null> {
+  const response = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+    { signal: AbortSignal.timeout(5_000) },
+  );
+  if (!response.ok) return null;
+
+  const claims = (await response.json()) as {
+    aud?: string;
+    iss?: string;
+    exp?: string;
+    sub?: string;
+    email?: string;
+    email_verified?: string | boolean;
+    name?: string;
+    picture?: string;
+  };
+  const expiresAt = Number(claims.exp);
+  if (
+    claims.aud !== clientId ||
+    !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss || '') ||
+    (claims.email_verified !== true && claims.email_verified !== 'true') ||
+    !claims.sub ||
+    !claims.email ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt <= Math.floor(Date.now() / 1000)
+  ) {
+    return null;
+  }
+
+  return {
+    id: `google_${claims.sub}`,
+    email: claims.email,
+    name: claims.name || claims.email.split('@')[0],
+    picture: claims.picture || '',
+    provider: 'google',
+  };
+}
+
+async function authenticatedProfile(
+  request: Request,
+  env: Env,
+): Promise<{ profile: GoogleProfile } | { response: Response }> {
+  if (!env.JWT_SECRET_KEY || env.JWT_SECRET_KEY.length < 32) {
+    return {
+      response: jsonResponse({ detail: 'Session signing is not configured.' }, 503),
+    };
+  }
+
+  const authorization = request.headers.get('Authorization') || '';
+  if (!authorization.startsWith('Bearer ')) {
+    return { response: jsonResponse({ detail: 'Authentication required.' }, 401) };
+  }
+
+  const token = authorization.slice(7).trim();
+  const profile = token
+    ? await verifySessionToken(token, env.JWT_SECRET_KEY)
+    : null;
+  if (!profile) {
+    return { response: jsonResponse({ detail: 'Authentication token is invalid or expired.' }, 401) };
+  }
+  return { profile };
+}
+
+function codingWorkspacePath(value: unknown): string | null {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 512 ||
+    value.includes('\0') ||
+    value.includes('\\') ||
+    value.startsWith('/') ||
+    /^[a-zA-Z]:/.test(value)
+  ) {
+    return null;
+  }
+  const parts = value.split('/');
+  if (parts.some((part) => !part || part === '.' || part === '..')) return null;
+  return value;
+}
+
+function lineArray(content: string): string[] {
+  if (!content) return [];
+  return (content.match(/[^\n]*\n|[^\n]+$/g) || []).map((line) =>
+    line.endsWith('\n') ? line.slice(0, -1).replace(/\r$/, '') : line.replace(/\r$/, ''),
+  );
+}
+
+function unifiedDiff(
+  filePath: string,
+  originalContent: string,
+  newContent: string,
+): { diff: string; linesAdded: number; linesRemoved: number } {
+  const original = lineArray(originalContent);
+  const updated = lineArray(newContent);
+  let prefix = 0;
+  while (prefix < original.length && prefix < updated.length && original[prefix] === updated[prefix]) {
+    prefix += 1;
+  }
+  let suffix = 0;
+  while (
+    suffix < original.length - prefix &&
+    suffix < updated.length - prefix &&
+    original[original.length - 1 - suffix] === updated[updated.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  const removed = original.slice(prefix, original.length - suffix);
+  const added = updated.slice(prefix, updated.length - suffix);
+  if (!removed.length && !added.length) return { diff: '', linesAdded: 0, linesRemoved: 0 };
+
+  const range = (start: number, count: number) =>
+    count === 0 ? `${start - 1},0` : count === 1 ? `${start}` : `${start},${count}`;
+  const hunk = [
+    `@@ -${range(prefix + 1, removed.length)} +${range(prefix + 1, added.length)} @@`,
+    ...removed.map((line) => `-${line}`),
+    ...added.map((line) => `+${line}`),
+  ];
+  return {
+    diff: [`--- a/${filePath}`, `+++ b/${filePath}`, ...hunk].join('\n'),
+    linesAdded: added.length,
+    linesRemoved: removed.length,
+  };
+}
+
+async function sha256Hex(content: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(content));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function readCodingFile(
+  env: Env,
+  userId: string,
+  filePath: string,
+): Promise<CodingWorkspaceFileRow | null> {
+  if (!env.DB) return null;
+  return env.DB
+    .prepare(
+      'SELECT file_path, content, sha256 FROM coding_workspace_files WHERE user_id = ? AND file_path = ?',
+    )
+    .bind(userId, filePath)
+    .first<CodingWorkspaceFileRow>();
+}
+
+function invalidCodingRequest(detail: string, status = 400): Response {
+  return jsonResponse({ detail }, status);
+}
+
+async function handleCodingRequest(request: Request, env: Env, path: string): Promise<Response> {
+  if (!env.DB) {
+    return jsonResponse({ detail: 'Coding workspace storage is not configured.' }, 503);
+  }
+
+  const authorization = await authenticatedProfile(request, env);
+  if ('response' in authorization) return authorization.response;
+  const userId = authorization.profile.id;
+
+  if (path === '/api/intelligence/coding/test' && request.method === 'POST') {
+    return jsonResponse({
+      detail: 'Code execution is disabled. Workers do not provide an OS-level sandbox for user code.',
+    }, 503);
+  }
+
+  if (request.method !== 'POST') {
+    return invalidCodingRequest('Method not allowed.', 405);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return invalidCodingRequest('Request body must be valid JSON.');
+  }
+
+  if (path === '/api/intelligence/coding/inspect') {
+    const maxFiles =
+      typeof body.max_files === 'number' && Number.isInteger(body.max_files)
+        ? Math.min(500, Math.max(1, body.max_files))
+        : 100;
+    const rows = await env.DB
+      .prepare(
+        'SELECT file_path, LENGTH(CAST(content AS BLOB)) AS size_bytes FROM coding_workspace_files WHERE user_id = ? ORDER BY file_path LIMIT ?',
+      )
+      .bind(userId, MAX_CODING_WORKSPACE_FILES)
+      .all<{ file_path: string; size_bytes: number }>();
+    const files = new Map<string, { path: string; relative_path: string; size_bytes: number; is_directory: boolean }>();
+    for (const row of rows.results) {
+      const parts = row.file_path.split('/');
+      for (let index = 1; index < parts.length; index += 1) {
+        const directory = parts.slice(0, index).join('/');
+        if (!files.has(directory)) {
+          files.set(directory, {
+            path: directory,
+            relative_path: directory,
+            size_bytes: 0,
+            is_directory: true,
+          });
+        }
+      }
+      files.set(row.file_path, {
+        path: row.file_path,
+        relative_path: row.file_path,
+        size_bytes: Number(row.size_bytes) || 0,
+        is_directory: false,
+      });
+    }
+    const orderedFiles = [...files.values()].sort((left, right) =>
+      left.relative_path.localeCompare(right.relative_path),
+    );
+    return jsonResponse({
+      files: orderedFiles.slice(0, maxFiles),
+      total_count: orderedFiles.length,
+      tests_enabled: false,
+    });
+  }
+
+  if (path === '/api/intelligence/coding/read') {
+    const filePath = codingWorkspacePath(body.file_path);
+    if (!filePath) return invalidCodingRequest('File path must be a safe relative workspace path.');
+    const row = await readCodingFile(env, userId, filePath);
+    if (!row) return invalidCodingRequest(`Source file not found: ${filePath}`, 404);
+    if (textEncoder.encode(row.content).byteLength > MAX_CODING_FILE_BYTES) {
+      return invalidCodingRequest('Files larger than 1000000 bytes cannot be read in the editor.', 400);
+    }
+    const maxLines =
+      typeof body.max_lines === 'number' && Number.isInteger(body.max_lines)
+        ? Math.min(5000, Math.max(1, body.max_lines))
+        : 500;
+    const lines = lineArray(row.content);
+    const content = lines.length > maxLines ? `${lines.slice(0, maxLines).join('\n')}\n` : row.content;
+    return jsonResponse({ file_path: filePath, content });
+  }
+
+  if (path === '/api/intelligence/coding/preview' || path === '/api/intelligence/coding/modify') {
+    if (typeof body.new_content !== 'string') {
+      return invalidCodingRequest('new_content must be a string.');
+    }
+    if (textEncoder.encode(body.new_content).byteLength > MAX_CODING_FILE_BYTES) {
+      return invalidCodingRequest('Edits cannot exceed 1000000 bytes.', 413);
+    }
+    const filePath = codingWorkspacePath(body.file_path);
+    if (!filePath) return invalidCodingRequest('File path must be a safe relative workspace path.');
+
+    const current = await readCodingFile(env, userId, filePath);
+    if (path.endsWith('/preview')) {
+      const originalContent = current?.content || '';
+      const diff = unifiedDiff(filePath, originalContent, body.new_content);
+      return jsonResponse({
+        file_path: filePath,
+        status: current ? 'modified' : 'created',
+        original_sha256: current?.sha256 || null,
+        diff: diff.diff,
+        lines_added: diff.linesAdded,
+        lines_removed: diff.linesRemoved,
+      });
+    }
+
+    if (
+      body.expected_sha256 !== null &&
+      (typeof body.expected_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(body.expected_sha256))
+    ) {
+      return invalidCodingRequest('expected_sha256 must be a valid preview hash or null.');
+    }
+    const expectedHash = body.expected_sha256 as string | null;
+    if ((current?.sha256 || null) !== expectedHash) {
+      return invalidCodingRequest('The file changed after preview. Refresh it and review a new diff.', 409);
+    }
+
+    const totals = await env.DB
+      .prepare(
+        'SELECT COUNT(*) AS file_count, COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) AS total_bytes FROM coding_workspace_files WHERE user_id = ?',
+      )
+      .bind(userId)
+      .first<{ file_count: number; total_bytes: number }>();
+    const fileCount = Number(totals?.file_count) || 0;
+    const totalBytes = Number(totals?.total_bytes) || 0;
+    const newBytes = textEncoder.encode(body.new_content).byteLength;
+    const oldBytes = current ? textEncoder.encode(current.content).byteLength : 0;
+    if (
+      (!current && fileCount >= MAX_CODING_WORKSPACE_FILES) ||
+      totalBytes - oldBytes + newBytes > MAX_CODING_WORKSPACE_BYTES
+    ) {
+      return invalidCodingRequest('Workspace file or storage quota exceeded.', 413);
+    }
+
+    const newHash = await sha256Hex(body.new_content);
+    const result = current
+      ? await env.DB
+          .prepare(
+            'UPDATE coding_workspace_files SET content = ?, sha256 = ?, updated_at = ? WHERE user_id = ? AND file_path = ? AND sha256 = ?',
+          )
+          .bind(body.new_content, newHash, new Date().toISOString(), userId, filePath, expectedHash)
+          .run()
+      : await env.DB
+          .prepare(
+            'INSERT INTO coding_workspace_files (user_id, file_path, content, sha256, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, file_path) DO NOTHING',
+          )
+          .bind(userId, filePath, body.new_content, newHash, new Date().toISOString())
+          .run();
+    if (result.meta?.changes !== 1) {
+      return invalidCodingRequest('The file changed after preview. Refresh it and review a new diff.', 409);
+    }
+
+    const diff = unifiedDiff(filePath, current?.content || '', body.new_content);
+    return jsonResponse({
+      file_path: filePath,
+      status: current ? 'modified' : 'created',
+      lines_added: diff.linesAdded,
+      lines_removed: diff.linesRemoved,
+      diff_summary: `+${diff.linesAdded} / -${diff.linesRemoved} lines`,
+      error: null,
+    });
+  }
+
+  return invalidCodingRequest('Coding endpoint not found.', 404);
 }
 
 async function streamOpenAICompatible({
@@ -935,54 +1393,46 @@ export default {
 
     // Google OAuth & Session Endpoints
     if (path === '/api/auth/google' && request.method === 'POST') {
-      let body: {
-        credential?: string;
-        email?: string;
-        name?: string;
-        picture?: string;
-        sub?: string;
-      } = {};
-      try {
-        body = await request.json();
-      } catch {
-        // Fallback for empty body
+      if (!env.JWT_SECRET_KEY || env.JWT_SECRET_KEY.length < 32) {
+        return jsonResponse({ detail: 'Session signing is not configured.' }, 503);
+      }
+      if (!env.GOOGLE_CLIENT_ID) {
+        return jsonResponse({ detail: 'Google sign-in is not configured.' }, 503);
       }
 
-      const email = body.email || 'shivam.patil@gmail.com';
-      const name =
-        body.name ||
-        (email.includes('@')
-          ? email
-              .split('@')[0]
-              .replace(/[._]/g, ' ')
-              .replace(/\b\w/g, (l) => l.toUpperCase())
-          : 'Shivam Patil');
-      const picture =
-        body.picture ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&size=128`;
-      const id = body.sub || `google-${Date.now()}`;
+      let body: { credential?: unknown };
+      try {
+        body = (await request.json()) as { credential?: unknown };
+      } catch {
+        return jsonResponse({ detail: 'Request body must be valid JSON.' }, 400);
+      }
+      if (typeof body.credential !== 'string' || !body.credential || body.credential.length > 8192) {
+        return jsonResponse({ detail: 'A valid Google ID token is required.' }, 400);
+      }
 
-      const user = {
-        id,
-        email,
-        name,
-        picture,
-        provider: 'google',
-      };
-
-      const token = `gauth_${btoa(
-        JSON.stringify({ id, email, name, exp: Date.now() + 7 * 24 * 3600 * 1000 })
-      )}`;
+      let profile: GoogleProfile | null;
+      try {
+        profile = await verifyGoogleCredential(body.credential, env.GOOGLE_CLIENT_ID);
+      } catch {
+        console.error('Google ID-token verification request failed.');
+        return jsonResponse({ detail: 'Google sign-in verification is temporarily unavailable.' }, 503);
+      }
+      if (!profile) {
+        return jsonResponse({ detail: 'Google ID token is invalid or expired.' }, 401);
+      }
+      const token = await createSessionToken(profile, env.JWT_SECRET_KEY);
 
       return jsonResponse({
         access_token: token,
         token_type: 'bearer',
-        user,
+        user: profile,
       });
     }
 
     if (path === '/api/auth/me') {
-      const authHeader = request.headers.get('Authorization') || '';
+      const authorization = await authenticatedProfile(request, env);
+      if ('response' in authorization) return authorization.response;
+      return jsonResponse(authorization.profile);
       if (authHeader.startsWith('Bearer gauth_')) {
         try {
           const raw = atob(authHeader.replace('Bearer gauth_', ''));
@@ -2943,7 +3393,7 @@ ${query}`;
 
     // Coding and Automations intelligence endpoints
     if (path.startsWith('/api/intelligence/coding')) {
-      return jsonResponse({ status: 'ok', files: [], result: 'Ready' });
+      return handleCodingRequest(request, env, path);
     }
     if (path.startsWith('/api/intelligence/automations')) {
       return jsonResponse([]);

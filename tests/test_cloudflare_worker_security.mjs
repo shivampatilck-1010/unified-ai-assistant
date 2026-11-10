@@ -1,0 +1,261 @@
+import assert from 'node:assert/strict';
+import { after, test } from 'node:test';
+
+import worker from '../worker/index.ts';
+
+const originalFetch = globalThis.fetch;
+const secret = 'worker-test-signing-key-that-is-at-least-32-characters';
+
+class MemoryD1 {
+  constructor() {
+    this.files = new Map();
+  }
+
+  prepare(query) {
+    return {
+      bind: (...values) => ({
+        first: async () => {
+          if (query.startsWith('SELECT file_path, content, sha256')) {
+            const [userId, filePath] = values;
+            return this.files.get(`${userId}\0${filePath}`) || null;
+          }
+          if (query.startsWith('SELECT COUNT(*)')) {
+            const userId = values[0];
+            const rows = [...this.files.values()].filter((row) => row.user_id === userId);
+            return {
+              file_count: rows.length,
+              total_bytes: rows.reduce(
+                (total, row) => total + new TextEncoder().encode(row.content).byteLength,
+                0,
+              ),
+            };
+          }
+          throw new Error(`Unexpected D1 first query: ${query}`);
+        },
+        all: async () => {
+          if (query.startsWith('SELECT file_path, LENGTH')) {
+            const userId = values[0];
+            return {
+              results: [...this.files.values()]
+                .filter((row) => row.user_id === userId)
+                .map((row) => ({
+                  file_path: row.file_path,
+                  size_bytes: new TextEncoder().encode(row.content).byteLength,
+                })),
+            };
+          }
+          throw new Error(`Unexpected D1 all query: ${query}`);
+        },
+        run: async () => {
+          if (query.startsWith('INSERT')) {
+            const [userId, filePath, content, sha256, updatedAt] = values;
+            const key = `${userId}\0${filePath}`;
+            if (this.files.has(key)) return { meta: { changes: 0 } };
+            this.files.set(key, { user_id: userId, file_path: filePath, content, sha256, updated_at: updatedAt });
+            return { meta: { changes: 1 } };
+          }
+          if (query.startsWith('UPDATE')) {
+            const [content, sha256, updatedAt, userId, filePath, expectedHash] = values;
+            const key = `${userId}\0${filePath}`;
+            const current = this.files.get(key);
+            if (!current || current.sha256 !== expectedHash) return { meta: { changes: 0 } };
+            this.files.set(key, { ...current, content, sha256, updated_at: updatedAt });
+            return { meta: { changes: 1 } };
+          }
+          throw new Error(`Unexpected D1 run query: ${query}`);
+        },
+      }),
+    };
+  }
+}
+
+function makeEnv(db = new MemoryD1()) {
+  return {
+    DB: db,
+    GOOGLE_CLIENT_ID: 'worker-test-client.apps.googleusercontent.com',
+    JWT_SECRET_KEY: secret,
+    ASSETS: { fetch: async () => new Response('asset') },
+  };
+}
+
+async function post(env, path, body, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return worker.fetch(
+    new Request(`https://worker.test${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+async function login(env, sub, overrides = {}) {
+  const claims = {
+    aud: env.GOOGLE_CLIENT_ID,
+    iss: 'https://accounts.google.com',
+    exp: String(Math.floor(Date.now() / 1000) + 3600),
+    sub,
+    email: `${sub}@example.com`,
+    email_verified: 'true',
+    name: sub,
+    ...overrides,
+  };
+  globalThis.fetch = async (input) => {
+    assert.match(String(input), /^https:\/\/oauth2\.googleapis\.com\/tokeninfo\?/);
+    return new Response(JSON.stringify(claims), { status: 200 });
+  };
+  const response = await post(env, '/api/auth/google', { credential: 'verified-id-token' });
+  return { response, body: await response.json() };
+}
+
+after(() => {
+  globalThis.fetch = originalFetch;
+});
+
+test('Google login rejects unverified profile-only input and invalid claims', async () => {
+  const env = makeEnv();
+  const profileOnly = await post(env, '/api/auth/google', {
+    email: 'attacker@example.com',
+    name: 'Attacker',
+  });
+  assert.equal(profileOnly.status, 400);
+
+  const invalid = await login(env, 'unverified-user', { email_verified: 'false' });
+  assert.equal(invalid.response.status, 401);
+
+  const wrongAudience = await login(env, 'wrong-audience-user', {
+    aud: 'attacker-client.apps.googleusercontent.com',
+  });
+  assert.equal(wrongAudience.response.status, 401);
+
+  const unconfigured = await post(
+    { ...env, JWT_SECRET_KEY: undefined },
+    '/api/auth/google',
+    { credential: 'verified-id-token' },
+  );
+  assert.equal(unconfigured.status, 503);
+});
+
+test('verified Google ID tokens create signed sessions required by /me', async () => {
+  const env = makeEnv();
+  const { response, body } = await login(env, 'verified-user');
+  assert.equal(response.status, 200);
+  assert.equal(body.user.email, 'verified-user@example.com');
+  assert.match(body.access_token, /^[^.]+\.[^.]+\.[^.]+$/);
+
+  const profile = await worker.fetch(
+    new Request('https://worker.test/api/auth/me', {
+      headers: { Authorization: `Bearer ${body.access_token}` },
+    }),
+    env,
+  );
+  assert.equal(profile.status, 200);
+  assert.equal((await profile.json()).id, 'google_verified-user');
+
+  const forged = await worker.fetch(
+    new Request('https://worker.test/api/auth/me', {
+      headers: { Authorization: 'Bearer forged.token.value' },
+    }),
+    env,
+  );
+  assert.equal(forged.status, 401);
+});
+
+test('coding workspace edits require auth, stay user-scoped, and reject stale previews', async () => {
+  const env = makeEnv();
+  const firstUser = await login(env, 'workspace-user-one');
+  const secondUser = await login(env, 'workspace-user-two');
+  const firstToken = firstUser.body.access_token;
+  const secondToken = secondUser.body.access_token;
+
+  const unauthenticated = await post(env, '/api/intelligence/coding/inspect', {});
+  assert.equal(unauthenticated.status, 401);
+
+  const preview = await post(
+    env,
+    '/api/intelligence/coding/preview',
+    { file_path: 'src/main.py', new_content: "print('safe')\n" },
+    firstToken,
+  );
+  const previewBody = await preview.json();
+  assert.equal(preview.status, 200);
+  assert.equal(previewBody.status, 'created');
+  assert.match(previewBody.diff, /^\-\-\- a\/src\/main\.py/m);
+
+  const created = await post(
+    env,
+    '/api/intelligence/coding/modify',
+    {
+      file_path: 'src/main.py',
+      new_content: "print('safe')\n",
+      expected_sha256: null,
+    },
+    firstToken,
+  );
+  assert.equal(created.status, 200);
+
+  const stale = await post(
+    env,
+    '/api/intelligence/coding/modify',
+    {
+      file_path: 'src/main.py',
+      new_content: "print('stale')\n",
+      expected_sha256: null,
+    },
+    firstToken,
+  );
+  assert.equal(stale.status, 409);
+
+  const editPreview = await post(
+    env,
+    '/api/intelligence/coding/preview',
+    { file_path: 'src/main.py', new_content: "print('updated')\n" },
+    firstToken,
+  );
+  const editPreviewBody = await editPreview.json();
+  const updated = await post(
+    env,
+    '/api/intelligence/coding/modify',
+    {
+      file_path: 'src/main.py',
+      new_content: "print('updated')\n",
+      expected_sha256: editPreviewBody.original_sha256,
+    },
+    firstToken,
+  );
+  assert.equal(updated.status, 200);
+
+  const ownRead = await post(
+    env,
+    '/api/intelligence/coding/read',
+    { file_path: 'src/main.py' },
+    firstToken,
+  );
+  assert.equal((await ownRead.json()).content, "print('updated')\n");
+
+  const otherUserRead = await post(
+    env,
+    '/api/intelligence/coding/read',
+    { file_path: 'src/main.py' },
+    secondToken,
+  );
+  assert.equal(otherUserRead.status, 404);
+
+  const unsafePath = await post(
+    env,
+    '/api/intelligence/coding/read',
+    { file_path: '../private.txt' },
+    firstToken,
+  );
+  assert.equal(unsafePath.status, 400);
+
+  const inspect = await post(env, '/api/intelligence/coding/inspect', {}, firstToken);
+  const inspectBody = await inspect.json();
+  assert.equal(inspectBody.tests_enabled, false);
+  assert.equal(inspectBody.total_count, 2);
+
+  const testsDisabled = await post(env, '/api/intelligence/coding/test', {}, firstToken);
+  assert.equal(testsDisabled.status, 503);
+});

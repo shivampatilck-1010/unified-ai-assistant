@@ -153,6 +153,24 @@ The supported self-hosted stack is the repository's Docker Compose deployment: P
 
 The named volumes preserve PostgreSQL and uploaded/workspace files. Back them up and test restore procedures. The `render.yaml` file is an API-only deployment example; configure its external PostgreSQL URL and durable storage before using it for production. Production code execution is disabled by default; enabling `ENABLE_CODING_TESTS` runs user-supplied pytest code with the API service account's OS permissions, not inside an OS sandbox. A temporary `trycloudflare.com` tunnel and local SQLite are for development, not production.
 
+### Cloudflare Workers deployment
+
+The Workers deployment serves the frontend and handles Google sign-in and per-user coding workspaces at the edge. Coding workspace files are stored in the `unified-ai-assistant-prod-db` D1 database. The Worker does not run user code; test execution always remains disabled because a Worker is not an OS-level sandbox. This deployment does not run the separate Python API or make its other endpoints available.
+
+1. Configure a Google OAuth web client with `https://unified-ai-assistant.cortexbuild1.workers.dev` as an authorized JavaScript origin. Set its client ID as `VITE_GOOGLE_CLIENT_ID` for the frontend build and as the Worker secret `GOOGLE_CLIENT_ID`.
+2. Set the Worker secrets before deployment with `npx wrangler secret put GOOGLE_CLIENT_ID` and `npx wrangler secret put JWT_SECRET_KEY`. Use a random signing secret of at least 32 characters; do not commit it or put it in frontend variables.
+3. Set `VITE_GOOGLE_CLIENT_ID` in the build environment, apply the D1 schema, build, and deploy:
+
+   ```powershell
+   $env:VITE_GOOGLE_CLIENT_ID = "<Google OAuth client ID>"
+   npx wrangler d1 migrations apply unified-ai-assistant-prod-db --remote
+   Set-Location apps/web
+   npm ci
+   npm run build
+   Set-Location ../..
+   npx wrangler deploy --keep-vars
+   ```
+
 For Cloudflare Pages as a separate frontend, use `apps/web` as the build root, `npm ci && npm run build` as the build command, and `dist` as the output directory. Set `VITE_API_BASE_URL` to the public API origin and `VITE_GOOGLE_CLIENT_ID` to the configured OAuth client ID. Configure matching CORS origins on the API.
 
 ---
