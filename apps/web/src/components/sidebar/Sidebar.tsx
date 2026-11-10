@@ -232,8 +232,8 @@ export function Sidebar({
           </ul>
         </nav>
 
-        {/* Conversation History */}
-        {!collapsed && conversations.length > 0 && (
+        {/* Conversation History - Authenticated Accounts Only */}
+        {!collapsed && Boolean(user) && conversations.length > 0 && (
           <div className="sidebar__history">
             <div className="sidebar__history-label">Recent conversations</div>
             <ul className="sidebar__history-list" role="list">
@@ -294,6 +294,23 @@ export function Sidebar({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Guest History Banner when Logged Out */}
+        {!collapsed && !user && (
+          <div className="sidebar__history-guest-notice" style={{ padding: '14px 16px', margin: '8px 12px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.08)', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#9ca3af', lineHeight: 1.4 }}>
+              Sign in to save and access your recent conversations.
+            </p>
+            <button
+              type="button"
+              className="sidebar__google-login-btn"
+              onClick={() => setShowAuthModal(true)}
+              style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '6px 12px' }}
+            >
+              <span>Sign in with Google</span>
+            </button>
           </div>
         )}
 

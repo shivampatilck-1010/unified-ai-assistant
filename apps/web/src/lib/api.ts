@@ -289,6 +289,11 @@ export function purgeGuestStorage(): void {
   } catch {}
 }
 
+// Proactively purge residual guest storage on startup when not authenticated
+if (typeof window !== 'undefined' && !getStoredUser()) {
+  purgeGuestStorage();
+}
+
 export function claimGuestDataToUser(user: UserProfile): void {
   if (typeof window === 'undefined' || !user?.id) return;
   try {

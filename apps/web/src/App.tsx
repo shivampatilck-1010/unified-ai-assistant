@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { NavigationSection, UnifiedProviderStatusResponse } from './types';
 import { useConversations } from './hooks/useConversations';
 import { useHealthCheck } from './hooks/useHealthCheck';
-import { fetchProviderStatus } from './lib/api';
+import { fetchProviderStatus, purgeGuestStorage, getStoredUser } from './lib/api';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatView } from './components/chat/ChatView';
 import { SectionPlaceholder } from './components/placeholders/SectionPlaceholder';
@@ -28,6 +28,13 @@ export default function App() {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showCouncilModal, setShowCouncilModal] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Proactively purge legacy/guest storage on initial load if logged out
+  useEffect(() => {
+    if (!getStoredUser()) {
+      purgeGuestStorage();
+    }
+  }, []);
 
   // Sync fullscreen state
   useEffect(() => {

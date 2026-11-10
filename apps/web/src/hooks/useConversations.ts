@@ -27,6 +27,10 @@ function getStorageKeys() {
 }
 
 function loadStoredConversations(): ConversationSummary[] {
+  // If not authenticated, guest session has NO persistent recent conversations
+  if (!getStoredUser()) {
+    return [];
+  }
   try {
     const { convs: key } = getStorageKeys();
     const raw = localStorage.getItem(key);
@@ -39,6 +43,8 @@ function loadStoredConversations(): ConversationSummary[] {
 }
 
 function saveStoredConversations(list: ConversationSummary[]) {
+  // Only persist recent conversations for authenticated accounts
+  if (!getStoredUser()) return;
   try {
     const { convs: key } = getStorageKeys();
     localStorage.setItem(key, JSON.stringify(list));
@@ -77,7 +83,7 @@ function sanitizeMessagesForStorage(msgs: ChatMessage[]): ChatMessage[] {
 }
 
 function saveStoredMessages(convId: string, msgs: ChatMessage[]) {
-  if (!convId) return;
+  if (!convId || !getStoredUser()) return;
   try {
     const { msgPrefix } = getStorageKeys();
     const sanitized = sanitizeMessagesForStorage(msgs);
@@ -256,23 +262,17 @@ export function useConversations(backendConnected: boolean = true) {
   // Load conversation list from backend and merge with local store
   const refreshList = useCallback(async () => {
     if (!backendConnected) return;
+    if (!getStoredUser()) {
+      setConversations([]);
+      return;
+    }
     try {
       setIsLoading(true);
       setError(null);
       const res = await fetchConversations(50, 0);
-      if (res.items && res.items.length > 0) {
-        setConversations((prev) => {
-          const map = new Map<string, ConversationSummary>();
-          // Server items
-          res.items.forEach((item) => map.set(item.id, item));
-          // Local items (preserve local-first)
-          prev.forEach((item) => {
-            if (!map.has(item.id)) map.set(item.id, item);
-          });
-          const merged = Array.from(map.values());
-          saveStoredConversations(merged);
-          return merged;
-        });
+      if (res.items) {
+        setConversations(res.items);
+        saveStoredConversations(res.items);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
