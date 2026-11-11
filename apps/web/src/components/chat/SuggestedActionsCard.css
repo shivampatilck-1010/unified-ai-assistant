@@ -1,0 +1,255 @@
+/* ==========================================================================
+   SuggestedActionsCard.css
+   Linear / Raycast / Claude Minimalist Action & Inquiry Card
+   - Dark neutral zinc/slate palette
+   - Subtle geometric micro-grid pattern
+   - Clean 1px borders, zero aggressive neon glow
+   - Interactive checkbox state and 1-click prompt dispatch
+   ========================================================================== */
+
+.suggested-actions-card {
+  margin: 18px 0;
+  padding: 18px 20px;
+  background-color: #111218;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #e4e4e7;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  animation: sacFadeIn 0.2s ease-out;
+  box-sizing: border-box;
+}
+
+@keyframes sacFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.sac-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sac-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sac-icon-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sac-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #f4f4f5;
+  letter-spacing: -0.01em;
+}
+
+.sac-subtitle {
+  font-size: 11.5px;
+  color: #71717a;
+  display: block;
+  margin-top: 1px;
+}
+
+/* Sections */
+.sac-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sac-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #a1a1aa;
+}
+
+/* Recommended Next Actions Checklist */
+.sac-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sac-action-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: #16171e;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.sac-action-item:hover {
+  background: #1c1e27;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.sac-action-item--done {
+  opacity: 0.65;
+  background: #13141a;
+}
+
+.sac-action-item--done .sac-action-text {
+  text-decoration: line-through;
+  color: #71717a;
+}
+
+.sac-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid #3f3f46;
+  background: #181920;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.15s ease;
+}
+
+.sac-checkbox--checked {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.sac-action-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #d4d4d8;
+}
+
+/* Suggested Inquiries / Questions */
+.sac-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sac-question-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  background: #16171e;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sac-question-card:hover {
+  background: #1c1e27;
+  border-color: rgba(56, 189, 248, 0.3);
+  transform: translateX(2px);
+}
+
+.sac-question-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+}
+
+.sac-question-bullet {
+  font-size: 13px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.sac-question-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e4e4e7;
+  font-weight: 500;
+}
+
+.sac-question-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sac-copy-btn {
+  background: transparent;
+  border: 1px solid #27272a;
+  border-radius: 4px;
+  color: #71717a;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sac-copy-btn:hover {
+  color: #ffffff;
+  border-color: #3f3f46;
+  background: #24252e;
+}
+
+.sac-ask-icon {
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  transition: transform 0.15s ease;
+}
+
+.sac-question-card:hover .sac-ask-icon {
+  transform: translateX(3px);
+}
+
+@media (max-width: 640px) {
+  .suggested-actions-card {
+    padding: 14px 16px;
+  }
+  .sac-question-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sac-question-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

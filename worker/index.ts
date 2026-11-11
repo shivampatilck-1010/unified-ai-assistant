@@ -6,7 +6,9 @@ export interface Env {
   GOOGLE_CLIENT_ID?: string;
   JWT_SECRET_KEY?: string;
   GEMINI_API_KEY?: string;
+  GEMINI_API_KEYS?: string;
   GOOGLE_API_KEY?: string;
+  GOOGLE_API_KEYS?: string;
   GROQ_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -1035,6 +1037,9 @@ async function streamOpenAICompatible({
     }
 
     clearTimeout(timeoutId);
+    if (!fullText.trim()) {
+      return { success: false, error: 'Empty stream response', text: '' };
+    }
     return { success: true, text: fullText };
   } catch (err: unknown) {
     clearTimeout(timeoutId);
@@ -1143,12 +1148,122 @@ async function streamAnthropic({
     }
 
     clearTimeout(timeoutId);
+    if (!fullText.trim()) {
+      return { success: false, error: 'Empty stream response', text: '' };
+    }
     return { success: true, text: fullText };
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg, text: '' };
   }
+}
+
+const GOOGLE_WORKING_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
+];
+
+const GOOGLE_EXHAUSTED_OR_RETIRED_MODELS = new Set([
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-1.5-pro',
+  'gemini-1.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-pro-preview-customtools',
+  'gemini-pro-latest',
+  'gemini-flash-latest',
+]);
+
+// Isolate-scoped cooldown tracker keyed by `${keyFingerprint}:${model}` so exhausted keys/models auto-switch immediately.
+const modelKeyCooldownUntil = new Map<string, number>();
+
+function keyFingerprint(apiKey: string): string {
+  if (!apiKey) return 'none';
+  if (apiKey.length <= 12) return `${apiKey.slice(0, 4)}..`;
+  return `${apiKey.slice(0, 6)}..${apiKey.slice(-4)}`;
+}
+
+export function resetGeminiCooldownsForTest(): void {
+  modelKeyCooldownUntil.clear();
+}
+
+export function getGeminiApiKeyPool(env: Env, clientApiKey?: string | null): string[] {
+  const rawSources = [
+    clientApiKey,
+    env.GEMINI_API_KEYS,
+    env.GOOGLE_API_KEYS,
+    env.GOOGLE_API_KEY,
+    env.GEMINI_API_KEY,
+  ];
+  const seen = new Set<string>();
+  const pool: string[] = [];
+  for (const src of rawSources) {
+    if (!src || typeof src !== 'string') continue;
+    const parts = src.split(/[\r\n,;]+/);
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed || trimmed === 'undefined' || trimmed === 'null') continue;
+      if (!seen.has(trimmed)) {
+        seen.add(trimmed);
+        pool.push(trimmed);
+      }
+    }
+  }
+  return pool;
+}
+
+export function resolveGeminiCandidates(requestedModel?: string | null, hasClientKey = false): string[] {
+  const cleaned = (requestedModel || '')
+    .trim()
+    .replace(/^(google|gemini)\//i, '');
+  const list: string[] = [];
+  if (cleaned && (hasClientKey || !GOOGLE_EXHAUSTED_OR_RETIRED_MODELS.has(cleaned))) {
+    list.push(cleaned);
+  }
+  for (const working of GOOGLE_WORKING_MODELS) {
+    if (!list.includes(working)) list.push(working);
+  }
+  return list;
+}
+
+function getPairCooldownKey(apiKey: string, model: string): string {
+  return `${keyFingerprint(apiKey)}:${model}`;
+}
+
+function isPairCoolingDown(apiKey: string, model: string, now = Date.now()): boolean {
+  const until = modelKeyCooldownUntil.get(getPairCooldownKey(apiKey, model));
+  if (!until) return false;
+  if (now >= until) {
+    modelKeyCooldownUntil.delete(getPairCooldownKey(apiKey, model));
+    return false;
+  }
+  return true;
+}
+
+function markPairCooldown(apiKey: string, model: string, statusCode: number, reasonText = ''): void {
+  const lower = reasonText.toLowerCase();
+  let durationMs = 30_000;
+  if (statusCode === 404) {
+    durationMs = 3_600_000;
+  } else if (statusCode === 401 || statusCode === 403 || lower.includes('api key not valid')) {
+    durationMs = 1_800_000;
+  } else if (
+    statusCode === 429 ||
+    lower.includes('quota') ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('rate limit')
+  ) {
+    durationMs = 90_000;
+  }
+  modelKeyCooldownUntil.set(getPairCooldownKey(apiKey, model), Date.now() + durationMs);
 }
 
 const DEFAULT_GEMINI_SAFETY_SETTINGS = [
@@ -1158,24 +1273,84 @@ const DEFAULT_GEMINI_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
 ];
 
+function buildGeminiAttemptPlan(
+  keys: string[],
+  candidateModels: string[]
+): Array<{ apiKey: string; model: string; keyIndex: number }> {
+  const active: Array<{ apiKey: string; model: string; keyIndex: number }> = [];
+  const cooled: Array<{ apiKey: string; model: string; keyIndex: number }> = [];
+
+  for (const model of candidateModels) {
+    for (let i = 0; i < keys.length; i++) {
+      const apiKey = keys[i];
+      if (!apiKey) continue;
+      if (isPairCoolingDown(apiKey, model)) {
+        cooled.push({ apiKey, model, keyIndex: i });
+      } else {
+        active.push({ apiKey, model, keyIndex: i });
+      }
+    }
+  }
+
+  // Self-healing fallback: if every pair in the isolate is cooled down, retry non-retired pairs anyway
+  return active.length > 0 ? active : cooled;
+}
+
 async function streamGeminiWithCandidates({
   apiKey,
+  apiKeys,
   candidateModels,
   contents,
   systemInstruction,
   sendSSE,
+  connectTimeoutMs = 7000,
 }: {
-  apiKey: string;
+  apiKey?: string | null;
+  apiKeys?: string[];
   candidateModels: string[];
   contents: any[];
   systemInstruction?: any;
   sendSSE: (event: string, data: Record<string, unknown>) => Promise<void>;
-}): Promise<{ success: boolean; model: string; text: string; error?: string }> {
-  let fullText = '';
+  connectTimeoutMs?: number;
+}): Promise<{
+  success: boolean;
+  model: string;
+  keyIndex: number;
+  text: string;
+  error?: string;
+  lastStatus?: number;
+  errors: string[];
+}> {
+  const keys =
+    apiKeys && apiKeys.length > 0 ? apiKeys : apiKey ? [apiKey] : [];
+  if (keys.length === 0) {
+    return {
+      success: false,
+      model: '',
+      keyIndex: -1,
+      text: '',
+      error: 'No Gemini API keys configured',
+      errors: ['no-keys'],
+    };
+  }
+
+  const plan = buildGeminiAttemptPlan(keys, candidateModels);
+  const errors: string[] = [];
   let lastErr = '';
-  for (const model of candidateModels) {
+  let lastStatus = 0;
+
+  for (const { apiKey: activeKey, model, keyIndex } of plan) {
+    const fetchCtrl = new AbortController();
+    let firstChunkReceived = false;
+    const fetchTimer = setTimeout(() => {
+      if (!firstChunkReceived) fetchCtrl.abort();
+    }, connectTimeoutMs);
+
+    let fullText = '';
+    let emittedAnyText = false;
+
     try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${activeKey}`;
       const resp = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1188,46 +1363,299 @@ async function streamGeminiWithCandidates({
             temperature: 0.7,
           },
         }),
+        signal: fetchCtrl.signal,
       });
 
-      if (resp.ok && resp.body) {
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let lineBuffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          lineBuffer += decoder.decode(value, { stream: true });
-          const lines = lineBuffer.split('\n');
-          lineBuffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data: ')) {
-              const dataJsonStr = trimmed.slice(6).trim();
-              try {
-                const parsed = JSON.parse(dataJsonStr);
-                const deltaText =
-                  parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                if (deltaText) {
-                  await sendSSE('text_delta', { text: deltaText });
-                  fullText += deltaText;
-                }
-              } catch {}
-            }
+      if (!resp.ok || !resp.body) {
+        clearTimeout(fetchTimer);
+        lastStatus = resp.status;
+        lastErr = await resp.text().catch(() => '');
+        markPairCooldown(activeKey, model, resp.status, lastErr);
+        const lowerErr = lastErr.toLowerCase();
+        if (resp.status === 401 || resp.status === 403 || lowerErr.includes('api key not valid')) {
+          for (const candidate of candidateModels) {
+            markPairCooldown(activeKey, candidate, resp.status, lastErr);
           }
         }
-        return { success: true, model, text: fullText };
-      } else {
-        lastErr = await resp.text().catch(() => '');
+        errors.push(`[${model}#k${keyIndex + 1} => ${resp.status}: ${lastErr.slice(0, 140)}]`);
+        continue;
       }
-    } catch (e: any) {
-      lastErr = e?.message || String(e);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let lineBuffer = '';
+      let inlineStreamError = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (!firstChunkReceived && value && value.length > 0) {
+          firstChunkReceived = true;
+          clearTimeout(fetchTimer);
+        }
+
+        lineBuffer += decoder.decode(value, { stream: true });
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data: ')) {
+            const dataJsonStr = trimmed.slice(6).trim();
+            try {
+              const parsed = JSON.parse(dataJsonStr);
+              if (parsed?.error) {
+                inlineStreamError = parsed.error.message || JSON.stringify(parsed.error);
+                lastStatus = Number(parsed.error.code || 500);
+                break;
+              }
+              const parts = parsed.candidates?.[0]?.content?.parts;
+              if (Array.isArray(parts)) {
+                for (const part of parts) {
+                  if (part?.text) {
+                    await sendSSE('text_delta', { text: part.text });
+                    fullText += part.text;
+                    emittedAnyText = true;
+                  }
+                }
+              }
+            } catch {}
+          }
+        }
+        if (inlineStreamError) break;
+      }
+
+      clearTimeout(fetchTimer);
+
+      if (inlineStreamError && !emittedAnyText) {
+        lastErr = inlineStreamError;
+        markPairCooldown(activeKey, model, lastStatus || 429, inlineStreamError);
+        errors.push(`[${model}#k${keyIndex + 1} => stream-err: ${inlineStreamError.slice(0, 140)}]`);
+        continue;
+      }
+
+      if (emittedAnyText) {
+        return {
+          success: true,
+          model,
+          keyIndex,
+          text: fullText,
+          lastStatus: 200,
+          errors,
+        };
+      }
+
+      lastStatus = 503;
+      lastErr = 'Empty Gemini SSE stream';
+      markPairCooldown(activeKey, model, 503, lastErr);
+      errors.push(`[${model}#k${keyIndex + 1} => empty stream]`);
+    } catch (e: unknown) {
+      clearTimeout(fetchTimer);
+      if (emittedAnyText) {
+        return {
+          success: true,
+          model,
+          keyIndex,
+          text: fullText,
+          lastStatus: 200,
+          errors,
+        };
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      lastErr = msg;
+      markPairCooldown(activeKey, model, 504, msg);
+      errors.push(`[${model}#k${keyIndex + 1} => ${msg.slice(0, 140)}]`);
     }
   }
-  return { success: false, model: '', text: fullText, error: lastErr };
+
+  return {
+    success: false,
+    model: '',
+    keyIndex: -1,
+    text: '',
+    error: lastErr || 'All Gemini key/model pairs exhausted',
+    lastStatus,
+    errors,
+  };
+}
+
+async function generateGeminiTextWithRotation({
+  apiKeys,
+  candidateModels,
+  contents,
+  systemInstruction,
+  temperature = 0.2,
+  maxOutputTokens = 1024,
+  connectTimeoutMs = 7000,
+}: {
+  apiKeys: string[];
+  candidateModels: string[];
+  contents: any[];
+  systemInstruction?: any;
+  temperature?: number;
+  maxOutputTokens?: number;
+  connectTimeoutMs?: number;
+}): Promise<{ success: boolean; model: string; text: string; error?: string }> {
+  if (apiKeys.length === 0) {
+    return { success: false, model: '', text: '', error: 'No Gemini API keys configured' };
+  }
+
+  const plan = buildGeminiAttemptPlan(apiKeys, candidateModels);
+  let lastErr = '';
+
+  for (const { apiKey: activeKey, model } of plan) {
+    const fetchCtrl = new AbortController();
+    const fetchTimer = setTimeout(() => fetchCtrl.abort(), connectTimeoutMs);
+    try {
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            ...(systemInstruction ? { system_instruction: systemInstruction } : {}),
+            safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
+            generationConfig: { temperature, maxOutputTokens },
+          }),
+          signal: fetchCtrl.signal,
+        }
+      );
+      clearTimeout(fetchTimer);
+
+      if (!geminiRes.ok) {
+        lastErr = await geminiRes.text().catch(() => '');
+        markPairCooldown(activeKey, model, geminiRes.status, lastErr);
+        continue;
+      }
+
+      const geminiData = (await geminiRes.json()) as any;
+      const parts = geminiData?.candidates?.[0]?.content?.parts;
+      const text = Array.isArray(parts)
+        ? parts.map((p: any) => p?.text || '').join('')
+        : '';
+      if (text.trim()) {
+        return { success: true, model, text: text.trim() };
+      }
+      markPairCooldown(activeKey, model, 503, 'Empty response body');
+    } catch (err: unknown) {
+      clearTimeout(fetchTimer);
+      lastErr = err instanceof Error ? err.message : String(err);
+      markPairCooldown(activeKey, model, 504, lastErr);
+    }
+  }
+
+  return { success: false, model: '', text: '', error: lastErr };
+}
+
+async function failoverAcrossProviders({
+  geminiKeys,
+  clientApiKey,
+  groqApiKey,
+  openRouterApiKey,
+  preferredGeminiModel = 'gemini-3.5-flash',
+  skipProvider,
+  reasonLabel,
+  rawList,
+  geminiContents,
+  systemInstruction,
+  sendSSE,
+}: {
+  geminiKeys: string[];
+  clientApiKey?: string | null;
+  groqApiKey?: string;
+  openRouterApiKey?: string;
+  preferredGeminiModel?: string;
+  skipProvider?: 'gemini' | 'groq' | 'openrouter';
+  reasonLabel: string;
+  rawList: Array<{ role: string; content: string }>;
+  geminiContents: any[];
+  systemInstruction: { parts: Array<{ text: string }> };
+  sendSSE: (event: string, data: Record<string, unknown>) => Promise<void>;
+}): Promise<{ success: boolean; provider: string; model: string; text: string }> {
+  const createAnnouncedSender = (targetLabel: string) => {
+    let announced = false;
+    return async (event: string, data: Record<string, unknown>) => {
+      if (!announced && event === 'text_delta' && typeof data.text === 'string' && data.text.length > 0) {
+        announced = true;
+        await sendSSE('text_delta', {
+          text: `\n> ⚡ *[${reasonLabel} · Auto-switched to **${targetLabel}**]*\n\n`,
+        });
+      }
+      await sendSSE(event, data);
+    };
+  };
+
+  if (skipProvider !== 'gemini' && geminiKeys.length > 0) {
+    let resolvedLabel = 'Google Gemini';
+    let announced = false;
+    const gemSendSSE = async (event: string, data: Record<string, unknown>) => {
+      if (!announced && event === 'text_delta' && typeof data.text === 'string' && data.text.length > 0) {
+        announced = true;
+        await sendSSE('text_delta', {
+          text: `\n> ⚡ *[${reasonLabel} · Auto-switched to **${resolvedLabel}**]*\n\n`,
+        });
+      }
+      await sendSSE(event, data);
+    };
+    const gemCandidates = resolveGeminiCandidates(preferredGeminiModel, Boolean(clientApiKey));
+    resolvedLabel = `Google Gemini (${gemCandidates[0] || 'gemini-3.5-flash'})`;
+    const gemRes = await streamGeminiWithCandidates({
+      apiKeys: geminiKeys,
+      candidateModels: gemCandidates,
+      contents: geminiContents,
+      systemInstruction,
+      sendSSE: gemSendSSE,
+    });
+    if (gemRes.success) {
+      return { success: true, provider: 'gemini', model: gemRes.model, text: gemRes.text };
+    }
+  }
+
+  if (skipProvider !== 'groq' && groqApiKey) {
+    for (const groqCandidate of ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b']) {
+      const res = await streamOpenAICompatible({
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        apiKey: groqApiKey,
+        model: groqCandidate,
+        messages: rawList.slice(-6),
+        systemPrompt: systemInstruction.parts[0].text,
+        sendSSE: createAnnouncedSender(`Groq ${groqCandidate}`),
+        firstTokenTimeoutMs: 7000,
+      });
+      if (res.success) {
+        return { success: true, provider: 'groq', model: groqCandidate, text: res.text };
+      }
+    }
+  }
+
+  if (skipProvider !== 'openrouter' && openRouterApiKey) {
+    for (const orCandidate of [
+      'nvidia/nemotron-3.5-lightning:free',
+      'google/gemma-4-26b-a4b-it:free',
+      'nvidia/nemotron-3.5-super-vl:free',
+    ]) {
+      const res = await streamOpenAICompatible({
+        url: 'https://openrouter.ai/api/v1/chat/completions',
+        apiKey: openRouterApiKey,
+        model: orCandidate,
+        messages: rawList.slice(-4),
+        systemPrompt: systemInstruction.parts[0].text,
+        sendSSE: createAnnouncedSender(`OpenRouter ${orCandidate}`),
+        extraHeaders: {
+          'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
+          'X-Title': 'Unified AI Assistant',
+        },
+        firstTokenTimeoutMs: 7000,
+      });
+      if (res.success) {
+        return { success: true, provider: 'openrouter', model: orCandidate, text: res.text };
+      }
+    }
+  }
+
+  return { success: false, provider: '', model: '', text: '' };
 }
 
 // =============================================================================
@@ -1437,14 +1865,24 @@ export default {
     }
 
     if (path === '/api/debug-models') {
-      const apiKey = env.GOOGLE_API_KEY || env.GEMINI_API_KEY;
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        const data = await res.json();
-        return jsonResponse(data);
-      } catch (e: unknown) {
-        return jsonResponse({ error: String(e) }, 500);
+      const keyPool = getGeminiApiKeyPool(env);
+      if (keyPool.length === 0) {
+        return jsonResponse({ error: 'No Gemini API keys configured' }, 503);
       }
+      let lastError: unknown = 'Unable to query models';
+      for (const apiKey of keyPool) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+          if (res.ok) {
+            const data = await res.json();
+            return jsonResponse(data);
+          }
+          lastError = await res.text().catch(() => `HTTP ${res.status}`);
+        } catch (e: unknown) {
+          lastError = String(e);
+        }
+      }
+      return jsonResponse({ error: String(lastError).slice(0, 300) }, 502);
     }
 
     // Google OAuth & Session Endpoints
@@ -1525,7 +1963,8 @@ export default {
       const clientApiKey =
         request.headers.get('x-gemini-key') ||
         request.headers.get('x-api-key');
-      const hasGemini = Boolean(clientApiKey || env.GOOGLE_API_KEY || env.GEMINI_API_KEY);
+      const geminiKeys = getGeminiApiKeyPool(env, clientApiKey);
+      const hasGemini = geminiKeys.length > 0;
       const hasGroq = Boolean(request.headers.get('x-groq-key') || env.GROQ_API_KEY || DEFAULT_GROQ_API_KEY);
       const hasOpenRouter = Boolean(request.headers.get('x-openrouter-key') || env.OPENROUTER_API_KEY || DEFAULT_OPENROUTER_API_KEY);
       const hasOpenAI = Boolean(request.headers.get('x-openai-key') || env.OPENAI_API_KEY);
@@ -1537,6 +1976,7 @@ export default {
         provider: 'auto',
         active_provider: 'Auto Routing (Smart Multi-Model Orchestration Engine)',
         active_model: 'auto',
+        gemini_key_pool_size: geminiKeys.length,
         available_models: [
           // 0. Intelligent Auto-Routing (Default Model)
           {
@@ -1544,7 +1984,7 @@ export default {
             name: 'Auto-Select (Smart Multi-Model Orchestration Engine)',
             provider: 'Auto Routing',
             is_default: true,
-            context_window: 2000000,
+            context_window: 1048576,
           },
 
           // 1. Groq Hardware LPUs (Verified Live API - Free Tier)
@@ -1563,7 +2003,7 @@ export default {
             context_window: 131072,
           },
 
-          // 2. OpenRouter High-Throughput Models (100% Free Tier)
+          // 2. OpenRouter High-Throughput Models (Verified Live Free Tier)
           {
             id: 'openrouter/nvidia/nemotron-3.5-lightning:free',
             name: 'NVIDIA Nemotron 3.5 Lightning (High-Throughput MoE, Ultra-Fast, Free Tier)',
@@ -1579,8 +2019,15 @@ export default {
             context_window: 131072,
           },
           {
-            id: 'openrouter/am-thinking-v1:free',
-            name: 'AM-Thinking-v1 (Specialized 32B STEM & Logic Engine, Free Tier)',
+            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
+            name: 'NVIDIA Nemotron 3 Ultra 550B (Frontier Systems Theorist, Free Tier)',
+            provider: 'OpenRouter',
+            is_default: false,
+            context_window: 131072,
+          },
+          {
+            id: 'openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+            name: 'NVIDIA Nemotron 3 Nano Omni 30B Reasoning (STEM & Logic, Free Tier)',
             provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
@@ -1592,32 +2039,46 @@ export default {
             is_default: false,
             context_window: 65536,
           },
-
-          // 3. Google Gemini Flagship Reasoning & Multimodal
           {
-            id: 'gemini-2.5-pro',
-            name: 'Gemini 2.5 Pro (Flagship Reasoning & Math, 2M Context)',
-            provider: 'Google',
+            id: 'openrouter/google/gemma-4-26b-a4b-it:free',
+            name: 'Gemma 4 26B A4B (Open-Weights MoE Reasoning, Free Tier)',
+            provider: 'OpenRouter',
             is_default: false,
-            context_window: 2097152,
+            context_window: 131072,
           },
+
+          // 3. Google Gemini Verified Working Models (Auto-Rotating Multi-Key Pool)
           {
-            id: 'gemini-2.5-flash',
-            name: 'Gemini 2.5 Flash (Ultra Fast Thinking, 1M Context)',
+            id: 'gemini-3.5-flash',
+            name: 'Gemini 3.5 Flash (Flagship Fast Reasoning & Diagrams, 1M Context)',
             provider: 'Google',
             is_default: false,
             context_window: 1048576,
           },
           {
-            id: 'gemini-1.5-pro',
-            name: 'Gemini 1.5 Pro (Deep Architecture & Multimodal Media)',
+            id: 'gemini-3-flash-preview',
+            name: 'Gemini 3 Flash Preview (High-Speed Multimodal & Security, 1M Context)',
             provider: 'Google',
             is_default: false,
-            context_window: 2097152,
+            context_window: 1048576,
           },
           {
-            id: 'gemini-3.8-flash',
-            name: 'Gemini 3.8 Flash (Edge Streamed)',
+            id: 'gemini-3.6-flash',
+            name: 'Gemini 3.6 Flash (Next-Gen Deep Synthesis, 1M Context)',
+            provider: 'Google',
+            is_default: false,
+            context_window: 1048576,
+          },
+          {
+            id: 'gemini-3.5-flash-lite',
+            name: 'Gemini 3.5 Flash-Lite (Ultra-Low Latency Edge Stream, 1M Context)',
+            provider: 'Google',
+            is_default: false,
+            context_window: 1048576,
+          },
+          {
+            id: 'gemini-3.1-flash-lite',
+            name: 'Gemini 3.1 Flash-Lite (High-Quota Rapid Inference, 1M Context)',
             provider: 'Google',
             is_default: false,
             context_window: 1048576,
@@ -1633,21 +2094,28 @@ export default {
           },
           {
             id: 'unified-team:dual-expert',
-            name: 'Unified Team: Dual-Expert Debate (Nemotron 550B + Groq Qwen)',
+            name: 'Unified Team: Dual-Expert Debate (Nemotron + Groq Qwen + Gemini 3.5 Flash)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:frontier-council',
-            name: 'Unified Team: Full Frontier Council (Nemotron 550B + GPT-OSS 120B + Qwen + Gemini)',
+            name: 'Unified Team: Full Frontier Council (Nemotron 550B + Qwen 27B + Gemini 3.5 Flash)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
           },
           {
             id: 'unified-team:code-pair',
-            name: 'Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini Architecture)',
+            name: 'Unified Team: Elite Engineering Pair (Groq Qwen 27B + Gemini 3.5 Architecture)',
+            provider: 'Unified Team',
+            is_default: false,
+            context_window: 200000,
+          },
+          {
+            id: 'unified-team:scientific-symposium',
+            name: 'Unified Team: Scientific Symposium (Nemotron Omni + Gemini 3.5 Flash)',
             provider: 'Unified Team',
             is_default: false,
             context_window: 200000,
@@ -1657,16 +2125,16 @@ export default {
           auto: true,
           'unified-team': true,
           council: true,
-          google: true,
-          gemini: true,
+          google: hasGemini,
+          gemini: hasGemini,
           nvidia: true,
-          groq: true,
-          openrouter: true,
+          groq: hasGroq,
+          openrouter: hasOpenRouter,
           qwen: true,
         },
         has_custom_key: Boolean(clientApiKey),
         message: configured
-          ? 'Cloudflare Edge AI Gateway Connected (Google + Groq + OpenRouter + OpenAI Live)'
+          ? `Cloudflare Edge AI Gateway Connected (${geminiKeys.length} Gemini key${geminiKeys.length === 1 ? '' : 's'} + Groq + OpenRouter Live)`
           : 'Please enter your personal Gemini API key in Settings to connect.',
       });
     }
@@ -1698,7 +2166,8 @@ export default {
         request.headers.get('x-gemini-key') ||
         request.headers.get('x-api-key');
 
-      const apiKey = clientApiKey || env.GOOGLE_API_KEY || env.GEMINI_API_KEY;
+      const geminiKeys = getGeminiApiKeyPool(env, clientApiKey);
+      const apiKey = geminiKeys[0] || '';
 
       const groqApiKey =
         body.groq_api_key ||
@@ -1724,7 +2193,7 @@ export default {
         env.ANTHROPIC_API_KEY ||
         '';
 
-      if (!apiKey && !groqApiKey && !openRouterApiKey && !openAIApiKey && !anthropicApiKey) {
+      if (geminiKeys.length === 0 && !groqApiKey && !openRouterApiKey && !openAIApiKey && !anthropicApiKey) {
         return jsonResponse(
           {
             error:
@@ -1902,18 +2371,20 @@ export default {
               '   - Do NOT present generated 3D schematics as manufacturing-ready CAD.\n' +
               '   - For follow-up edits to an existing visual artifact, preserve its established purpose and any user-approved choices while changing only what the user asks to change. Reuse recent visual context instead of starting over.\n' +
               '   - For 2D designs or illustrations, provide a polished vector SVG in an ```svg fenced block; for process or system diagrams, use Mermaid; for explanation, use clear prose.\n\n' +
-              'INTERACTIVE INQUIRY & CONCEPTUAL EXPLORATION CARDS:\n' +
-              'When assessing understanding, exploring branching topics, or clarifying intent:\n' +
-              'Output an interactive MCQ block:\n' +
-              '```mcq\n' +
-              'question: "In the Calvin Cycle (Light-Independent Reactions), what is the primary role of ATP and NADPH?"\n' +
-              'options:\n' +
-              '  - Option A: To provide phosphorylation energy and reducing equivalents to convert 3-PGA into G3P sugars.\n' +
-              '  - Option B: To facilitate the release of Oxygen gas as a photolysis byproduct.\n' +
-              '  - Option C: To capture additional solar photons from the thylakoid membrane.\n' +
-              '  - Option D: To split atmospheric CO2 directly into carbon and oxygen radicals.\n' +
+              'IN-DEPTH INTELLIGENCE & PRACTICAL CLOSING GUIDANCE (STRICTLY NO MCQs):\n' +
+              '- Deliver deeply intelligent, rigorous, and intellectually substantive analysis with all necessary technical, theoretical, mathematical, or empirical details. Never summarize superficially or truncate critical explanations.\n' +
+              '- Provide governing formulas ($...$ / $$...$$), underlying reaction or algorithmic mechanisms, failure modes, trade-offs, and practical significance.\n' +
+              '- STRICT RULE: NEVER output multiple-choice quiz questions (MCQs with Option A/B/C/D), self-test questions, or trivia tests at the end of responses. The user wants practical next steps and thoughtful conceptual questions, NOT quizzes.\n' +
+              '- AT THE END OF EVERY COMPREHENSIVE RESPONSE, suggest what to do and what to ask next using the clean interactive format below:\n' +
+              '```suggested-actions\n' +
+              'actions:\n' +
+              '  - <Action item 1: concrete, practical next step to test, implement, practice, or calculate>\n' +
+              '  - <Action item 2: verification, synthesis, or application step>\n' +
+              'questions:\n' +
+              '  - <High-impact question 1 the user can ask to explore deeper mechanisms or implications>\n' +
+              '  - <High-impact question 2 probing edge cases, advanced optimization, or related systems>\n' +
               '```\n' +
-              'The workspace renders an elegant Claude editorial card with warm terracotta accents, monospaced options, and conceptual deep-dive reference branches with formulas and one-click study note exports.\n\n' +
+              'The workspace renders this as an interactive Linear-style Next Steps card with interactive checkboxes for actions and clickable 1-click prompt dispatch for questions.\n\n' +
               'EXAM PREPARATION & PRINTABLE STUDY GUIDES:\n' +
               'When the user asks for study guides, revision sheets, formula cheat sheets, or asks to "generate PDF":\n' +
               'Structure your response with clear hierarchical headings, LaTeX mathematical equations ($...$ and $$...$$), summary tables, and include at the very beginning:\n' +
@@ -1968,62 +2439,88 @@ export default {
           let usedModel = chosenModel;
           let accumulatedAssistantText = '';
 
-          // 0. Auto-Routing Decision Engine (Classifies user prompt and routes to peak specialist model)
+          // 0. Auto-Routing Decision Engine (Classifies user prompt and routes to verified live specialist model)
           if (!chosenModel || chosenModel === 'auto' || chosenModel.startsWith('auto/')) {
             const lastUserMsg = [...rawList].reverse().find((m) => m.role === 'user')?.content || '';
             const lowerMsg = lastUserMsg.toLowerCase();
 
             const isCode = /\b(code|function|bug|error|refactor|typescript|javascript|python|react|html|css|sql|api|loop|component|git|syntax|class|compile|algorithm|database|json|schema|async|await|props|unit test|script)\b/.test(lowerMsg);
-            // Atom/element/molecule queries MUST NOT go to Groq 3D — they need Gemini's visual-diagram awareness
-            const isAtom = /\b(atom|atomic|element|bohr model|electron|proton|neutron|nucleus|orbital|molecule|molecule|hydrogen|helium|lithium|beryllium|carbon|nitrogen|oxygen|neon|sodium|magnesium|argon|chlorine|potassium|calcium|iron|copper|zinc|gold|periodic table)\b/.test(lowerMsg);
+            // Atom/element/molecule queries go to Gemini for rich visual atomic diagrams
+            const isAtom = /\b(atom|atomic|element|bohr model|electron|proton|neutron|nucleus|orbital|molecule|hydrogen|helium|lithium|beryllium|carbon|nitrogen|oxygen|neon|sodium|magnesium|argon|chlorine|potassium|calcium|iron|copper|zinc|gold|periodic table)\b/.test(lowerMsg);
             const is3D = !isAtom && /\b(3d|three\.js|interactive-3d|3d-model|cross-section|exploded view|anatomy|piston|engine|crankshaft|cylinder|camshaft|valvetrain|motor|car|vehicle|mesh|geometry|cad|schematic 3d|machinacal|mechanical|cutaway)\b/.test(lowerMsg);
             const isStem = /\b(math|equation|calculus|matrix|theorem|proof|physics|algebra|integral|derivative|quantum|probability|combinatorics|am-thinking|nemotron|eigenvalue|trigonometry|geometry|formula)\b/.test(lowerMsg);
             const isDebate = /\b(debate|compare perspectives|council|deliberate|pros and cons|cross-check|multiple viewpoints|two sides)\b/.test(lowerMsg);
             const isWorkflow = /\b(workflow|step by step plan|automate|agent|pipeline|translate|spanish|french|german|chinese|hindi|multilingual|schedule|roadmap)\b/.test(lowerMsg);
-            // Cybersecurity & hacking topics get Gemini 2.5 Pro for comprehensive technical depth
             const isCybersecurity = /\b(phishing|malware|ransomware|exploit|vulnerability|penetration test|pen test|ctf|hacking|cybersecurity|cyber security|infosec|firewall|intrusion|ddos|sql injection|xss|csrf|zero.?day|social engineering|trojan|botnet|keylogger|rootkit|vishing|smishing|spear.?phish)\b/.test(lowerMsg);
             const isDeepAnalysis = /\b(explain in depth|comprehensive analysis|history|essay|patent|research paper|summary of|architecture document|deep dive)\b/.test(lowerMsg) || lastUserMsg.length > 500;
 
-            let autoTarget = 'gemini-2.5-pro';
+            const defaultGeminiModel = 'gemini-3.5-flash';
+            const fallbackNonGeminiModel = groqApiKey
+              ? 'groq/openai/gpt-oss-120b'
+              : 'openrouter/nvidia/nemotron-3.5-lightning:free';
+
+            let autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
             let taskDomain = 'High-Velocity Conversational & Deep Reasoning';
-            let specialistName = 'Google Gemini 2.5 Pro';
+            let specialistName = geminiKeys.length > 0 ? 'Google Gemini 3.5 Flash' : 'Groq GPT-OSS 120B';
 
             if (isDebate) {
               autoTarget = 'unified-team:dual-expert';
               taskDomain = 'Multi-Model Frontier Deliberation';
               specialistName = 'Unified Team (Dual-Expert Debate)';
+            } else if (isAtom) {
+              autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
+              taskDomain = 'Atomic, Chemical & Interactive Diagrams';
+              specialistName = geminiKeys.length > 0
+                ? 'Google Gemini 3.5 Flash (Interactive Scientific Diagrams)'
+                : 'Groq GPT-OSS 120B';
             } else if (is3D) {
-              autoTarget = 'groq/openai/gpt-oss-120b';
+              autoTarget = groqApiKey ? 'groq/openai/gpt-oss-120b' : defaultGeminiModel;
               taskDomain = 'Interactive 3D Geometry & Spatial Engineering';
-              specialistName = 'Groq GPT-OSS 120B (Real-Time LPU Spatial Inference)';
+              specialistName = groqApiKey
+                ? 'Groq GPT-OSS 120B (Real-Time LPU Spatial Inference)'
+                : 'Google Gemini 3.5 Flash (Spatial Engineering)';
             } else if (isCybersecurity) {
-              autoTarget = 'gemini-2.5-pro';
+              autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
               taskDomain = 'Cybersecurity & Threat Intelligence';
-              specialistName = 'Google Gemini 2.5 Pro (Deep Security Analysis)';
+              specialistName = geminiKeys.length > 0
+                ? 'Google Gemini 3.5 Flash (Deep Security Analysis)'
+                : 'Groq GPT-OSS 120B (Security Analysis)';
             } else if (isCode) {
-              autoTarget = 'groq/qwen/qwen3.8-27b';
+              autoTarget = groqApiKey
+                ? 'groq/qwen/qwen3.8-27b'
+                : openRouterApiKey
+                  ? 'openrouter/cohere/north-mini-code:free'
+                  : defaultGeminiModel;
               taskDomain = 'Code Architecture & Implementation';
-              specialistName = 'Groq Qwen 3.8 27B (High-Velocity LPU Code Engine)';
+              specialistName = groqApiKey
+                ? 'Groq Qwen 3.8 27B (High-Velocity LPU Code Engine)'
+                : 'Google Gemini 3.5 Flash (Code Engine)';
             } else if (isStem) {
-              autoTarget = 'gemini-2.5-pro';
+              autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
               taskDomain = 'STEM, Mathematics & Formal Logic';
-              specialistName = 'Google Gemini 2.5 Pro (Ultra-Fast Thinking & Math)';
+              specialistName = geminiKeys.length > 0
+                ? 'Google Gemini 3.5 Flash (STEM Reasoning & Math)'
+                : 'Groq GPT-OSS 120B (STEM Reasoning)';
             } else if (isWorkflow) {
-              autoTarget = 'gemini-2.5-pro';
+              autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
               taskDomain = 'Agentic Workflow & Multi-Step Architecture';
-              specialistName = 'Google Gemini 2.5 Pro (2M Context)';
+              specialistName = geminiKeys.length > 0
+                ? 'Google Gemini 3.5 Flash (1M Context)'
+                : 'Groq GPT-OSS 120B';
             } else if (isDeepAnalysis) {
-              autoTarget = 'gemini-2.5-pro';
+              autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
               taskDomain = 'Deep Analytical Synthesis & Long Context';
-              specialistName = 'Google Gemini 2.5 Pro (2M Context)';
+              specialistName = geminiKeys.length > 0
+                ? 'Google Gemini 3.5 Flash (1M Context)'
+                : 'Groq GPT-OSS 120B';
             } else {
-              autoTarget = 'gemini-2.5-flash';
+              autoTarget = geminiKeys.length > 0 ? defaultGeminiModel : fallbackNonGeminiModel;
               taskDomain = 'High-Velocity Conversational Inference';
-              specialistName = 'Google Gemini 2.5 Flash';
+              specialistName = geminiKeys.length > 0 ? 'Google Gemini 3.5 Flash' : 'Groq GPT-OSS 120B';
             }
 
             await sendSSE('text_delta', {
-              text: `> **Auto-Routed** to **${specialistName}**\n> *Task Domain: **${taskDomain}** · Dynamically selected for peak effectiveness.*\n\n`,
+              text: `> **Auto-Routed** to **${specialistName}**\n> *Task Domain: **${taskDomain}** · Dynamically selected for live working performance.*\n\n`,
             });
 
             chosenModel = autoTarget;
@@ -2040,6 +2537,7 @@ export default {
           const isOpenRouter =
             chosenModel.startsWith('openrouter/') ||
             chosenModel.includes('nemotron') ||
+            chosenModel.includes('north-mini') ||
             chosenModel.includes('gemma-4') ||
             chosenModel.includes('devstral') ||
             chosenModel.includes('glm') ||
@@ -2071,38 +2569,51 @@ export default {
               messages: groqMessages,
               systemPrompt: systemInstruction.parts[0].text,
               sendSSE,
+              firstTokenTimeoutMs: 7000,
             });
 
             if (groqResult.success) {
               accumulatedAssistantText = groqResult.text;
             } else {
-              // Resilient auto-recovery via Google Gemini
-              await sendSSE('text_delta', {
-                text: `\n> *[Groq capacity limit reached · Seamlessly completing request via **Google Gemini 2.5 Flash**]*\n\n`,
-              });
-              const geminiFallback = await streamGeminiWithCandidates({
-                apiKey,
-                candidateModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'],
-                contents: geminiContents,
+              const recovered = await failoverAcrossProviders({
+                geminiKeys,
+                clientApiKey,
+                groqApiKey,
+                openRouterApiKey,
+                preferredGeminiModel: 'gemini-3.5-flash',
+                skipProvider: 'groq',
+                reasonLabel: `Groq ${groqModel} capacity limit reached`,
+                rawList,
+                geminiContents,
                 systemInstruction,
                 sendSSE,
               });
-              if (geminiFallback.success) {
-                accumulatedAssistantText = geminiFallback.text;
-                usedProvider = 'gemini';
-                usedModel = geminiFallback.model;
+              if (recovered.success) {
+                accumulatedAssistantText = recovered.text;
+                usedProvider = recovered.provider;
+                usedModel = recovered.model;
               }
             }
             isHandled = true;
           } else if (isOpenRouter) {
-            let orModel = chosenModel.replace(/^openrouter\//, '');
-            if (orModel.includes('550b') || orModel.includes('nemotron-3-ultra') || orModel.includes('lightning') || orModel.includes('nemotron')) {
+            let orModel = chosenModel.replace(/^openrouter\//, '').trim();
+            if (orModel.includes('am-thinking-v1') || orModel.includes('thinking-v1')) {
+              orModel = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
+            } else if (orModel.includes('550b') || orModel.includes('nemotron-3-ultra')) {
+              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+            } else if (orModel.includes('nano-omni')) {
+              orModel = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
+            } else if (orModel.includes('super-vl')) {
+              orModel = 'nvidia/nemotron-3.5-super-vl:free';
+            } else if (orModel.includes('lightning')) {
               orModel = 'nvidia/nemotron-3.5-lightning:free';
             } else if (orModel.includes('north') || orModel.includes('code') || orModel.includes('devstral')) {
               orModel = 'cohere/north-mini-code:free';
-            } else if (orModel.includes('thinking')) {
-              orModel = 'am-thinking-v1:free';
-            } else {
+            } else if (orModel.includes('gemma-4-31b')) {
+              orModel = 'google/gemma-4-31b-it:free';
+            } else if (orModel.includes('gemma-4')) {
+              orModel = 'google/gemma-4-26b-a4b-it:free';
+            } else if (!orModel.endsWith(':free') && orModel !== 'openrouter/free') {
               orModel = 'nvidia/nemotron-3.5-lightning:free';
             }
 
@@ -2129,41 +2640,48 @@ export default {
             if (orResult.success) {
               accumulatedAssistantText = orResult.text;
             } else {
-              await sendSSE('text_delta', {
-                text: `\n> ⚡ *[OpenRouter free queue congestion detected (>7s) · Seamlessly accelerated via **Google Gemini 2.5 Flash** for instant response]*\n\n`,
-              });
-              const geminiFallback = await streamGeminiWithCandidates({
-                apiKey,
-                candidateModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'],
-                contents: geminiContents,
+              const recovered = await failoverAcrossProviders({
+                geminiKeys,
+                clientApiKey,
+                groqApiKey,
+                openRouterApiKey,
+                preferredGeminiModel: 'gemini-3.5-flash',
+                skipProvider: 'openrouter',
+                reasonLabel: `OpenRouter ${orModel} unavailable`,
+                rawList,
+                geminiContents,
                 systemInstruction,
                 sendSSE,
               });
-              if (geminiFallback.success) {
-                accumulatedAssistantText = geminiFallback.text;
-                usedProvider = 'gemini';
-                usedModel = geminiFallback.model;
+              if (recovered.success) {
+                accumulatedAssistantText = recovered.text;
+                usedProvider = recovered.provider;
+                usedModel = recovered.model;
               }
             }
             isHandled = true;
           } else if (chosenModel.startsWith('openai/') && !chosenModel.includes('gpt-oss')) {
             const userProvidedKey = body.openai_api_key || request.headers.get('x-openai-key');
             if (!userProvidedKey) {
-              // Seamlessly route unfunded OpenAI model requests to Google Gemini 2.5 Pro
               await sendSSE('text_delta', {
-                text: `> *[Routing **${chosenModel}** to **Google Gemini 2.5 Pro** | Free Flagship Intelligence]*\n\n`,
+                text: `> *[Routing **${chosenModel}** to **Google Gemini 3.5 Flash** | Free Flagship Intelligence]*\n\n`,
               });
-              const geminiFallback = await streamGeminiWithCandidates({
-                apiKey,
-                candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
-                contents: geminiContents,
+              const recovered = await failoverAcrossProviders({
+                geminiKeys,
+                clientApiKey,
+                groqApiKey,
+                openRouterApiKey,
+                preferredGeminiModel: 'gemini-3.5-flash',
+                reasonLabel: `Routing ${chosenModel}`,
+                rawList,
+                geminiContents,
                 systemInstruction,
                 sendSSE,
               });
-              if (geminiFallback.success) {
-                accumulatedAssistantText = geminiFallback.text;
-                usedProvider = 'gemini';
-                usedModel = geminiFallback.model;
+              if (recovered.success) {
+                accumulatedAssistantText = recovered.text;
+                usedProvider = recovered.provider;
+                usedModel = recovered.model;
               }
               isHandled = true;
             } else {
@@ -2188,20 +2706,22 @@ export default {
               if (openaiResult.success) {
                 accumulatedAssistantText = openaiResult.text;
               } else {
-                await sendSSE('text_delta', {
-                  text: `\n> ⚠️ **OpenAI Direct Stream Notice**: Account has $0 credit balance remaining.\n> *[Seamlessly completing request via **Google Gemini 2.5 Pro** at 0 cost]*\n\n`,
-                });
-                const geminiFallback = await streamGeminiWithCandidates({
-                  apiKey,
-                  candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
-                  contents: geminiContents,
+                const recovered = await failoverAcrossProviders({
+                  geminiKeys,
+                  clientApiKey,
+                  groqApiKey,
+                  openRouterApiKey,
+                  preferredGeminiModel: 'gemini-3.5-flash',
+                  reasonLabel: 'OpenAI upstream unavailable',
+                  rawList,
+                  geminiContents,
                   systemInstruction,
                   sendSSE,
                 });
-                if (geminiFallback.success) {
-                  accumulatedAssistantText = geminiFallback.text;
-                  usedProvider = 'gemini';
-                  usedModel = geminiFallback.model;
+                if (recovered.success) {
+                  accumulatedAssistantText = recovered.text;
+                  usedProvider = recovered.provider;
+                  usedModel = recovered.model;
                 }
               }
               isHandled = true;
@@ -2210,19 +2730,24 @@ export default {
             const userProvidedAnthropicKey = body.anthropic_api_key || request.headers.get('x-anthropic-key');
             if (!userProvidedAnthropicKey) {
               await sendSSE('text_delta', {
-                text: `> *[Routing **${chosenModel}** to **Google Gemini 2.5 Pro** | Free Frontier Reasoning]*\n\n`,
+                text: `> *[Routing **${chosenModel}** to **Google Gemini 3.5 Flash** | Free Frontier Reasoning]*\n\n`,
               });
-              const geminiFallback = await streamGeminiWithCandidates({
-                apiKey,
-                candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
-                contents: geminiContents,
+              const recovered = await failoverAcrossProviders({
+                geminiKeys,
+                clientApiKey,
+                groqApiKey,
+                openRouterApiKey,
+                preferredGeminiModel: 'gemini-3.5-flash',
+                reasonLabel: `Routing ${chosenModel}`,
+                rawList,
+                geminiContents,
                 systemInstruction,
                 sendSSE,
               });
-              if (geminiFallback.success) {
-                accumulatedAssistantText = geminiFallback.text;
-                usedProvider = 'gemini';
-                usedModel = geminiFallback.model;
+              if (recovered.success) {
+                accumulatedAssistantText = recovered.text;
+                usedProvider = recovered.provider;
+                usedModel = recovered.model;
               }
               isHandled = true;
             } else {
@@ -2243,20 +2768,22 @@ export default {
               if (anthropicResult.success) {
                 accumulatedAssistantText = anthropicResult.text;
               } else {
-                await sendSSE('text_delta', {
-                  text: `\n> *[Anthropic key error · Seamlessly completing request via **Google Gemini 2.5 Pro**]*\n\n`,
-                });
-                const geminiFallback = await streamGeminiWithCandidates({
-                  apiKey,
-                  candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
-                  contents: geminiContents,
+                const recovered = await failoverAcrossProviders({
+                  geminiKeys,
+                  clientApiKey,
+                  groqApiKey,
+                  openRouterApiKey,
+                  preferredGeminiModel: 'gemini-3.5-flash',
+                  reasonLabel: 'Anthropic key/upstream unavailable',
+                  rawList,
+                  geminiContents,
                   systemInstruction,
                   sendSSE,
                 });
-                if (geminiFallback.success) {
-                  accumulatedAssistantText = geminiFallback.text;
-                  usedProvider = 'gemini';
-                  usedModel = geminiFallback.model;
+                if (recovered.success) {
+                  accumulatedAssistantText = recovered.text;
+                  usedProvider = recovered.provider;
+                  usedModel = recovered.model;
                 }
               }
               isHandled = true;
@@ -2269,141 +2796,234 @@ export default {
             usedProvider = 'unified-team';
             usedModel = chosenModel;
 
+            const isCodePair = chosenModel === 'unified-team:code-pair';
+            const isSciSymposium = chosenModel === 'unified-team:scientific-symposium';
             const isDualExpert =
               chosenModel === 'unified-team:dual-expert' ||
               chosenModel === 'council/dual-expert-deliberation';
 
-            const teamMode = isDualExpert
-              ? 'Dual-Expert Debate (Nemotron 550B + Groq Qwen 27B + Gemini 2.5 Pro)'
-              : 'Full Frontier Council (Nemotron 550B + Groq GPT-OSS 120B + Groq Qwen 27B + Gemini 2.5 Pro)';
+            const teamMode = isCodePair
+              ? 'Elite Engineering Pair (Groq Qwen 3.8 27B + Google Gemini 3.5 Flash)'
+              : isSciSymposium
+                ? 'Scientific Symposium (NVIDIA Nemotron Omni 30B + Google Gemini 3.5 Flash)'
+                : isDualExpert
+                  ? 'Dual-Expert Debate (Nemotron + Groq Qwen 3.8 27B + Google Gemini 3.5 Flash)'
+                  : 'Full Frontier Council (Nemotron 550B + Groq Qwen 3.8 27B + Google Gemini 3.5 Flash)';
 
             await sendSSE('text_delta', {
               text: `> *[Unified Team: **${teamMode}** | Authentic Live Multi-Model Inference]*\n\n`,
             });
 
-            // ── ROUND 1: NVIDIA Nemotron 550B Ultra (via OpenRouter API) ───────────
-            await sendSSE('text_delta', {
-              text: `### Round 1: NVIDIA Nemotron 550B Ultra\n> *Role: Systems Theorist & Adversarial Critic | Real OpenRouter MoE 550B*\n\n`,
-            });
-
-            const nemotronResult = await streamOpenAICompatible({
-              url: 'https://openrouter.ai/api/v1/chat/completions',
-              apiKey: openRouterApiKey,
-              model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-              messages: rawList,
-              systemPrompt:
-                'You are NVIDIA Nemotron 550B, serving as Lead Architect and Adversarial Critic in the Unified AI Team. Analyze the user query. Formulate the core theoretical principles, boundary conditions, edge cases, and architectural invariants. Be concise, mathematically sharp, and rigorous.',
-              sendSSE,
-              extraHeaders: {
-                'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
-                'X-Title': 'Unified AI Assistant',
-              },
-            });
-
-            const nemotronOutput = nemotronResult.success
-              ? nemotronResult.text
-              : 'Theoretical formulation completed.';
-
-            // ── ROUND 2: Groq Qwen 27B (via Groq Hardware LPUs) ───────────────────
-            await sendSSE('text_delta', {
-              text: `\n\n---\n\n### Round 2: Groq Qwen 27B\n> *Role: Implementation Lead & Production Coder | Real Groq LPU Hardware*\n\n`,
-            });
-
-            const qwenResult = await streamOpenAICompatible({
-              url: 'https://api.groq.com/openai/v1/chat/completions',
-              apiKey: groqApiKey,
-              model: 'qwen/qwen3.8-27b',
-              messages: [
-                ...rawList,
-                {
-                  role: 'user',
-                  content: `Nemotron 550B established this critique and architectural guidance:\n\n${nemotronOutput}\n\nBased on this, implement the solution with concrete, hardened, production-grade code addressing all of Nemotron's points.`,
-                },
-              ],
-              systemPrompt:
-                'You are Qwen 27B on Groq LPUs, serving as Lead Implementation Specialist in the Unified AI Team. Review Nemotron 550B\'s guidance. Provide clean, complete, production-grade code that satisfies all boundary conditions and invariants.',
-              sendSSE,
-            });
-
-            const qwenOutput = qwenResult.success
-              ? qwenResult.text
-              : 'Production implementation completed.';
-
-            // ── ROUND 3: Gemini 2.5 Pro (via Google API) ─────────────────────────
-            await sendSSE('text_delta', {
-              text: `\n\n---\n\n### Round 3: Google Gemini 2.5 Pro\n> *Role: Executive Chairperson | Consensus Synthesis & Final Verification*\n\n`,
-            });
-
-            const chairContents = [
-              ...geminiContents,
-              {
-                role: 'user' as const,
-                parts: [
-                  {
-                    text: `As Executive Chairperson of the Unified AI Team, review the deliberated perspectives:\n\n[NVIDIA NEMOTRON 550B CRITIQUE]:\n${nemotronOutput}\n\n[GROQ QWEN 27B IMPLEMENTATION]:\n${qwenOutput}\n\nSynthesize the final authoritative consensus, asymptotic complexity, verification notes, and complete deliverable for the user. Deliver publication-grade markdown with clean hierarchical headings and display equations.`,
-                  },
-                ],
-              },
-            ];
-
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse&key=${apiKey}`;
-            const geminiResp = await fetch(geminiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: chairContents,
-                system_instruction: systemInstruction,
-                safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
-                generationConfig: {
-                  maxOutputTokens: 8192,
-                  temperature: 0.7,
-                },
-              }),
-            });
-
-            if (geminiResp.ok && geminiResp.body) {
-              const reader = geminiResp.body.getReader();
-              const decoder = new TextDecoder();
-              let lineBuffer = '';
-
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                lineBuffer += decoder.decode(value, { stream: true });
-                const lines = lineBuffer.split('\n');
-                lineBuffer = lines.pop() || '';
-
-                for (const line of lines) {
-                  const trimmed = line.trim();
-                  if (trimmed.startsWith('data: ')) {
-                    const dataJsonStr = trimmed.slice(6).trim();
-                    try {
-                      const parsed = JSON.parse(dataJsonStr);
-                      const deltaText =
-                        parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                      if (deltaText) {
-                        await sendSSE('text_delta', { text: deltaText });
-                        accumulatedAssistantText += deltaText;
+            const runTeamStep = async (
+              candidates: Array<{ url: string; apiKey?: string; model: string; isOpenRouter?: boolean }>,
+              messagesList: Array<{ role: string; content: string }>,
+              sysPrompt: string
+            ) => {
+              for (const c of candidates) {
+                if (!c.apiKey) continue;
+                const res = await streamOpenAICompatible({
+                  url: c.url,
+                  apiKey: c.apiKey,
+                  model: c.model,
+                  messages: messagesList,
+                  systemPrompt: sysPrompt,
+                  sendSSE,
+                  extraHeaders: c.isOpenRouter
+                    ? {
+                        'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
+                        'X-Title': 'Unified AI Assistant',
                       }
-                    } catch {}
-                  }
-                }
+                    : undefined,
+                  firstTokenTimeoutMs: 7000,
+                });
+                if (res.success) return res;
+              }
+              return { success: false, text: '', error: 'All team step candidates unavailable' };
+            };
+
+            const roundOutputs: string[] = [];
+
+            if (isCodePair || isSciSymposium) {
+              const round1Title = isCodePair
+                ? '### Round 1: Groq Qwen 3.8 27B\n> *Role: Implementation Lead & Production Coder | Real Groq LPU Hardware*\n\n'
+                : '### Round 1: NVIDIA Nemotron Nano Omni 30B Reasoning\n> *Role: Quantitative Theorist & First-Principles Formulator*\n\n';
+              await sendSSE('text_delta', { text: round1Title });
+
+              const r1Candidates = isCodePair
+                ? [
+                    { url: 'https://api.groq.com/openai/v1/chat/completions', apiKey: groqApiKey, model: 'qwen/qwen3.8-27b' },
+                    { url: 'https://api.groq.com/openai/v1/chat/completions', apiKey: groqApiKey, model: 'openai/gpt-oss-120b' },
+                    { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'cohere/north-mini-code:free', isOpenRouter: true },
+                    { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'nvidia/nemotron-3.5-lightning:free', isOpenRouter: true },
+                  ]
+                : [
+                    { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', isOpenRouter: true },
+                    { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'nvidia/nemotron-3.5-lightning:free', isOpenRouter: true },
+                    { url: 'https://api.groq.com/openai/v1/chat/completions', apiKey: groqApiKey, model: 'openai/gpt-oss-120b' },
+                  ];
+
+              const r1Sys = isCodePair
+                ? 'You are Qwen 3.8 27B on Groq LPUs, Lead Implementation Specialist. Provide concrete, complete, hardened production code or technical architecture.'
+                : 'You are NVIDIA Nemotron Omni 30B Reasoning. Analyze the query from first principles, derivations, boundary conditions, and invariants.';
+              const r1Res = await runTeamStep(r1Candidates, rawList.slice(-6), r1Sys);
+              const r1Out = r1Res.success ? r1Res.text : 'Primary specialist review completed.';
+              roundOutputs.push(r1Out);
+
+              await sendSSE('text_delta', {
+                text: `\n\n---\n\n### Round 2: Google Gemini 3.5 Flash\n> *Role: Executive Chairperson | Verification, Edge-Case Audit & Final Deliverable*\n\n`,
+              });
+
+              const chairContents = [
+                ...geminiContents,
+                {
+                  role: 'user' as const,
+                  parts: [
+                    {
+                      text: `As Executive Chairperson of the Unified AI Team, review the Round 1 output below:\n\n[ROUND 1 SPECIALIST OUTPUT]:\n${r1Out}\n\nVerify correctness, catch any flaws or missing cases, and deliver the final complete, authoritative deliverable for the user.`,
+                    },
+                  ],
+                },
+              ];
+              const chairRes = await streamGeminiWithCandidates({
+                apiKeys: geminiKeys,
+                candidateModels: resolveGeminiCandidates('gemini-3.5-flash', Boolean(clientApiKey)),
+                contents: chairContents,
+                systemInstruction,
+                sendSSE,
+              });
+              if (chairRes.success) {
+                roundOutputs.push(chairRes.text);
+              } else {
+                const chairBackup = await failoverAcrossProviders({
+                  geminiKeys,
+                  clientApiKey,
+                  groqApiKey,
+                  openRouterApiKey,
+                  skipProvider: 'gemini',
+                  reasonLabel: 'Gemini chairperson pool exhausted',
+                  rawList: [
+                    ...rawList.slice(-4),
+                    {
+                      role: 'user',
+                      content: `Review and finalize this draft cleanly:\n\n${r1Out}`,
+                    },
+                  ],
+                  geminiContents: chairContents,
+                  systemInstruction,
+                  sendSSE,
+                });
+                if (chairBackup.success) roundOutputs.push(chairBackup.text);
               }
             } else {
+              // Dual-Expert Debate or Full Frontier Council (3 live rounds with fast 7s timeouts + fallbacks)
               await sendSSE('text_delta', {
-                text: '\n\n*(Gemini synthesis completed team deliberation)*\n',
+                text: `### Round 1: NVIDIA Nemotron 550B Ultra\n> *Role: Systems Theorist & Adversarial Critic | OpenRouter MoE with Fast Failover*\n\n`,
               });
+
+              const nemotronRes = await runTeamStep(
+                [
+                  { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'nvidia/nemotron-3-ultra-550b-a55b:free', isOpenRouter: true },
+                  { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'nvidia/nemotron-3.5-lightning:free', isOpenRouter: true },
+                  { url: 'https://api.groq.com/openai/v1/chat/completions', apiKey: groqApiKey, model: 'openai/gpt-oss-120b' },
+                ],
+                rawList.slice(-6),
+                'You are NVIDIA Nemotron 550B, serving as Lead Architect and Adversarial Critic in the Unified AI Team. Analyze the user query. Formulate the core theoretical principles, boundary conditions, edge cases, and architectural invariants. Be concise, mathematically sharp, and rigorous.'
+              );
+              const nemotronOutput = nemotronRes.success
+                ? nemotronRes.text
+                : 'Theoretical formulation completed.';
+              roundOutputs.push(nemotronOutput);
+
+              await sendSSE('text_delta', {
+                text: `\n\n---\n\n### Round 2: Groq Qwen 3.8 27B\n> *Role: Implementation Lead & Production Coder | Real Groq LPU Hardware*\n\n`,
+              });
+
+              const qwenMessages = [
+                ...rawList.slice(-4),
+                {
+                  role: 'user',
+                  content: `Nemotron established this critique and architectural guidance:\n\n${nemotronOutput}\n\nBased on this, implement or resolve the request thoroughly, addressing all invariants and edge cases.`,
+                },
+              ];
+              const qwenRes = await runTeamStep(
+                [
+                  { url: 'https://api.groq.com/openai/v1/chat/completions', apiKey: groqApiKey, model: 'qwen/qwen3.8-27b' },
+                  { url: 'https://api.groq.com/openai/v1/chat/completions', apiKey: groqApiKey, model: 'openai/gpt-oss-120b' },
+                  { url: 'https://openrouter.ai/api/v1/chat/completions', apiKey: openRouterApiKey, model: 'nvidia/nemotron-3.5-lightning:free', isOpenRouter: true },
+                ],
+                qwenMessages,
+                'You are Qwen 3.8 27B on Groq LPUs, serving as Lead Implementation Specialist in the Unified AI Team. Address all boundary conditions and deliver complete production-ready output.'
+              );
+              const qwenOutput = qwenRes.success
+                ? qwenRes.text
+                : 'Implementation synthesis completed.';
+              roundOutputs.push(qwenOutput);
+
+              await sendSSE('text_delta', {
+                text: `\n\n---\n\n### Round 3: Google Gemini 3.5 Flash\n> *Role: Executive Chairperson | Consensus Synthesis & Final Verification*\n\n`,
+              });
+
+              const chairContents = [
+                ...geminiContents,
+                {
+                  role: 'user' as const,
+                  parts: [
+                    {
+                      text: `As Executive Chairperson of the Unified AI Team, review the deliberated perspectives:\n\n[ROUND 1 ARCHITECT CRITIQUE]:\n${nemotronOutput}\n\n[ROUND 2 IMPLEMENTATION]:\n${qwenOutput}\n\nSynthesize the final authoritative consensus, verification notes, and complete deliverable for the user in clean publication-grade markdown.`,
+                    },
+                  ],
+                },
+              ];
+
+              const chairGemRes = await streamGeminiWithCandidates({
+                apiKeys: geminiKeys,
+                candidateModels: resolveGeminiCandidates('gemini-3.5-flash', Boolean(clientApiKey)),
+                contents: chairContents,
+                systemInstruction,
+                sendSSE,
+              });
+
+              if (chairGemRes.success) {
+                roundOutputs.push(chairGemRes.text);
+              } else {
+                const chairBackup = await failoverAcrossProviders({
+                  geminiKeys,
+                  clientApiKey,
+                  groqApiKey,
+                  openRouterApiKey,
+                  skipProvider: 'gemini',
+                  reasonLabel: 'Gemini chairperson pool exhausted',
+                  rawList: [
+                    ...rawList.slice(-4),
+                    {
+                      role: 'user',
+                      content: `As Chairperson, synthesize these two team outputs into one clear final deliverable:\n\n[Critique]:\n${nemotronOutput}\n\n[Draft]:\n${qwenOutput}`,
+                    },
+                  ],
+                  geminiContents: chairContents,
+                  systemInstruction,
+                  sendSSE,
+                });
+                if (chairBackup.success) {
+                  roundOutputs.push(chairBackup.text);
+                }
+              }
             }
 
+            accumulatedAssistantText = roundOutputs.filter(Boolean).join('\n\n---\n\n');
             isHandled = true;
           }
 
           if (!isHandled) {
-            const isGeminiModel = chosenModel.startsWith('gemini-');
+            const cleanedGoogleModel = chosenModel.replace(/^(google|gemini)\//i, '');
+            const isGeminiModel =
+              chosenModel.startsWith('gemini-') ||
+              chosenModel.startsWith('gemma-') ||
+              chosenModel.startsWith('google/');
+
             if (!isGeminiModel) {
               await sendSSE('text_delta', {
-                text: `> ⚠️ **Model Not Supported**: The model \`${chosenModel}\` is not recognized. Please choose an active model from the dropdown (Gemini 2.5 Pro, Groq GPT-OSS 120B, Groq Qwen 27B, or NVIDIA Nemotron 550B).\n\n`,
+                text: `> ⚠️ **Model Not Supported**: The model \`${chosenModel}\` is not recognized. Please choose an active model from the dropdown (Gemini 3.5 Flash, Groq GPT-OSS 120B, Groq Qwen 3.8 27B, or NVIDIA Nemotron 3.5 Lightning).\n\n`,
               });
               await sendSSE('message_complete', {
                 finish_reason: 'stop',
@@ -2414,105 +3034,57 @@ export default {
               return;
             }
 
-            const candidateModels = Array.from(
-              new Set([
-                chosenModel,
-                'gemini-3.8-flash',
-                'gemini-3.1-pro-preview',
-                'gemini-flash-latest',
-                'gemini-pro-latest',
-                'gemini-3.5-flash-lite',
-                'gemini-2.5-pro',
-                'gemini-2.5-flash',
-              ])
+            const candidateModels = resolveGeminiCandidates(
+              cleanedGoogleModel,
+              Boolean(clientApiKey)
             );
-            let geminiResponse: Response | null = null;
-            let lastErrorText = '';
-            let lastErrorStatus = 0;
-            const modelErrors: string[] = [];
+            const gemResult = await streamGeminiWithCandidates({
+              apiKeys: geminiKeys,
+              candidateModels,
+              contents: geminiContents,
+              systemInstruction,
+              sendSSE,
+            });
 
-            for (const model of candidateModels) {
-              const fetchCtrl = new AbortController();
-              const fetchTimer = setTimeout(() => fetchCtrl.abort(), 35000);
-              try {
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-                const resp = await fetch(geminiUrl, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: geminiContents,
-                    system_instruction: systemInstruction,
-                    safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
-                    generationConfig: {
-                      maxOutputTokens: 8192,
-                      temperature: 0.7,
-                    },
-                  }),
-                  signal: fetchCtrl.signal,
-                });
-                clearTimeout(fetchTimer);
+            if (gemResult.success) {
+              accumulatedAssistantText = gemResult.text;
+              usedModel = gemResult.model;
+              usedProvider = 'gemini';
+              isHandled = true;
+            } else {
+              const recovered = await failoverAcrossProviders({
+                geminiKeys,
+                clientApiKey,
+                groqApiKey,
+                openRouterApiKey,
+                skipProvider: 'gemini',
+                reasonLabel: 'Gemini API key pool quota/capacity limit reached',
+                rawList,
+                geminiContents,
+                systemInstruction,
+                sendSSE,
+              });
 
-                if (resp.ok && resp.body) {
-                  geminiResponse = resp;
-                  usedModel = model;
-                  usedProvider = 'gemini';
-                  break;
-                } else {
-                  lastErrorStatus = resp.status;
-                  lastErrorText = await resp.text().catch(() => '');
-                  modelErrors.push(`[${model} => ${resp.status}: ${lastErrorText}]`);
-                }
-              } catch (err: unknown) {
-                clearTimeout(fetchTimer);
-                const errMsg = err instanceof Error ? err.message : String(err);
-                lastErrorText = errMsg;
-                modelErrors.push(`[${model} => Err: ${errMsg}]`);
-              }
-            }
-
-            if (!geminiResponse || !geminiResponse.body) {
-              // Seamless Auto-Failover: If Gemini quota/error occurs, fall back to Groq LPU or OpenRouter
-              if (groqApiKey || openRouterApiKey) {
-                const fallbackProvider = groqApiKey ? 'Groq LPUs' : 'OpenRouter';
-                const fallbackModel = groqApiKey ? 'openai/gpt-oss-120b' : 'nvidia/nemotron-3.5-super-vl:free';
-                const fallbackUrl = groqApiKey
-                  ? 'https://api.groq.com/openai/v1/chat/completions'
-                  : 'https://openrouter.ai/api/v1/chat/completions';
-                const fallbackKey = groqApiKey || openRouterApiKey;
-
-                await sendSSE('text_delta', {
-                  text: `> *[Auto-Failover: Gemini free-tier daily quota limit reached · Seamlessly completing via **${fallbackProvider} (${fallbackModel})**]*\n\n`,
-                });
-
-                const fallbackResult = await streamOpenAICompatible({
-                  url: fallbackUrl,
-                  apiKey: fallbackKey,
-                  model: fallbackModel,
-                  messages: rawList,
-                  systemPrompt: systemInstruction.parts[0].text,
-                  sendSSE,
-                });
-
-                if (fallbackResult.success) {
-                  accumulatedAssistantText = fallbackResult.text;
-                  usedModel = fallbackModel;
-                  usedProvider = groqApiKey ? 'groq' : 'openrouter';
-                  isHandled = true;
-                }
-              }
-
-              if (!isHandled) {
+              if (recovered.success) {
+                accumulatedAssistantText = recovered.text;
+                usedModel = recovered.model;
+                usedProvider = recovered.provider;
+                isHandled = true;
+              } else {
                 const isQuota =
-                  lastErrorStatus === 429 ||
-                  modelErrors.some((e) => e.includes('429') || e.includes('RESOURCE_EXHAUSTED') || e.includes('Quota exceeded'));
+                  gemResult.lastStatus === 429 ||
+                  gemResult.errors.some(
+                    (e) =>
+                      e.includes('429') ||
+                      e.includes('RESOURCE_EXHAUSTED') ||
+                      e.includes('Quota exceeded')
+                  );
 
                 const errorText = isQuota
-                  ? '**Daily Free-Tier Quota Limit Reached on Gemini**\n\nThe free-tier usage limit for this shared API key has been reached for today. You can enter your personal Gemini API key in Settings (or by clicking the 🔑 API Key button in the header) to continue immediately with unlimited requests.'
-                  : 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.';
+                  ? '**Daily Free-Tier Quota Limit Reached on All Configured Gemini Keys**\n\nAll keys in the configured pool hit temporary quota limits, and backup providers were also unavailable. Please wait a moment or add another personal API key in Settings.'
+                  : 'Apologies, Gemini and backup providers returned a temporary service error. Please verify your API keys in Settings or try again.';
 
-                await sendSSE('text_delta', {
-                  text: errorText,
-                });
+                await sendSSE('text_delta', { text: errorText });
                 await sendSSE('message_complete', {
                   finish_reason: 'stop',
                   provider: 'gemini',
@@ -2520,43 +3092,6 @@ export default {
                 });
                 await writer.close();
                 return;
-              }
-            }
-
-            if (!isHandled && geminiResponse && geminiResponse.body) {
-              const reader = geminiResponse.body.getReader();
-              const decoder = new TextDecoder();
-              let lineBuffer = '';
-
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                lineBuffer += decoder.decode(value, { stream: true });
-                const lines = lineBuffer.split('\n');
-                lineBuffer = lines.pop() || '';
-
-                for (const line of lines) {
-                  const trimmed = line.trim();
-                  if (trimmed.startsWith('data: ')) {
-                    const dataJsonStr = trimmed.slice(6).trim();
-                    try {
-                      const parsed = JSON.parse(dataJsonStr);
-                      const candidate = parsed.candidates?.[0];
-                      const parts = candidate?.content?.parts;
-                      if (Array.isArray(parts)) {
-                        for (const part of parts) {
-                          if (part.text) {
-                            accumulatedAssistantText += part.text;
-                            await sendSSE('text_delta', { text: part.text });
-                          }
-                        }
-                      }
-                    } catch {
-                      // Ignore JSON parse errors on partial chunks
-                    }
-                  }
-                }
               }
             }
           }
@@ -3520,9 +4055,9 @@ export default {
         .join('\n\n---\n\n');
 
       let answerText = '';
-      const apiKey = env.GOOGLE_API_KEY || env.GEMINI_API_KEY;
+      const knowledgeKeys = getGeminiApiKeyPool(env);
 
-      if (apiKey) {
+      if (knowledgeKeys.length > 0) {
         try {
           const geminiPrompt = `You are Unified AI's Knowledge Base Assistant (Phase 5 Files & Knowledge Engine).
 Your goal is to provide a grounded, high-fidelity explanation to the user's question, strictly based on the verified document excerpts below.
@@ -3539,26 +4074,16 @@ ${excerptsText}
 USER QUESTION:
 ${query}`;
 
-          const geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
-                safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
-                generationConfig: {
-                  temperature: 0.2,
-                  maxOutputTokens: 1024,
-                },
-              }),
-            }
-          );
+          const rotRes = await generateGeminiTextWithRotation({
+            apiKeys: knowledgeKeys,
+            candidateModels: resolveGeminiCandidates('gemini-3.5-flash'),
+            contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
+            temperature: 0.2,
+            maxOutputTokens: 1024,
+          });
 
-          if (geminiRes.ok) {
-            const geminiData = await geminiRes.json();
-            const cand = (geminiData as any)?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (cand) answerText = cand.trim();
+          if (rotRes.success && rotRes.text) {
+            answerText = rotRes.text;
           }
         } catch (gemErr) {
           console.warn('Gemini grounded Q&A error:', gemErr);

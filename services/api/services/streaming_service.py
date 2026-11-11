@@ -568,6 +568,8 @@ INTERACTION GUIDELINES:
   * State the export file name clearly (e.g. "Your chat is exported in INT335_P24_chat_export.md.").
   * Offer subsequent actions (e.g. "I can turn it into a PDF or Word file if you want.").
   * The frontend automatically renders the interactive document attachment card matching the reference design.
+- IN-DEPTH TECHNICAL & CONCEPTUAL RIGOR: Provide rigorous, in-depth, and intellectually substantive analysis with all necessary technical, theoretical, mathematical, or empirical details. Never summarize superficially or truncate critical explanations.
+- PRACTICAL CLOSING GUIDANCE (NO MCQs): NEVER output multiple-choice quiz questions (MCQs with Option A/B/C/D), self-test trivia, or quizzes at the end of responses. Instead, conclude responses by suggesting what to do next (concrete actionable next steps) and what to ask next (thoughtful follow-up questions) using a ```suggested-actions``` block with `actions:` and `questions:`.
 """
             conversation_history.insert(0, {"role": "system", "content": base_system_prompt})
 

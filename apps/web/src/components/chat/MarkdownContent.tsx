@@ -8,6 +8,7 @@ import { PromptFlashcard } from './PromptFlashcard';
 import { InteractiveSimulationCard } from './InteractiveSimulationCard';
 import { PdfExportCard } from './PdfExportCard';
 import { InteractiveChoiceCard } from './InteractiveChoiceCard';
+import { SuggestedActionsCard } from './SuggestedActionsCard';
 import { UniversalDiagramCard } from './UniversalDiagramCard';
 import { CouncilDeliberationCard, type CouncilParticipant, type CouncilRound } from './CouncilDeliberationCard';
 import { InteractiveCalendarEventCard } from '../calendar/InteractiveCalendarEventCard';
@@ -504,23 +505,11 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       }
     }
 
-    // Auto-wrap unfenced MCQ questions with Option A/B into interactive mcq blocks
-    if (
-      !processed.includes('```mcq') &&
-      !processed.includes('```choice') &&
-      !processed.includes('```concept') &&
-      /(?:Option\s+A:|A\))\s+/i.test(processed) &&
-      /(?:Option\s+B:|B\))\s+/i.test(processed)
-    ) {
-      const mcqRegex = /([^\n]+\?)\s*\n+((?:(?:\*?\*?Option\s+[A-D]:|\*?\*?[A-D]\))\s+[^\n]+\n*){2,})/i;
-      const match = processed.match(mcqRegex);
-      if (match) {
-        const questionText = match[1].trim();
-        const rawOptions = match[2].trim().split('\n').filter(Boolean);
-        const mcqBlock = `\n\`\`\`mcq\nquestion: "${questionText}"\noptions:\n${rawOptions.map((o) => `  - ${o.trim()}`).join('\n')}\n\`\`\`\n`;
-        processed = processed.replace(match[0], mcqBlock);
-      }
-    }
+    // Clean out any legacy repetitive multiple-choice quiz blocks
+    processed = processed.replace(
+      /(?:###?\s*(?:\*\*)?(?:Practice Self-Test|Quick Knowledge Check|Knowledge Check)(?:\*\*)?[\s\S]*?(?:Option\s+[A-D]:[^\n]*\n*)+)/gi,
+      ''
+    );
 
     return processed;
   }, [content]);
@@ -788,8 +777,67 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
     }
 
     // Interactive MCQ / Choice Poll / Concept Explanation Tree Block
+    // Suggested Actions & Inquiries Block (Action Checklist & Clickable Questions without MCQs)
+    if (
+      lowerLang === 'suggested-actions' ||
+      lowerLang === 'suggested-inquiries' ||
+      lowerLang === 'next-steps' ||
+      lowerLang === 'actions' ||
+      lowerLang === 'inquiries' ||
+      lowerLang === 'recommendations'
+    ) {
+      let cardTitle = 'Next Steps & Suggested Inquiries';
+      const actions: string[] = [];
+      const questions: string[] = [];
+      let currentSection: 'actions' | 'questions' | 'none' = 'none';
+
+      const lines = code.split('\n');
+      for (const l of lines) {
+        const t = l.trim();
+        if (!t) continue;
+        if (t.toLowerCase().startsWith('title:')) {
+          cardTitle = t.replace(/^title:\s*/i, '').replace(/^["']|["']$/g, '').trim();
+        } else if (
+          t.toLowerCase().startsWith('actions:') ||
+          t.toLowerCase().startsWith('next_actions:') ||
+          t.toLowerCase().startsWith('tasks:') ||
+          t.toLowerCase().startsWith('what_to_do:')
+        ) {
+          currentSection = 'actions';
+        } else if (
+          t.toLowerCase().startsWith('questions:') ||
+          t.toLowerCase().startsWith('inquiries:') ||
+          t.toLowerCase().startsWith('what_to_ask:') ||
+          t.toLowerCase().startsWith('suggested_questions:')
+        ) {
+          currentSection = 'questions';
+        } else if (t.startsWith('- ') || t.startsWith('* ') || /^\d+\.\s+/.test(t)) {
+          const item = t.replace(/^[-*]\s+|\d+\.\s+/, '').replace(/^["']|["']$/g, '').trim();
+          if (currentSection === 'actions') {
+            actions.push(item);
+          } else if (currentSection === 'questions') {
+            questions.push(item);
+          } else {
+            if (item.endsWith('?')) questions.push(item);
+            else actions.push(item);
+          }
+        }
+      }
+
+      return (
+        <SuggestedActionsCard
+          title={cardTitle}
+          actions={actions}
+          questions={questions}
+          onSelectChoice={onSelectChoice}
+        />
+      );
+    }
+
+    // Interactive Choice / Inquiry / Conceptual Branching Block
     if (
       lowerLang === 'mcq' ||
+      lowerLang === 'quiz' ||
       lowerLang === 'choices' ||
       lowerLang === 'choice' ||
       lowerLang === 'poll' ||
@@ -801,8 +849,8 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       lowerLang === 'branches'
     ) {
       let question = 'Please select an option:';
-      let category = lowerLang.includes('concept') ? 'Course Concept' : 'Clarification & Choice';
-      let typeBadge = lowerLang.includes('concept') ? 'LINK' : 'MCQ';
+      let category = lowerLang.includes('concept') ? 'Course Concept' : 'Inquiry & Clarification';
+      let typeBadge = lowerLang.includes('concept') ? 'LINK' : 'Inquiry';
       let summary: string | undefined = undefined;
       const options: string[] = [];
       const customBranches: ExplanationBranch[] = [];
@@ -837,6 +885,17 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
         } else if (/^\d+\.\s+/.test(t)) {
           options.push(t.replace(/^\d+\.\s+/, '').trim());
         }
+      }
+
+      // If marked as mcq, render directly as non-quiz SuggestedActionsCard
+      if (lowerLang === 'mcq' || lowerLang === 'quiz') {
+        return (
+          <SuggestedActionsCard
+            title={question.replace(/\?$/, '')}
+            questions={options}
+            onSelectChoice={onSelectChoice}
+          />
+        );
       }
 
       return (
