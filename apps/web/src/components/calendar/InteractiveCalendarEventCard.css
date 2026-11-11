@@ -93,6 +93,19 @@
   color: #a1a1aa;
 }
 
+.sched-tz-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  letter-spacing: 0.01em;
+}
+
 .cal-badge-priority {
   display: inline-flex;
   align-items: center;

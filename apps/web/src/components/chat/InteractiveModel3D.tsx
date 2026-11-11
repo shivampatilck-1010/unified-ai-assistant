@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { InteractiveModel, InteractiveModelPart } from './interactiveModelSchema';
 import './InteractiveModel3D.css';
 
@@ -9,33 +11,332 @@ interface InteractiveModel3DProps {
   model: InteractiveModel;
 }
 
-function createGeometry(part: InteractiveModelPart): THREE.BufferGeometry {
+// ── Realistic PBR Material Engine for AI-Generated Parts ──────────────────────
+function getRealisticMaterial(part: InteractiveModelPart): THREE.MeshStandardMaterial {
+  const name = (part.name + ' ' + part.id).toLowerCase();
+
+  // Hardened Tool Steel / Saw Blades / Teeth
+  if (/saw|blade|disc|teeth|tooth/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#e2e8f0',
+      metalness: 0.95,
+      roughness: 0.14,
+    });
+  }
+
+  // Cast Iron / Separation Grates / Structural Brackets / Frames
+  if (/grate|rib|comb|slot|chassis|frame|stand/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#334155',
+      metalness: 0.85,
+      roughness: 0.38,
+    });
+  }
+
+  // Industrial Sheet Metal / Tapered Hoppers / Bins / Chambers
+  if (/hopper|funnel|chute|bin|collector|chamber|box/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#475569',
+      metalness: 0.55,
+      roughness: 0.42,
+    });
+  }
+
+  // Natural Fiber / Rotating Brush Bristles
+  if (/brush|doffer|bristle|fiber/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#f8fafc',
+      metalness: 0.08,
+      roughness: 0.85,
+    });
+  }
+
+  // Machined Precision Steel / Forged Alloy (Piston, crankshaft, camshaft, wrist pin, connecting rod)
+  if (/piston|crank|cam|rod|pin|journal|shaft|bearing/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#cbd5e1',
+      metalness: 0.92,
+      roughness: 0.22,
+    });
+  }
+
+  // Cast Aluminum / Engine Blocks / Housings
+  if (/block|head|pan|housing|case|liner|wall/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#475569',
+      metalness: 0.72,
+      roughness: 0.46,
+    });
+  }
+
+  // Nitrided Hardened Steel / Rings / Sprockets / Gears
+  if (/ring|gear|sprocket|chain|belt|flywheel/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#334155',
+      metalness: 0.95,
+      roughness: 0.18,
+    });
+  }
+
+  // Ceramic / Insulators
+  if (/spark|ceramic|insulator/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#f8fafc',
+      metalness: 0.05,
+      roughness: 0.12,
+    });
+  }
+
+  // Spring Steel / Valves
+  if (/spring|valve/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#94a3b8',
+      metalness: 0.88,
+      roughness: 0.24,
+    });
+  }
+
+  // Exhaust / Intake Manifolds
+  if (/manifold|exhaust|intake|header|pipe/.test(name)) {
+    return new THREE.MeshStandardMaterial({
+      color: part.color || '#b45309',
+      metalness: 0.85,
+      roughness: 0.32,
+    });
+  }
+
+  // Default PBR Material honoring AI-selected color and realistic metallic luster
+  return new THREE.MeshStandardMaterial({
+    color: part.color,
+    metalness: 0.75,
+    roughness: 0.28,
+  });
+}
+
+// ── Procedural Helical Curve for Mechanical Springs ──────────────────────────
+class HelixCurve extends THREE.Curve<THREE.Vector3> {
+  turns: number;
+  radius: number;
+  height: number;
+  constructor(turns = 6, radius = 0.35, height = 0.9) {
+    super();
+    this.turns = turns;
+    this.radius = radius;
+    this.height = height;
+  }
+  getPoint(t: number): THREE.Vector3 {
+    const angle = t * Math.PI * 2 * this.turns;
+    const x = Math.cos(angle) * this.radius;
+    const y = (t - 0.5) * this.height;
+    const z = Math.sin(angle) * this.radius;
+    return new THREE.Vector3(x, y, z);
+  }
+}
+
+// ── High-Fidelity Geometry Engine for AI-Generated Model Parts ────────────────
+function createPartMesh(part: InteractiveModelPart): THREE.Object3D {
+  const mat = getRealisticMaterial(part);
+  const name = (part.name + ' ' + part.id).toLowerCase();
+
+  // 1. Photorealistic Machined Piston Assembly
+  if (/piston/i.test(name)) {
+    const group = new THREE.Group();
+    // Piston Crown with beveled top deck
+    const crownGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.55, 48);
+    const crownMesh = new THREE.Mesh(crownGeo, mat);
+    crownMesh.position.y = 0.225;
+    group.add(crownMesh);
+
+    // 3 Nitrided Steel Piston Rings in lands
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.95, roughness: 0.1 });
+    [-0.05, 0.08, 0.2].forEach((ry) => {
+      const ringGeo = new THREE.TorusGeometry(0.505, 0.015, 8, 48);
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = Math.PI / 2;
+      ringMesh.position.y = ry + 0.15;
+      group.add(ringMesh);
+    });
+
+    // Piston Skirt with weight relief
+    const skirtGeo = new THREE.CylinderGeometry(0.48, 0.46, 0.45, 48);
+    const skirtMesh = new THREE.Mesh(skirtGeo, mat);
+    skirtMesh.position.y = -0.275;
+    group.add(skirtMesh);
+
+    // Wrist Pin Bore
+    const pinMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.3 });
+    const pinGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.02, 24);
+    const pinMesh = new THREE.Mesh(pinGeo, pinMat);
+    pinMesh.rotation.z = Math.PI / 2;
+    pinMesh.position.y = -0.12;
+    group.add(pinMesh);
+
+    return group;
+  }
+
+  // 2. Forged Connecting Rod with Eye Bushings & Rod Cap Bolts
+  if (/rod|connecting/i.test(name)) {
+    const group = new THREE.Group();
+    // Small End (Wrist pin bushing)
+    const smallEndGeo = new THREE.TorusGeometry(0.18, 0.07, 16, 48);
+    const smallEnd = new THREE.Mesh(smallEndGeo, mat);
+    smallEnd.position.y = 0.44;
+    group.add(smallEnd);
+
+    // Shank with I-beam forged profile
+    const shankGeo = new RoundedBoxGeometry(0.14, 0.62, 0.08, 4, 0.02);
+    const shank = new THREE.Mesh(shankGeo, mat);
+    group.add(shank);
+
+    // Big End (Crankpin journal)
+    const bigEndGeo = new THREE.TorusGeometry(0.28, 0.09, 16, 48);
+    const bigEnd = new THREE.Mesh(bigEndGeo, mat);
+    bigEnd.position.y = -0.44;
+    group.add(bigEnd);
+
+    // Rod Cap Bolts
+    const boltMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.95, roughness: 0.2 });
+    [-0.24, 0.24].forEach((bx) => {
+      const boltGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.2, 16);
+      const bolt = new THREE.Mesh(boltGeo, boltMat);
+      bolt.position.set(bx, -0.44, 0);
+      group.add(bolt);
+    });
+
+    return group;
+  }
+
+  // 3. Toothed Circular Saw Blades, Gears & Sprockets
+  if (/saw|blade|teeth|gear|sprocket/i.test(name)) {
+    const group = new THREE.Group();
+    // Disc body with axle hole
+    const discGeo = new THREE.CylinderGeometry(0.46, 0.46, 0.1, 48);
+    const disc = new THREE.Mesh(discGeo, mat);
+    group.add(disc);
+
+    const boreMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.4 });
+    const boreGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.12, 24);
+    const bore = new THREE.Mesh(boreGeo, boreMat);
+    group.add(bore);
+
+    // Radial teeth array around perimeter
+    const toothCount = 20;
+    const toothMat = new THREE.MeshStandardMaterial({
+      color: 0xf1f5f9,
+      metalness: 0.98,
+      roughness: 0.1,
+    });
+    for (let i = 0; i < toothCount; i++) {
+      const angle = (i / toothCount) * Math.PI * 2;
+      const toothGeo = new THREE.ConeGeometry(0.04, 0.1, 4);
+      const tooth = new THREE.Mesh(toothGeo, toothMat);
+      tooth.position.set(Math.cos(angle) * 0.48, 0, Math.sin(angle) * 0.48);
+      tooth.rotation.y = -angle;
+      tooth.rotation.z = -Math.PI / 2;
+      group.add(tooth);
+    }
+    return group;
+  }
+
+  // 4. Helical Spring
+  if (/spring/i.test(name)) {
+    const helix = new HelixCurve(6, 0.35, 0.9);
+    const springGeo = new THREE.TubeGeometry(helix, 80, 0.04, 12, false);
+    return new THREE.Mesh(springGeo, mat);
+  }
+
+  // 5. Poppet Valve
+  if (/valve/i.test(name)) {
+    const group = new THREE.Group();
+    const headGeo = new THREE.CylinderGeometry(0.38, 0.16, 0.12, 36);
+    const headMesh = new THREE.Mesh(headGeo, mat);
+    headMesh.position.y = -0.44;
+    group.add(headMesh);
+
+    const stemGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.88, 24);
+    const stemMesh = new THREE.Mesh(stemGeo, mat);
+    stemMesh.position.y = 0.06;
+    group.add(stemMesh);
+    return group;
+  }
+
+  // 6. Industrial Tapered Hopper / Chute / Bin
+  if (/hopper|funnel|chute|bin/i.test(name)) {
+    const group = new THREE.Group();
+    const hopperGeo = new THREE.CylinderGeometry(0.55, 0.3, 0.95, 4, 1, true);
+    hopperGeo.rotateY(Math.PI / 4);
+    const hopperMesh = new THREE.Mesh(hopperGeo, mat);
+    hopperMesh.material.side = THREE.DoubleSide;
+    group.add(hopperMesh);
+
+    const rimGeo = new RoundedBoxGeometry(0.82, 0.05, 0.82, 4, 0.015);
+    const rimMesh = new THREE.Mesh(rimGeo, mat);
+    rimMesh.position.y = 0.48;
+    group.add(rimMesh);
+    return group;
+  }
+
+  // 7. Engine Block / Cylinder Head with Bored Recesses
+  if (/block|head/i.test(name) && part.shape === 'box') {
+    const group = new THREE.Group();
+    const blockGeo = new RoundedBoxGeometry(1, 1, 1, 4, 0.04);
+    const blockMesh = new THREE.Mesh(blockGeo, mat);
+    group.add(blockMesh);
+
+    const boreMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.3 });
+    const borePositions = [-0.36, -0.12, 0.12, 0.36];
+    borePositions.forEach((bx) => {
+      const boreGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.04, 32);
+      const boreMesh = new THREE.Mesh(boreGeo, boreMat);
+      boreMesh.position.set(bx, 0.49, 0);
+      group.add(boreMesh);
+    });
+
+    return group;
+  }
+
+  // 8. Default High-Fidelity Shapes with Beveling & Smooth Subdivision
+  let geo: THREE.BufferGeometry;
   switch (part.shape) {
+    case 'cylinder':
+      geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 64);
+      break;
+    case 'box':
+      // Machined metal chamfers & rounded bevels
+      geo = new RoundedBoxGeometry(1, 1, 1, 4, 0.05);
+      break;
+    case 'capsule':
+      geo = new THREE.CapsuleGeometry(0.5, 1, 24, 48);
+      break;
     case 'ellipsoid':
     case 'sphere':
-      return new THREE.SphereGeometry(1, 32, 24);
-    case 'capsule':
-      return new THREE.CapsuleGeometry(0.5, 1, 6, 16);
-    case 'cylinder':
-      return new THREE.CylinderGeometry(0.75, 0.75, 1, 32);
-    case 'box':
-      return new THREE.BoxGeometry(1, 1, 1);
+      geo = new THREE.SphereGeometry(0.5, 64, 48);
+      break;
     case 'torus':
-      return new THREE.TorusGeometry(0.75, 0.22, 16, 48);
+      geo = new THREE.TorusGeometry(0.4, 0.14, 24, 64);
+      break;
+    default:
+      geo = new RoundedBoxGeometry(1, 1, 1, 4, 0.05);
   }
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 export function InteractiveModel3D({ model }: InteractiveModel3DProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const modelGroupRef = useRef<THREE.Group | null>(null);
-  const meshByPartRef = useRef(new Map<string, THREE.Mesh>());
-  const basePositionsRef = useRef(new Map<string, THREE.Vector3>());
+  const objectByPartRef = useRef<Map<string, THREE.Object3D>>(new Map());
+  const basePositionsRef = useRef<Map<string, THREE.Vector3>>(new Map());
   const controlsRef = useRef<OrbitControls | null>(null);
   const [selectedPartId, setSelectedPartId] = useState<string>(model.parts[0]?.id ?? '');
   const [sectionView, setSectionView] = useState(false);
   const [explosion, setExplosion] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+
   const selectedPart = model.parts.find((part) => part.id === selectedPartId) ?? model.parts[0];
 
   useEffect(() => {
@@ -43,59 +344,92 @@ export function InteractiveModel3D({ model }: InteractiveModel3DProps) {
     if (!viewport) return;
 
     let renderer: THREE.WebGLRenderer;
-    try {
-      const width = Math.max(viewport.clientWidth, 320);
-      const height = Math.max(viewport.clientHeight, 360);
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color('#161513');
-      const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-      camera.position.set(4.5, 3.1, 5.2);
-      camera.lookAt(0, 0, 0);
+    let pmremGenerator: THREE.PMREMGenerator | null = null;
+    let envTexture: THREE.Texture | null = null;
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-      renderer.setSize(width, height);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    try {
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x11100f);
+
+      const camera = new THREE.PerspectiveCamera(42, viewport.clientWidth / viewport.clientHeight, 0.1, 100);
+      camera.position.set(4.8, 3.4, 5.6);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.25;
+
       viewport.replaceChildren(renderer.domElement);
 
-      scene.add(new THREE.HemisphereLight(0xfff1de, 0x312c29, 2.1));
-      const keyLight = new THREE.DirectionalLight(0xffe6d3, 3);
-      keyLight.position.set(4, 6, 5);
+      // Studio HDR-style Environment
+      pmremGenerator = new THREE.PMREMGenerator(renderer);
+      pmremGenerator.compileEquirectangularShader();
+      envTexture = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+      scene.environment = envTexture;
+
+      // Studio Lighting
+      const ambLight = new THREE.AmbientLight(0xfff7ed, 1.2);
+      scene.add(ambLight);
+
+      const keyLight = new THREE.DirectionalLight(0xffedd5, 2.8);
+      keyLight.position.set(6, 8, 7);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.width = 1024;
+      keyLight.shadow.mapSize.height = 1024;
+      keyLight.shadow.bias = -0.001;
       scene.add(keyLight);
-      const fillLight = new THREE.DirectionalLight(0x9ab8ff, 1.2);
-      fillLight.position.set(-5, 2, -4);
+
+      const fillLight = new THREE.DirectionalLight(0x93c5fd, 1.4);
+      fillLight.position.set(-6, 3, -5);
       scene.add(fillLight);
 
+      const rimLight = new THREE.DirectionalLight(0xfef08a, 1.8);
+      rimLight.position.set(0, -5, -6);
+      scene.add(rimLight);
+
+      // Studio Ground Grid
+      const floorGrid = new THREE.GridHelper(16, 32, 0x3f3f46, 0x18181b);
+      floorGrid.position.y = -2.8;
+      scene.add(floorGrid);
+
       const group = new THREE.Group();
-      const meshMap = new Map<string, THREE.Mesh>();
+      const objMap = new Map<string, THREE.Object3D>();
       const basePositions = new Map<string, THREE.Vector3>();
+
+      // Render the AI's dynamically generated 3D components
       for (const part of model.parts) {
-        const material = new THREE.MeshStandardMaterial({
-          color: part.color,
-          roughness: 0.4,
-          metalness: 0.04,
+        const partMesh = createPartMesh(part);
+        partMesh.name = part.name;
+        partMesh.position.set(...part.position);
+        partMesh.scale.set(...part.scale);
+        partMesh.userData.partId = part.id;
+
+        partMesh.traverse((node) => {
+          node.userData.partId = part.id;
+          if (node instanceof THREE.Mesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
         });
-        const mesh = new THREE.Mesh(createGeometry(part), material);
-        mesh.name = part.name;
-        mesh.position.set(...part.position);
-        mesh.scale.set(...part.scale);
-        mesh.userData.partId = part.id;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        group.add(mesh);
-        meshMap.set(part.id, mesh);
-        basePositions.set(part.id, mesh.position.clone());
+
+        group.add(partMesh);
+        objMap.set(part.id, partMesh);
+        basePositions.set(part.id, partMesh.position.clone());
       }
+
       scene.add(group);
       modelGroupRef.current = group;
-      meshByPartRef.current = meshMap;
+      objectByPartRef.current = objMap;
       basePositionsRef.current = basePositions;
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.08;
-      controls.minDistance = 2.5;
-      controls.maxDistance = 14;
+      controls.dampingFactor = 0.06;
+      controls.minDistance = 2.0;
+      controls.maxDistance = 16;
       controlsRef.current = controls;
 
       const raycaster = new THREE.Raycaster();
@@ -113,50 +447,47 @@ export function InteractiveModel3D({ model }: InteractiveModel3DProps) {
         const bounds = renderer.domElement.getBoundingClientRect();
         pointer.set(
           ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
-          -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+          -((event.clientY - bounds.top) / bounds.height) * 2 + 1
         );
         raycaster.setFromCamera(pointer, camera);
-        const hit = raycaster.intersectObjects(group.children, false)[0];
-        const partId = hit?.object.userData.partId;
-        if (typeof partId === 'string') setSelectedPartId(partId);
+        const hits = raycaster.intersectObjects(group.children, true);
+        const hit = hits.find((entry) => Boolean(entry.object.userData.partId));
+        if (hit?.object.userData.partId) {
+          setSelectedPartId(String(hit.object.userData.partId));
+        }
       };
-      renderer.domElement.addEventListener('pointerdown', handlePointerDown);
-      renderer.domElement.addEventListener('pointerup', handlePointerUp);
 
-      const resizeObserver = new ResizeObserver(() => {
-        const nextWidth = Math.max(viewport.clientWidth, 320);
-        const nextHeight = Math.max(viewport.clientHeight, 360);
-        camera.aspect = nextWidth / nextHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(nextWidth, nextHeight);
-      });
-      resizeObserver.observe(viewport);
+      const domElement = renderer.domElement;
+      domElement.addEventListener('pointerdown', handlePointerDown);
+      domElement.addEventListener('pointerup', handlePointerUp);
 
-      let animationFrame = 0;
+      let animId: number;
       const render = () => {
         controls.update();
         renderer.render(scene, camera);
-        animationFrame = window.requestAnimationFrame(render);
+        animId = requestAnimationFrame(render);
       };
-      render();
+      animId = requestAnimationFrame(render);
+
+      const handleResize = () => {
+        if (!viewport) return;
+        camera.aspect = viewport.clientWidth / viewport.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+      };
+      window.addEventListener('resize', handleResize);
 
       return () => {
-        window.cancelAnimationFrame(animationFrame);
-        resizeObserver.disconnect();
-        renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
-        renderer.domElement.removeEventListener('pointerup', handlePointerUp);
+        cancelAnimationFrame(animId);
+        window.removeEventListener('resize', handleResize);
+        domElement.removeEventListener('pointerdown', handlePointerDown);
+        domElement.removeEventListener('pointerup', handlePointerUp);
         controls.dispose();
-        scene.traverse((object) => {
-          if (object instanceof THREE.Mesh) {
-            object.geometry.dispose();
-            const materials = Array.isArray(object.material) ? object.material : [object.material];
-            materials.forEach((material) => material.dispose());
-          }
-        });
         renderer.dispose();
-        renderer.domElement.remove();
+        pmremGenerator?.dispose();
+        envTexture?.dispose();
         modelGroupRef.current = null;
-        meshByPartRef.current.clear();
+        objectByPartRef.current.clear();
         basePositionsRef.current.clear();
         controlsRef.current = null;
       };
@@ -166,78 +497,104 @@ export function InteractiveModel3D({ model }: InteractiveModel3DProps) {
     }
   }, [model]);
 
+  // Exploded View Slider Implementation
   useEffect(() => {
+    if (!model.parts || model.parts.length === 0) return;
+
     const center = model.parts
       .reduce((sum, part) => sum.add(new THREE.Vector3(...part.position)), new THREE.Vector3())
       .multiplyScalar(1 / model.parts.length);
 
     for (const part of model.parts) {
-      const mesh = meshByPartRef.current.get(part.id);
-      if (!mesh) continue;
-      const material = mesh.material as THREE.MeshStandardMaterial;
-      const isOuter = /^(outer|surface|shell)$/i.test(part.layer);
-      material.transparent = sectionView && isOuter;
-      material.opacity = sectionView && isOuter ? 0.18 : 1;
-      material.depthWrite = !(sectionView && isOuter);
-      material.emissive.set(part.id === selectedPartId ? '#66412c' : '#000000');
-      material.emissiveIntensity = part.id === selectedPartId ? 0.7 : 0;
-      material.needsUpdate = true;
-
-      const base = basePositionsRef.current.get(part.id);
-      if (base) {
-        const direction = base.clone().sub(center);
-        mesh.position.copy(base).addScaledVector(direction, explosion * 0.75);
+      const obj = objectByPartRef.current.get(part.id);
+      if (!obj) continue;
+      const base = basePositionsRef.current.get(part.id) ?? obj.position;
+      const explodeVector = base.clone().sub(center);
+      if (explodeVector.lengthSq() < 0.0001) {
+        explodeVector.set(0, 1, 0);
+      } else {
+        explodeVector.normalize();
       }
+      obj.position.copy(base.clone().addScaledVector(explodeVector, explosion * 1.5));
     }
-  }, [explosion, model, sectionView, selectedPartId]);
+  }, [explosion, model.parts]);
+
+  // Cross-section & Part Highlighting
+  useEffect(() => {
+    for (const part of model.parts) {
+      const obj = objectByPartRef.current.get(part.id);
+      if (!obj) continue;
+      const isSelected = part.id === selectedPartId;
+      const isOuter = part.layer === 'outer';
+
+      obj.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+          child.material.transparent = sectionView && isOuter;
+          child.material.opacity = sectionView && isOuter ? 0.28 : 1.0;
+          child.material.roughness = isSelected ? 0.15 : child.material.roughness;
+          if (isSelected) {
+            child.material.emissive = new THREE.Color('#d97757');
+            child.material.emissiveIntensity = 0.35;
+          } else {
+            child.material.emissive = new THREE.Color('#000000');
+            child.material.emissiveIntensity = 0;
+          }
+          child.material.needsUpdate = true;
+        }
+      });
+    }
+  }, [selectedPartId, sectionView, model.parts]);
 
   const handleResetView = useCallback(() => {
-    controlsRef.current?.reset();
     setExplosion(0);
     setSectionView(false);
-  }, []);
+    setSelectedPartId(model.parts[0]?.id ?? '');
+    const controls = controlsRef.current;
+    if (controls) {
+      controls.reset();
+      controls.object.position.set(4.8, 3.4, 5.6);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+  }, [model.parts]);
 
   const handleExportGlb = useCallback(() => {
     const group = modelGroupRef.current;
-    if (!group) {
-      setExportError('The 3D scene is not ready to export yet.');
-      return;
-    }
+    if (!group) return;
 
     setExportError(null);
-    new GLTFExporter().parse(
+    const exporter = new GLTFExporter();
+    exporter.parse(
       group,
-      (result) => {
-        if (!(result instanceof ArrayBuffer)) {
-          setExportError('The GLB exporter returned an unexpected result.');
-          return;
-        }
-        const blob = new Blob([result], { type: 'model/gltf-binary' });
+      (gltf) => {
+        const blob = new Blob([gltf as ArrayBuffer], { type: 'model/gltf-binary' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${model.title.trim().replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() || 'learning-model'}.glb`;
+        link.download = `${model.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.glb`;
         link.click();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        URL.revokeObjectURL(url);
       },
       (error) => {
-        setExportError(error instanceof Error ? error.message : 'Could not export this model as GLB.');
+        setExportError(error instanceof Error ? error.message : 'Could not export GLB file.');
       },
-      { binary: true },
+      { binary: true }
     );
   }, [model.title]);
 
   return (
-    <section className="interactive-model" aria-label={`Interactive 3D model: ${model.title}`}>
+    <section className="interactive-model" aria-label={`3D model of ${model.title}`}>
       <header className="interactive-model__header">
         <div>
-          <span className="interactive-model__eyebrow">INTERACTIVE 3D EXPLORER</span>
+          <span className="interactive-model__eyebrow">AI-GENERATED 3D EXPLORER</span>
           <h3>{model.title}</h3>
           <p>{model.subject}</p>
         </div>
-        <button type="button" className="interactive-model__export" onClick={handleExportGlb}>
-          Download GLB
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button type="button" className="interactive-model__export" onClick={handleExportGlb}>
+            Download GLB
+          </button>
+        </div>
       </header>
 
       <div className="interactive-model__controls">
@@ -261,51 +618,66 @@ export function InteractiveModel3D({ model }: InteractiveModel3DProps) {
             aria-label="Explode model parts"
           />
         </label>
-        <button type="button" onClick={handleResetView}>Reset view</button>
-        <span className="interactive-model__hint">Drag to rotate · scroll to zoom · select a part</span>
+        <button type="button" onClick={handleResetView}>
+          Reset view
+        </button>
+        <span className="interactive-model__hint">
+          Drag to rotate · Scroll to zoom · Click part to inspect
+        </span>
       </div>
 
-      <div className="interactive-model__body">
-        <div className="interactive-model__viewport" ref={viewportRef} role="img" aria-label={`Rotatable 3D model of ${model.subject}`}>
-          {renderError && (
-            <div className="interactive-model__error" role="alert">
-              3D preview unavailable: {renderError}
-            </div>
-          )}
+      <div className="interactive-model__workspace">
+        <div className="interactive-model__stage">
+          <div ref={viewportRef} className="interactive-model__viewport" />
+          {renderError && <p className="interactive-model__error">{renderError}</p>}
+          {exportError && <p className="interactive-model__error">{exportError}</p>}
         </div>
+
         <aside className="interactive-model__sidebar">
-          <div className="interactive-model__part-list" aria-label="Model parts">
-            {model.parts.map((part) => (
-              <button
-                type="button"
-                key={part.id}
-                className={selectedPart?.id === part.id ? 'is-selected' : ''}
-                aria-pressed={selectedPart?.id === part.id}
-                onClick={() => setSelectedPartId(part.id)}
-              >
-                <span style={{ backgroundColor: part.color }} aria-hidden="true" />
-                <span>{part.name}</span>
-                <small>{part.layer}</small>
-              </button>
-            ))}
+          <div className="interactive-model__parts" role="radiogroup" aria-label="Model parts">
+            {model.parts.map((part) => {
+              const isSelected = part.id === selectedPartId;
+              return (
+                <button
+                  key={part.id}
+                  type="button"
+                  className={`interactive-model__part-btn ${isSelected ? 'is-selected' : ''}`}
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => setSelectedPartId(part.id)}
+                >
+                  <span
+                    className="interactive-model__color-dot"
+                    style={{ background: part.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="interactive-model__part-name">{part.name}</span>
+                  <span className="interactive-model__part-layer">{part.layer}</span>
+                </button>
+              );
+            })}
           </div>
+
           {selectedPart && (
-            <div className="interactive-model__details" aria-live="polite">
-              <span className="interactive-model__eyebrow">PART INSPECTOR</span>
+            <div className="interactive-model__inspector">
+              <span className="interactive-model__inspector-title">PART INSPECTOR</span>
               <h4>{selectedPart.name}</h4>
               <p>{selectedPart.description}</p>
               {selectedPart.function && (
-                <p><strong>Role:</strong> {selectedPart.function}</p>
+                <p className="interactive-model__role">
+                  <strong>Role:</strong> {selectedPart.function}
+                </p>
               )}
             </div>
           )}
         </aside>
       </div>
 
-      <footer className="interactive-model__footer">
-        <p>{model.note || 'Simplified educational model, not to scale. Do not use for diagnosis, treatment, or manufacturing.'}</p>
-        {exportError && <p className="interactive-model__export-error" role="alert">{exportError}</p>}
-      </footer>
+      {model.note && (
+        <footer className="interactive-model__footer">
+          <p>{model.note}</p>
+        </footer>
+      )}
     </section>
   );
 }

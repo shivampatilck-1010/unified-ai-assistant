@@ -907,6 +907,7 @@ async function streamOpenAICompatible({
   systemPrompt,
   sendSSE,
   extraHeaders,
+  firstTokenTimeoutMs = 8000,
 }: {
   url: string;
   apiKey: string;
@@ -915,6 +916,7 @@ async function streamOpenAICompatible({
   systemPrompt?: string;
   sendSSE: (event: string, data: Record<string, unknown>) => Promise<void>;
   extraHeaders?: Record<string, string>;
+  firstTokenTimeoutMs?: number;
 }): Promise<{ success: boolean; error?: string; text: string }> {
   const formattedMessages: Array<{ role: string; content: string }> = [];
   if (systemPrompt) {
@@ -929,7 +931,27 @@ async function streamOpenAICompatible({
     }
   }
 
+  const abortController = new AbortController();
+  let firstTokenReceived = false;
+  const timeoutId = setTimeout(() => {
+    if (!firstTokenReceived) {
+      abortController.abort();
+    }
+  }, firstTokenTimeoutMs);
+
   try {
+    const payload: Record<string, unknown> = {
+      model,
+      messages: formattedMessages,
+      stream: true,
+      temperature: 0.6,
+    };
+
+    if (url.includes('openrouter.ai')) {
+      payload.provider = { sort: 'throughput' };
+      payload.transforms = ['middle-out'];
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -937,20 +959,18 @@ async function streamOpenAICompatible({
         Authorization: `Bearer ${apiKey}`,
         ...(extraHeaders || {}),
       },
-      body: JSON.stringify({
-        model,
-        messages: formattedMessages,
-        stream: true,
-        temperature: 0.6,
-      }),
+      body: JSON.stringify(payload),
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
+      clearTimeout(timeoutId);
       const errorBody = await response.text().catch(() => '');
       return { success: false, error: `HTTP ${response.status}: ${errorBody}`, text: '' };
     }
 
     if (!response.body) {
+      clearTimeout(timeoutId);
       return { success: false, error: 'No stream body', text: '' };
     }
 
@@ -963,6 +983,12 @@ async function streamOpenAICompatible({
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      if (!firstTokenReceived && value && value.length > 0) {
+        firstTokenReceived = true;
+        clearTimeout(timeoutId);
+      }
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
@@ -1008,8 +1034,10 @@ async function streamOpenAICompatible({
       }
     }
 
+    clearTimeout(timeoutId);
     return { success: true, text: fullText };
   } catch (err: unknown) {
+    clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg, text: '' };
   }
@@ -1114,12 +1142,21 @@ async function streamAnthropic({
       }
     }
 
+    clearTimeout(timeoutId);
     return { success: true, text: fullText };
   } catch (err: unknown) {
+    clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg, text: '' };
   }
 }
+
+const DEFAULT_GEMINI_SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+];
 
 async function streamGeminiWithCandidates({
   apiKey,
@@ -1145,6 +1182,7 @@ async function streamGeminiWithCandidates({
         body: JSON.stringify({
           contents,
           system_instruction: systemInstruction,
+          safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
           generationConfig: {
             maxOutputTokens: 8192,
             temperature: 0.7,
@@ -1525,24 +1563,17 @@ export default {
             context_window: 131072,
           },
 
-          // 2. OpenRouter (Verified Live API - 100% Free Tier)
+          // 2. OpenRouter High-Throughput Models (100% Free Tier)
           {
-            id: 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free',
-            name: 'NVIDIA Nemotron 550B Ultra (Frontier MoE Titan, Free Tier)',
+            id: 'openrouter/nvidia/nemotron-3.5-lightning:free',
+            name: 'NVIDIA Nemotron 3.5 Lightning (High-Throughput MoE, Ultra-Fast, Free Tier)',
             provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
           },
           {
             id: 'openrouter/nvidia/nemotron-3.5-super-vl:free',
-            name: 'NVIDIA Nemotron 3.5 Super VL (120B-A12B Multimodal Flagship MoE, Free Tier)',
-            provider: 'OpenRouter',
-            is_default: false,
-            context_window: 131072,
-          },
-          {
-            id: 'openrouter/nvidia/nemotron-3.5-lightning:free',
-            name: 'NVIDIA Nemotron 3.5 Lightning (30B-A3B High-Throughput MoE, Free Tier)',
+            name: 'NVIDIA Nemotron 3.5 Super VL (Multimodal MoE, Free Tier)',
             provider: 'OpenRouter',
             is_default: false,
             context_window: 131072,
@@ -1821,7 +1852,7 @@ export default {
               'You have DIRECT, REAL-TIME access to Unified AI\'s Files & Knowledge Base. When verified document excerpts are provided, ground your explanations directly on those facts and cite them using [Doc: filename, Page X] badges.\n\n' +
               'CORE COGNITIVE & RESPONSE PRINCIPLES:\n' +
               '1. HIGH-SPEED DIRECT STREAMING: Deliver the substantive answer, core conceptual insight, or code FIRST. Never begin with conversational filler or robotic throat-clearing ("Certainly!", "I can help with that", "Sure!"). Begin directly with the answer.\n' +
-              '2. EDITORIAL CLARITY & RIGOR: Structure technical explanations with academic rigor. Write publication-grade markdown with clean hierarchical headings (use ### and #### for section headers; never output raw #####). Use precise LaTeX mathematics ($...$ inline, $$...$$ display equations), asymptotic bounds (O, Ω, Θ), and well-commented code.\n' +
+              '2. EDITORIAL DEPTH, EXHAUSTIVENESS & RIGOR: When explaining technical, scientific, cybersecurity, or engineering concepts (such as phishing, buffer overflows, thermodynamics, or neural networks), provide an exhaustive, publication-grade deep dive. Never stop at a brief superficial outline or truncated bullet list. Break down the complete conceptual foundation, multi-stage lifecycle/mechanisms, attack vectors or operational workflows, concrete real-world case studies, architectural diagrams, mathematical formulations, and industry-standard defensive counter-measures / mitigation strategies. Ensure every explanation is fully completed end-to-end without artificial abbreviations or stopping midway.\n' +
               '3. NATIVE VISUAL SIMULATIONS & PEDAGOGICAL ENGINES:\n' +
               '   When explaining, illustrating, or demonstrating algorithms, data structures, or scientific phenomena, embed the native interactive visualizer block:\n' +
               '   - For Dijkstra, A*, BFS, DFS: ```interactive-simulation\\ntype: graph-traversal\\n```\n' +
@@ -1843,13 +1874,34 @@ export default {
               '4. SEAMLESS EMBEDDED FIGURES & SCIENTIFIC SCHEMATICS (BORDERLESS IN-CHAT FIGURES):\n' +
               '   Often an interactive physics simulation with sliders is unnecessary, and the user simply needs a crisp, publication-grade visual diagram, schematic, or ray-tracing figure directly embedded in the chat without bulky flashcard borders.\n' +
               '   - For Optics, Telescopes, Optical Ray Traces, Ray Paths, Reflector/Refractor Optics, Electrical Circuits, Flowcharts, and Anatomical Schematics: output a clean vector SVG block ```svg\\n<svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg">...\\n</svg>\\n``` with title attribute or <title> tag. The chat workspace embeds these as borderless, seamless figures directly into the text with Retina PNG download and clean academic captioning (zero flashcard frames, and zero atomic legends).\n' +
-              '   - For Atom Diagrams: output ```visual-diagram\\ntype: atom\\nelement: Carbon\\n``` (supports any element like Hydrogen, Helium, Carbon, Oxygen, Sodium, Silicon, Chlorine, Calcium).\n' +
+              '   - For Atom Diagrams & 3D Atomic Models: output ```visual-diagram\\ntype: atom\\nelement: Argon\\n``` (supports all elements like Hydrogen, Helium, Lithium, Beryllium, Boron, Carbon, Nitrogen, Oxygen, Fluorine, Neon, Sodium, Magnesium, Aluminum, Silicon, Phosphorus, Sulfur, Chlorine, Argon, Potassium, Calcium, Iron, Copper, Zinc, Gold, etc.). If the user explicitly asks for a 3D model (e.g. "argon 3d model", "atom 3d model"), output ```visual-diagram\\ntype: atom-3d\\nelement: Argon\\n``` or an ```interactive-3d``` WebGL block with nucleus and concentric electron orbits.\n' +
               '   - For Molecules: output ```visual-diagram\\ntype: molecule\\n``` (Water H2O dipole, Benzene C6H6 aromatic ring, etc.).\n' +
-              '   - For Neural Networks: output ```visual-diagram\\ntype: neural-net\\n```.\n' +
+              '   - For Biological Neuroanatomy, Neurons, Action Potentials, Synapses, and Glial Cells (Astrocytes, Oligodendrocytes, Microglia): output ```visual-diagram\\ntype: biological-neuron\\n``` or a clean detailed vector SVG. CRITICAL RULE: NEVER output Artificial Neural Network (ANN/MLP) machine learning diagrams with weights (x_1, h_1, y_hat) when explaining human biology, the nervous system, or cellular neurology!\n' +
+              '   - For Artificial Neural Networks & Deep Learning Topologies (ML/AI): output ```visual-diagram\\ntype: neural-net\\n```.\n' +
               '   - For Microcontroller, ESP32, SoC, CPU, and Embedded Hardware Architecture: output ```visual-diagram\\ntype: architecture\\n``` or clean static vector SVG block ```svg ... ```. NEVER generate toy simulation buttons (such as "Run Task on Core 0", "Toggle Wi-Fi Burst") or canvas particle loops for static hardware block diagrams.\n\n' +
               '5. SCIENTIFIC TELEMETRY & GENUINE PHYSICAL ACCURACY:\n' +
               '   - SCIENTIFIC INSPECTION INTEGRITY: When users interact with or inspect visual simulations, cards must display rigorous domain-specific physics or chemistry metrics (e.g. molar masses, thermodynamic enthalpies, chemical formulas, gas compositions, quantum states). NEVER show canvas implementation artifacts or programming terms like "Render Node (Particle)", "Canvas Object", "dynamic graphic primitive", or "Position: (x, y)".\n' +
               '   - GENERATIVE UI CONTROLS FORMATTING: When generating custom HTML/Canvas widgets, arrange controls horizontally in a flex toolbar centered above or below the canvas using Claude Warm Editorial palette (background #1f1e1c, terracotta #d97757 accents, cream #faf9f5 text; NEVER use jarring neon cyan #00b4d8 buttons). Ensure ample canvas padding (min 40px) so bottom elements and coprocessor labels are never cut off.\n\n' +
+              '6. INTERACTIVE 3D MODELS & ADAPTIVE VISUAL DESIGN:\n' +
+              '   - Adapt the output to the user\'s specific goal; do not force every request into a 3D model. Honor requested format, audience, use case, style, dimensions, and level of detail.\n' +
+              '   - For an interactive 3D model, anatomy view, or cross-section, produce an ```interactive-3d fenced JSON block with `title`, `subject`, optional `note`, and 1-36 `parts` (up to 48 for complex engines/assemblies).\n' +
+              '     Each part must have `id` (unique short identifier), `name`, `shape` (`sphere`, `ellipsoid`, `capsule`, `cylinder`, `box`, or `torus`), `position` and `scale` (three-number arrays), `color` (six-digit hex, e.g. #3b82f6), `layer` (`outer` for surfaces that become translucent in cross-section view; `inner` for internal core parts), `description`, and optional `function`.\n' +
+              '     Keep positions within -4..4 and scale values between 0.05 and 3.5. The application renders this structured JSON directly in an interactive WebGL viewer with selectable parts, cross-section toggles, exploded view sliders, and GLB export. Never put HTML, JavaScript, or executable code in this block.\n' +
+              '   - PART NAMING FOR HIGH-FIDELITY RENDERING: The 3D renderer automatically upgrades part geometry based on part name keywords:\n' +
+              '     * Name parts containing "piston" → procedural piston crown, 3 compression rings, skirt assembly, wrist pin\n' +
+              '     * Name parts containing "connecting rod" or "con rod" → I-beam shank, small end bushing, big end cap with bolts\n' +
+              '     * Name parts containing "gear", "sprocket", "saw" → toothed gear with 20 perimeter teeth + center bore\n' +
+              '     * Name parts containing "spring" → procedural helical spring (TubeGeometry on HelixCurve)\n' +
+              '     * Name parts containing "valve" → poppet valve head + precision stem\n' +
+              '     * Name parts containing "hopper", "bin", "funnel" → open-top tapered hopper with rim\n' +
+              '     * Name parts containing "block" or "head" (shape=box) → engine block with cylinder bore recesses\n' +
+              '     Use these keywords in part names to trigger automatic high-fidelity procedural geometry instead of plain primitives.\n' +
+              '   - CRITICAL: NEVER use `interactive-3d` for atomic/element/periodic table requests. For atoms/elements, ALWAYS use ```visual-diagram\\ntype: atom\\nelement: [ElementName]\\n``` (Bohr model 2D) or ```visual-diagram\\ntype: atom-3d\\nelement: [ElementName]\\n``` for 3D orbital view.\n' +
+              '   - Make the model educational and internally coherent: arrange shapes to communicate their spatial relationships, label parts clearly, and explain each part in accurate, plain language.\n' +
+              '   - For human anatomy, label it a simplified educational schematic, not to scale or suitable for clinical diagnosis or treatment. Never call simplified educational anatomy medically validated.\n' +
+              '   - Do NOT present generated 3D schematics as manufacturing-ready CAD.\n' +
+              '   - For follow-up edits to an existing visual artifact, preserve its established purpose and any user-approved choices while changing only what the user asks to change. Reuse recent visual context instead of starting over.\n' +
+              '   - For 2D designs or illustrations, provide a polished vector SVG in an ```svg fenced block; for process or system diagrams, use Mermaid; for explanation, use clear prose.\n\n' +
               'INTERACTIVE INQUIRY & CONCEPTUAL EXPLORATION CARDS:\n' +
               'When assessing understanding, exploring branching topics, or clarifying intent:\n' +
               'Output an interactive MCQ block:\n' +
@@ -1871,9 +1923,8 @@ export default {
               'You have DIRECT, REAL-TIME access to Unified AI\'s built-in Calendar & Task Management system, as well as 1-click sync to Google Calendar, Apple Calendar (.ics), and Microsoft Outlook.\n' +
               'CRITICAL RULES:\n' +
               '- NEVER say "I cannot directly access or modify your personal calendar apps"! You HAVE native calendar integration.\n' +
-              '- NEVER output raw BEGIN:VCALENDAR code blocks, and NEVER output repetitive text or bullet points like "Click export link on the event card above... Download .ics file below..." or list sync instructions with emojis.\n' +
-              '- When the user asks to schedule an exam or event, provide the single interactive calendar block below without unnecessary emoji clutter or repetitive sync bullets:\n' +
-              '- Output EXACTLY ONE clean calendar event block (never output duplicate blocks or wrong years like 2025; tomorrow is November 9, 2026):\n' +
+              '- NEVER output raw BEGIN:VCALENDAR code blocks, and NEVER output repetitive text or bullet points like "Click export link on the event card above... Download .ics file below..." or list sync instructions with emojis. The calendar widget ALREADY provides interactive 1-click sync buttons.\n' +
+              '- When the user asks to schedule an exam or event, provide EXACTLY ONE clean calendar event block without unnecessary emoji clutter or repetitive sync bullets:\n' +
               '```calendar-event\n' +
               'title: <Event Title, e.g. Chemistry Exam>\n' +
               'date: <YYYY-MM-DD, e.g. 2026-11-09>\n' +
@@ -1883,6 +1934,8 @@ export default {
               'description: <Brief review topics, syllabus summary, or notes>\n' +
               '```\n' +
               'This triggers the live interactive Smart Scheduler Card where the user can customize subject, date, time, and notes with live sync to Unified Calendar, Google Calendar, Apple iCal, and Outlook.\n\n' +
+              'LIVE VOICE & SPOKEN CONVERSATIONAL INFERENCE:\n' +
+              'When engaged in conversational live voice sessions, synthesize explanations into natural, engaging spoken prose. Avoid dumping dense raw LaTeX equations or un-vocalizable markdown syntax into spoken speech.\n\n' +
               'MULTIMODAL REASONING & CONVERSATIONAL MEMORY:\n' +
               'You have full multimodal capabilities to inspect images, charts, plots, and code files. Seamlessly maintain conversational context across turns without asking the user to repeat prior context.',
           },
@@ -1921,9 +1974,14 @@ export default {
             const lowerMsg = lastUserMsg.toLowerCase();
 
             const isCode = /\b(code|function|bug|error|refactor|typescript|javascript|python|react|html|css|sql|api|loop|component|git|syntax|class|compile|algorithm|database|json|schema|async|await|props|unit test|script)\b/.test(lowerMsg);
+            // Atom/element/molecule queries MUST NOT go to Groq 3D — they need Gemini's visual-diagram awareness
+            const isAtom = /\b(atom|atomic|element|bohr model|electron|proton|neutron|nucleus|orbital|molecule|molecule|hydrogen|helium|lithium|beryllium|carbon|nitrogen|oxygen|neon|sodium|magnesium|argon|chlorine|potassium|calcium|iron|copper|zinc|gold|periodic table)\b/.test(lowerMsg);
+            const is3D = !isAtom && /\b(3d|three\.js|interactive-3d|3d-model|cross-section|exploded view|anatomy|piston|engine|crankshaft|cylinder|camshaft|valvetrain|motor|car|vehicle|mesh|geometry|cad|schematic 3d|machinacal|mechanical|cutaway)\b/.test(lowerMsg);
             const isStem = /\b(math|equation|calculus|matrix|theorem|proof|physics|algebra|integral|derivative|quantum|probability|combinatorics|am-thinking|nemotron|eigenvalue|trigonometry|geometry|formula)\b/.test(lowerMsg);
             const isDebate = /\b(debate|compare perspectives|council|deliberate|pros and cons|cross-check|multiple viewpoints|two sides)\b/.test(lowerMsg);
             const isWorkflow = /\b(workflow|step by step plan|automate|agent|pipeline|translate|spanish|french|german|chinese|hindi|multilingual|schedule|roadmap)\b/.test(lowerMsg);
+            // Cybersecurity & hacking topics get Gemini 2.5 Pro for comprehensive technical depth
+            const isCybersecurity = /\b(phishing|malware|ransomware|exploit|vulnerability|penetration test|pen test|ctf|hacking|cybersecurity|cyber security|infosec|firewall|intrusion|ddos|sql injection|xss|csrf|zero.?day|social engineering|trojan|botnet|keylogger|rootkit|vishing|smishing|spear.?phish)\b/.test(lowerMsg);
             const isDeepAnalysis = /\b(explain in depth|comprehensive analysis|history|essay|patent|research paper|summary of|architecture document|deep dive)\b/.test(lowerMsg) || lastUserMsg.length > 500;
 
             let autoTarget = 'gemini-2.5-pro';
@@ -1934,18 +1992,26 @@ export default {
               autoTarget = 'unified-team:dual-expert';
               taskDomain = 'Multi-Model Frontier Deliberation';
               specialistName = 'Unified Team (Dual-Expert Debate)';
+            } else if (is3D) {
+              autoTarget = 'groq/openai/gpt-oss-120b';
+              taskDomain = 'Interactive 3D Geometry & Spatial Engineering';
+              specialistName = 'Groq GPT-OSS 120B (Real-Time LPU Spatial Inference)';
+            } else if (isCybersecurity) {
+              autoTarget = 'gemini-2.5-pro';
+              taskDomain = 'Cybersecurity & Threat Intelligence';
+              specialistName = 'Google Gemini 2.5 Pro (Deep Security Analysis)';
             } else if (isCode) {
               autoTarget = 'groq/qwen/qwen3.8-27b';
               taskDomain = 'Code Architecture & Implementation';
-              specialistName = 'Groq Qwen 3.8 27B & Cohere North Code';
+              specialistName = 'Groq Qwen 3.8 27B (High-Velocity LPU Code Engine)';
             } else if (isStem) {
-              autoTarget = 'openrouter/nvidia/nemotron-3.5-super-vl:free';
+              autoTarget = 'gemini-2.5-pro';
               taskDomain = 'STEM, Mathematics & Formal Logic';
-              specialistName = 'NVIDIA Nemotron 3.5 Super VL & AM-Thinking';
+              specialistName = 'Google Gemini 2.5 Pro (Ultra-Fast Thinking & Math)';
             } else if (isWorkflow) {
-              autoTarget = 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free';
-              taskDomain = 'Agentic Workflow & Multi-Step Planning';
-              specialistName = 'NVIDIA Nemotron 550B Ultra';
+              autoTarget = 'gemini-2.5-pro';
+              taskDomain = 'Agentic Workflow & Multi-Step Architecture';
+              specialistName = 'Google Gemini 2.5 Pro (2M Context)';
             } else if (isDeepAnalysis) {
               autoTarget = 'gemini-2.5-pro';
               taskDomain = 'Deep Analytical Synthesis & Long Context';
@@ -2030,46 +2096,45 @@ export default {
             isHandled = true;
           } else if (isOpenRouter) {
             let orModel = chosenModel.replace(/^openrouter\//, '');
-            if (orModel.includes('550b') || orModel.includes('nemotron-3-ultra')) {
-              orModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
-            } else if (orModel.includes('lightning')) {
+            if (orModel.includes('550b') || orModel.includes('nemotron-3-ultra') || orModel.includes('lightning') || orModel.includes('nemotron')) {
               orModel = 'nvidia/nemotron-3.5-lightning:free';
             } else if (orModel.includes('north') || orModel.includes('code') || orModel.includes('devstral')) {
               orModel = 'cohere/north-mini-code:free';
             } else if (orModel.includes('thinking')) {
               orModel = 'am-thinking-v1:free';
             } else {
-              orModel = 'nvidia/nemotron-3.5-super-vl:free';
+              orModel = 'nvidia/nemotron-3.5-lightning:free';
             }
 
             usedProvider = 'openrouter';
             usedModel = orModel;
             await sendSSE('text_delta', {
-              text: `> *[Model: **OpenRouter ${orModel}** | Real Frontier Inference]*\n\n`,
+              text: `> *[Model: **OpenRouter ${orModel}** | High-Throughput Inference]*\n\n`,
             });
 
             const orResult = await streamOpenAICompatible({
               url: 'https://openrouter.ai/api/v1/chat/completions',
               apiKey: openRouterApiKey,
               model: orModel,
-              messages: rawList.slice(-6),
+              messages: rawList.slice(-4),
               systemPrompt: systemInstruction.parts[0].text,
               sendSSE,
               extraHeaders: {
                 'HTTP-Referer': 'https://unified-ai-assistant.cortexbuild1.workers.dev',
                 'X-Title': 'Unified AI Assistant',
               },
+              firstTokenTimeoutMs: 7000,
             });
 
             if (orResult.success) {
               accumulatedAssistantText = orResult.text;
             } else {
               await sendSSE('text_delta', {
-                text: `\n> *[OpenRouter busy · Seamlessly completing request via **Google Gemini 2.5 Pro**]*\n\n`,
+                text: `\n> ⚡ *[OpenRouter free queue congestion detected (>7s) · Seamlessly accelerated via **Google Gemini 2.5 Flash** for instant response]*\n\n`,
               });
               const geminiFallback = await streamGeminiWithCandidates({
                 apiKey,
-                candidateModels: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro'],
+                candidateModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'],
                 contents: geminiContents,
                 systemInstruction,
                 sendSSE,
@@ -2288,6 +2353,7 @@ export default {
               body: JSON.stringify({
                 contents: chairContents,
                 system_instruction: systemInstruction,
+                safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
                 generationConfig: {
                   maxOutputTokens: 8192,
                   temperature: 0.7,
@@ -2351,13 +2417,13 @@ export default {
             const candidateModels = Array.from(
               new Set([
                 chosenModel,
+                'gemini-3.8-flash',
+                'gemini-3.1-pro-preview',
+                'gemini-flash-latest',
+                'gemini-pro-latest',
+                'gemini-3.5-flash-lite',
                 'gemini-2.5-pro',
                 'gemini-2.5-flash',
-                'gemini-1.5-pro',
-                'gemini-3.8-flash',
-                'gemini-flash-latest',
-                'gemini-3.5-flash',
-                'gemini-3.1-flash-lite',
               ])
             );
             let geminiResponse: Response | null = null;
@@ -2367,7 +2433,7 @@ export default {
 
             for (const model of candidateModels) {
               const fetchCtrl = new AbortController();
-              const fetchTimer = setTimeout(() => fetchCtrl.abort(), 12000);
+              const fetchTimer = setTimeout(() => fetchCtrl.abort(), 35000);
               try {
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
                 const resp = await fetch(geminiUrl, {
@@ -2376,6 +2442,7 @@ export default {
                   body: JSON.stringify({
                     contents: geminiContents,
                     system_instruction: systemInstruction,
+                    safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
                     generationConfig: {
                       maxOutputTokens: 8192,
                       temperature: 0.7,
@@ -2404,57 +2471,90 @@ export default {
             }
 
             if (!geminiResponse || !geminiResponse.body) {
-              const isQuota =
-                lastErrorStatus === 429 ||
-                lastErrorText.includes('RESOURCE_EXHAUSTED') ||
-                lastErrorText.includes('Quota exceeded');
+              // Seamless Auto-Failover: If Gemini quota/error occurs, fall back to Groq LPU or OpenRouter
+              if (groqApiKey || openRouterApiKey) {
+                const fallbackProvider = groqApiKey ? 'Groq LPUs' : 'OpenRouter';
+                const fallbackModel = groqApiKey ? 'openai/gpt-oss-120b' : 'nvidia/nemotron-3.5-super-vl:free';
+                const fallbackUrl = groqApiKey
+                  ? 'https://api.groq.com/openai/v1/chat/completions'
+                  : 'https://openrouter.ai/api/v1/chat/completions';
+                const fallbackKey = groqApiKey || openRouterApiKey;
 
-              const errorText = isQuota
-                ? '**Daily Free-Tier Quota Limit Reached on Gemini**\n\nThe free-tier usage limit for this shared API key has been reached for today. You can enter your personal Gemini API key in Settings (or by clicking the 🔑 API Key button in the header) to continue immediately with unlimited requests.'
-                : 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.';
+                await sendSSE('text_delta', {
+                  text: `> *[Auto-Failover: Gemini free-tier daily quota limit reached · Seamlessly completing via **${fallbackProvider} (${fallbackModel})**]*\n\n`,
+                });
 
-              await sendSSE('text_delta', {
-                text: errorText,
-              });
-              await sendSSE('message_complete', {
-                finish_reason: 'stop',
-                provider: 'gemini',
-                model: chosenModel,
-              });
-              await writer.close();
-              return;
+                const fallbackResult = await streamOpenAICompatible({
+                  url: fallbackUrl,
+                  apiKey: fallbackKey,
+                  model: fallbackModel,
+                  messages: rawList,
+                  systemPrompt: systemInstruction.parts[0].text,
+                  sendSSE,
+                });
+
+                if (fallbackResult.success) {
+                  accumulatedAssistantText = fallbackResult.text;
+                  usedModel = fallbackModel;
+                  usedProvider = groqApiKey ? 'groq' : 'openrouter';
+                  isHandled = true;
+                }
+              }
+
+              if (!isHandled) {
+                const isQuota =
+                  lastErrorStatus === 429 ||
+                  modelErrors.some((e) => e.includes('429') || e.includes('RESOURCE_EXHAUSTED') || e.includes('Quota exceeded'));
+
+                const errorText = isQuota
+                  ? '**Daily Free-Tier Quota Limit Reached on Gemini**\n\nThe free-tier usage limit for this shared API key has been reached for today. You can enter your personal Gemini API key in Settings (or by clicking the 🔑 API Key button in the header) to continue immediately with unlimited requests.'
+                  : 'Apologies, Gemini API returned a temporary service error. Please verify your API key in Settings or try again.';
+
+                await sendSSE('text_delta', {
+                  text: errorText,
+                });
+                await sendSSE('message_complete', {
+                  finish_reason: 'stop',
+                  provider: 'gemini',
+                  model: chosenModel,
+                });
+                await writer.close();
+                return;
+              }
             }
 
-            const reader = geminiResponse.body.getReader();
-            const decoder = new TextDecoder();
-            let lineBuffer = '';
+            if (!isHandled && geminiResponse && geminiResponse.body) {
+              const reader = geminiResponse.body.getReader();
+              const decoder = new TextDecoder();
+              let lineBuffer = '';
 
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-              lineBuffer += decoder.decode(value, { stream: true });
-              const lines = lineBuffer.split('\n');
-              lineBuffer = lines.pop() || '';
+                lineBuffer += decoder.decode(value, { stream: true });
+                const lines = lineBuffer.split('\n');
+                lineBuffer = lines.pop() || '';
 
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (trimmed.startsWith('data: ')) {
-                  const dataJsonStr = trimmed.slice(6).trim();
-                  try {
-                    const parsed = JSON.parse(dataJsonStr);
-                    const candidate = parsed.candidates?.[0];
-                    const parts = candidate?.content?.parts;
-                    if (Array.isArray(parts)) {
-                      for (const part of parts) {
-                        if (part.text) {
-                          accumulatedAssistantText += part.text;
-                          await sendSSE('text_delta', { text: part.text });
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (trimmed.startsWith('data: ')) {
+                    const dataJsonStr = trimmed.slice(6).trim();
+                    try {
+                      const parsed = JSON.parse(dataJsonStr);
+                      const candidate = parsed.candidates?.[0];
+                      const parts = candidate?.content?.parts;
+                      if (Array.isArray(parts)) {
+                        for (const part of parts) {
+                          if (part.text) {
+                            accumulatedAssistantText += part.text;
+                            await sendSSE('text_delta', { text: part.text });
+                          }
                         }
                       }
+                    } catch {
+                      // Ignore JSON parse errors on partial chunks
                     }
-                  } catch {
-                    // Ignore JSON parse errors on partial chunks
                   }
                 }
               }
@@ -3446,6 +3546,7 @@ ${query}`;
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
+                safetySettings: DEFAULT_GEMINI_SAFETY_SETTINGS,
                 generationConfig: {
                   temperature: 0.2,
                   maxOutputTokens: 1024,

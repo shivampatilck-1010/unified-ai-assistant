@@ -1,16 +1,17 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { AtomViewer3D } from './AtomViewer3D';
 import './UniversalDiagramCard.css';
 
 export interface UniversalDiagramProps {
-  type?: 'atom' | 'molecule' | 'cell' | 'circuit' | 'neural-net' | 'architecture' | 'microcontroller' | 'custom-svg' | string;
+  type?: 'atom' | 'atom-3d' | 'molecule' | 'cell' | 'circuit' | 'neural-net' | 'biological-neuron' | 'neuron' | 'architecture' | 'microcontroller' | 'custom-svg' | string;
   title?: string;
   code?: string;
   element?: string;
 }
 
-interface AtomPreset {
+export interface AtomPreset {
   name: string;
   symbol: string;
   z: number;
@@ -21,18 +22,49 @@ interface AtomPreset {
   period: number;
 }
 
-const ATOM_PRESETS: AtomPreset[] = [
-  { name: 'Hydrogen', symbol: 'H', z: 1, a: 1, shells: [1], config: '1s^1', group: 'Nonmetal (Group 1)', period: 1 },
+export const ATOM_PRESETS: AtomPreset[] = [
+  { name: 'Hydrogen', symbol: 'H', z: 1, a: 1, shells: [1], config: '1s^1', group: 'Reactive Nonmetal (Group 1)', period: 1 },
   { name: 'Helium', symbol: 'He', z: 2, a: 4, shells: [2], config: '1s^2', group: 'Noble Gas (Group 18)', period: 1 },
   { name: 'Lithium', symbol: 'Li', z: 3, a: 7, shells: [2, 1], config: '[\\text{He}]\\,2s^1', group: 'Alkali Metal (Group 1)', period: 2 },
+  { name: 'Beryllium', symbol: 'Be', z: 4, a: 9, shells: [2, 2], config: '[\\text{He}]\\,2s^2', group: 'Alkaline Earth (Group 2)', period: 2 },
+  { name: 'Boron', symbol: 'B', z: 5, a: 11, shells: [2, 3], config: '[\\text{He}]\\,2s^2\\,2p^1', group: 'Metalloid (Group 13)', period: 2 },
   { name: 'Carbon', symbol: 'C', z: 6, a: 12, shells: [2, 4], config: '[\\text{He}]\\,2s^2\\,2p^2', group: 'Reactive Nonmetal (Group 14)', period: 2 },
   { name: 'Nitrogen', symbol: 'N', z: 7, a: 14, shells: [2, 5], config: '[\\text{He}]\\,2s^2\\,2p^3', group: 'Pnictogen (Group 15)', period: 2 },
   { name: 'Oxygen', symbol: 'O', z: 8, a: 16, shells: [2, 6], config: '[\\text{He}]\\,2s^2\\,2p^4', group: 'Chalcogen (Group 16)', period: 2 },
+  { name: 'Fluorine', symbol: 'F', z: 9, a: 19, shells: [2, 7], config: '[\\text{He}]\\,2s^2\\,2p^5', group: 'Halogen (Group 17)', period: 2 },
+  { name: 'Neon', symbol: 'Ne', z: 10, a: 20, shells: [2, 8], config: '[\\text{He}]\\,2s^2\\,2p^6', group: 'Noble Gas (Group 18)', period: 2 },
   { name: 'Sodium', symbol: 'Na', z: 11, a: 23, shells: [2, 8, 1], config: '[\\text{Ne}]\\,3s^1', group: 'Alkali Metal (Group 1)', period: 3 },
+  { name: 'Magnesium', symbol: 'Mg', z: 12, a: 24, shells: [2, 8, 2], config: '[\\text{Ne}]\\,3s^2', group: 'Alkaline Earth (Group 2)', period: 3 },
+  { name: 'Aluminum', symbol: 'Al', z: 13, a: 27, shells: [2, 8, 3], config: '[\\text{Ne}]\\,3s^2\\,3p^1', group: 'Post-Transition Metal (Group 13)', period: 3 },
   { name: 'Silicon', symbol: 'Si', z: 14, a: 28, shells: [2, 8, 4], config: '[\\text{Ne}]\\,3s^2\\,3p^2', group: 'Metalloid (Group 14)', period: 3 },
+  { name: 'Phosphorus', symbol: 'P', z: 15, a: 31, shells: [2, 8, 5], config: '[\\text{Ne}]\\,3s^2\\,3p^3', group: 'Pnictogen (Group 15)', period: 3 },
+  { name: 'Sulfur', symbol: 'S', z: 16, a: 32, shells: [2, 8, 6], config: '[\\text{Ne}]\\,3s^2\\,3p^4', group: 'Chalcogen (Group 16)', period: 3 },
   { name: 'Chlorine', symbol: 'Cl', z: 17, a: 35, shells: [2, 8, 7], config: '[\\text{Ne}]\\,3s^2\\,3p^5', group: 'Halogen (Group 17)', period: 3 },
+  { name: 'Argon', symbol: 'Ar', z: 18, a: 40, shells: [2, 8, 8], config: '[\\text{Ne}]\\,3s^2\\,3p^6', group: 'Noble Gas (Group 18)', period: 3 },
+  { name: 'Potassium', symbol: 'K', z: 19, a: 39, shells: [2, 8, 8, 1], config: '[\\text{Ar}]\\,4s^1', group: 'Alkali Metal (Group 1)', period: 4 },
   { name: 'Calcium', symbol: 'Ca', z: 20, a: 40, shells: [2, 8, 8, 2], config: '[\\text{Ar}]\\,4s^2', group: 'Alkaline Earth (Group 2)', period: 4 },
+  { name: 'Titanium', symbol: 'Ti', z: 22, a: 48, shells: [2, 8, 10, 2], config: '[\\text{Ar}]\\,3d^2\\,4s^2', group: 'Transition Metal (Group 4)', period: 4 },
+  { name: 'Iron', symbol: 'Fe', z: 26, a: 56, shells: [2, 8, 14, 2], config: '[\\text{Ar}]\\,3d^6\\,4s^2', group: 'Transition Metal (Group 8)', period: 4 },
+  { name: 'Copper', symbol: 'Cu', z: 29, a: 64, shells: [2, 8, 18, 1], config: '[\\text{Ar}]\\,3d^{10}\\,4s^1', group: 'Transition Metal (Group 11)', period: 4 },
+  { name: 'Zinc', symbol: 'Zn', z: 30, a: 65, shells: [2, 8, 18, 2], config: '[\\text{Ar}]\\,3d^{10}\\,4s^2', group: 'Transition Metal (Group 12)', period: 4 },
+  { name: 'Krypton', symbol: 'Kr', z: 36, a: 84, shells: [2, 8, 18, 8], config: '[\\text{Ar}]\\,3d^{10}\\,4s^2\\,4p^6', group: 'Noble Gas (Group 18)', period: 4 },
+  { name: 'Silver', symbol: 'Ag', z: 47, a: 108, shells: [2, 8, 18, 18, 1], config: '[\\text{Kr}]\\,4d^{10}\\,5s^1', group: 'Transition Metal (Group 11)', period: 5 },
+  { name: 'Gold', symbol: 'Au', z: 79, a: 197, shells: [2, 8, 18, 32, 18, 1], config: '[\\text{Xe}]\\,4f^{14}\\,5d^{10}\\,6s^1', group: 'Transition Metal (Group 11)', period: 6 },
 ];
+
+export function resolveAtomIndex(elemName?: string): number {
+  if (!elemName) return 17; // Argon is index 17
+  const clean = elemName.trim().toLowerCase();
+  // Exact match on symbol or name
+  const idx = ATOM_PRESETS.findIndex(
+    (a) => a.name.toLowerCase() === clean || a.symbol.toLowerCase() === clean
+  );
+  if (idx >= 0) return idx;
+  // Partial match
+  const pIdx = ATOM_PRESETS.findIndex((a) => a.name.toLowerCase().includes(clean));
+  if (pIdx >= 0) return pIdx;
+  return 17; // Default to Argon
+}
 
 function renderMathHtml(math: string, displayMode = false): string {
   try {
@@ -49,20 +81,33 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
   type = 'atom',
   title,
   code = '',
-  element = 'Carbon',
+  element = 'Argon',
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [animate, setAnimate] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
 
-  // Selected atom preset
-  const [atomIndex, setAtomIndex] = useState<number>(() => {
-    const idx = ATOM_PRESETS.findIndex(
-      (a) => a.name.toLowerCase() === element.toLowerCase() || a.symbol.toLowerCase() === element.toLowerCase()
-    );
-    return idx >= 0 ? idx : 3; // Default to Carbon (index 3)
-  });
+  // Selected atom preset with reactive prop synchronization
+  const [atomIndex, setAtomIndex] = useState<number>(() => resolveAtomIndex(element));
+
+  useEffect(() => {
+    setAtomIndex(resolveAtomIndex(element));
+  }, [element]);
+
+  // Determine if 3D orbital WebGL view is requested
+  const wants3D = useMemo(() => {
+    const combined = `${type} ${title || ''} ${code || ''} ${element || ''}`.toLowerCase();
+    return combined.includes('3d') || combined.includes('atom-3d') || type === 'atom-3d';
+  }, [type, title, code, element]);
+
+  const [is3DMode, setIs3DMode] = useState<boolean>(() => wants3D);
+
+  useEffect(() => {
+    if (wants3D) {
+      setIs3DMode(true);
+    }
+  }, [wants3D]);
 
   // Selected molecule preset
   const [moleculePreset, setMoleculePreset] = useState<'water' | 'benzene'>('water');
@@ -73,9 +118,28 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
   const normalizedType = useMemo(() => {
     const lower = (type || '').toLowerCase();
     const lowerCode = (code || '').toLowerCase();
+    const lowerTitle = (title || '').toLowerCase();
+    const fullContext = `${lower} ${lowerTitle} ${lowerCode}`;
+
     if (lower.includes('atom') || lowerCode.includes('type: atom') || lowerCode.includes('bohr')) return 'atom';
     if (lower.includes('molecule') || lowerCode.includes('type: molecule') || lowerCode.includes('benzene') || lowerCode.includes('water')) return 'molecule';
-    if (lower.includes('neural') || lowerCode.includes('type: neural')) return 'neural-net';
+    
+    // Disambiguate Biological Neuroanatomy vs Machine Learning Artificial Neural Networks
+    const isBioNeuron =
+      /neuron|biological|nervous|glial|glia|soma|axon|dendrite|myelin|ranvier|synapse|schwann|astrocyte|neurotransmitter|saltatory|action\s*potential|membrane\s*potential/i.test(fullContext) &&
+      !/deep\s*learning|perceptron|artificial|mlp|backprop|cnn|rnn|layer\s*weights|epoch|training\s*loss/i.test(fullContext);
+
+    if (
+      isBioNeuron ||
+      lower.includes('biological-neuron') ||
+      lower.includes('neuron') ||
+      lowerCode.includes('type: biological-neuron') ||
+      lowerCode.includes('type: neuron')
+    ) {
+      return 'biological-neuron';
+    }
+
+    if (fullContext.includes('neural') || lowerCode.includes('type: neural')) return 'neural-net';
     if (
       lower.includes('architecture') ||
       lower.includes('microcontroller') ||
@@ -94,7 +158,7 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     }
     if (code && code.trim().startsWith('<svg')) return 'custom-svg';
     return 'atom';
-  }, [type, code]);
+  }, [type, title, code]);
 
   const currentAtom = ATOM_PRESETS[atomIndex] || ATOM_PRESETS[3];
 
@@ -161,14 +225,14 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
   // Render Bohr Atom Diagram (Clean, Large, Zero Text Collisions)
   const renderAtomSvg = () => {
     const cx = 330;
-    const cy = 240;
-    // Generous radial spacing so orbital shells and electrons NEVER collide
-    const shellRadii = [75, 135, 195, 245];
-    const shellNames = ['K (n=1)', 'L (n=2)', 'M (n=3)', 'N (n=4)'];
+    const cy = 250;
+    // Generous radial spacing supporting up to 6 quantum shells without collisions
+    const shellRadii = [65, 110, 155, 195, 230, 260];
+    const shellNames = ['K (n=1)', 'L (n=2)', 'M (n=3)', 'N (n=4)', 'O (n=5)', 'P (n=6)'];
 
     return (
       <svg
-        viewBox="0 0 660 480"
+        viewBox="0 0 660 500"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
         aria-label={`Bohr model of ${currentAtom.name}`}
@@ -567,6 +631,290 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
     );
   };
 
+  // Render Anatomically Accurate Multipolar Biological Neuron & Glial Architecture
+  const renderBiologicalNeuronSvg = () => {
+    return (
+      <svg width="100%" height="370" viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Biological Neuron and Glial Architecture Schematic">
+        <defs>
+          <linearGradient id="bioSomaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#d97757" stopOpacity="0.95" />
+            <stop offset="100%" stopColor="#9a3412" stopOpacity="0.95" />
+          </linearGradient>
+          <linearGradient id="bioMyelinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
+            <stop offset="50%" stopColor="#0284c7" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#0369a1" stopOpacity="0.95" />
+          </linearGradient>
+          <linearGradient id="bioCapillaryGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#be123c" stopOpacity="0.9" />
+          </linearGradient>
+          <filter id="bioDropShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.55" />
+          </filter>
+        </defs>
+
+        {/* Outer Canvas Frame */}
+        <rect x="8" y="8" width="744" height="364" rx="10" fill="#141312" stroke="rgba(255,255,255,0.06)" />
+
+        {/* Top Glial Support Zone: Blood Capillary & Astrocyte */}
+        {/* Blood Capillary Vessel */}
+        <g transform="translate(300, 24)">
+          <rect x="0" y="0" width="220" height="22" rx="11" fill="url(#bioCapillaryGrad)" stroke="#f43f5e" strokeWidth="1.2" />
+          <text x="110" y="15" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            Cerebral Blood Capillary (Blood-Brain Barrier)
+          </text>
+        </g>
+
+        {/* Astrocyte Glial Cell */}
+        <g transform="translate(380, 85)" filter="url(#bioDropShadow)">
+          {/* Perivascular End-feet extending up to capillary */}
+          <path d="M-15,-10 Q -30,-40 -50,-50" fill="none" stroke="#c084fc" strokeWidth="2.5" strokeLinecap="round" />
+          <ellipse cx="-50" cy="-50" rx="8" ry="4" fill="#a855f7" />
+          <path d="M15,-10 Q 30,-40 60,-50" fill="none" stroke="#c084fc" strokeWidth="2.5" strokeLinecap="round" />
+          <ellipse cx="60" cy="-50" rx="8" ry="4" fill="#a855f7" />
+
+          {/* Processes extending down to Node of Ranvier and Axon */}
+          <path d="M-10,15 Q -25,45 -35,75" fill="none" stroke="#c084fc" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M10,15 Q 35,45 55,75" fill="none" stroke="#c084fc" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M-20,0 Q -60,10 -90,40" fill="none" stroke="#c084fc" strokeWidth="1.8" strokeLinecap="round" />
+
+          {/* Astrocyte Star-shaped Cell Body & Nucleus */}
+          <circle cx="0" cy="0" r="14" fill="#7e22ce" stroke="#c084fc" strokeWidth="2" />
+          <circle cx="0" cy="0" r="5" fill="#e9d5ff" />
+          <text x="0" y="-18" fill="#c084fc" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            Astrocyte (Glial Cell)
+          </text>
+          <text x="0" y="28" fill="#d8b4fe" fontSize="8.5" textAnchor="middle" fontFamily="monospace">
+            K⁺ Buffering &amp; Glutamate Uptake
+          </text>
+        </g>
+
+        {/* Receptive Synaptic Input Signals Arriving at Dendrites */}
+        <g transform="translate(35, 60)">
+          <path d="M0,0 L40,30" stroke="#34d399" strokeWidth="2" strokeDasharray="3 2" />
+          <circle cx="45" cy="33" r="4" fill="#34d399" />
+          <text x="0" y="-6" fill="#34d399" fontSize="9" fontWeight="bold" fontFamily="monospace">
+            + EPSP (Excitatory)
+          </text>
+        </g>
+        <g transform="translate(25, 275)">
+          <path d="M0,0 L45,-25" stroke="#f43f5e" strokeWidth="2" strokeDasharray="3 2" />
+          <circle cx="50" cy="-28" r="4" fill="#f43f5e" />
+          <text x="0" y="16" fill="#f43f5e" fontSize="9" fontWeight="bold" fontFamily="monospace">
+            - IPSP (Inhibitory)
+          </text>
+        </g>
+
+        {/* Dendritic Tree (Branching Left from Soma) */}
+        <g stroke="#d97757" strokeLinecap="round" fill="none">
+          {/* Upper primary dendrite */}
+          <path d="M165,185 Q 120,150 85,115" strokeWidth="6" />
+          <path d="M85,115 Q 60,95 35,80" strokeWidth="3.5" />
+          <path d="M85,115 Q 65,135 45,150" strokeWidth="3" />
+          <path d="M120,150 Q 95,175 60,190" strokeWidth="3" />
+
+          {/* Dendritic spines (tiny receptive protrusions) */}
+          <line x1="80" y1="110" x2="74" y2="104" strokeWidth="2" stroke="#ea580c" />
+          <circle cx="73" cy="103" r="2" fill="#fed7aa" stroke="none" />
+          <line x1="50" y1="90" x2="45" y2="84" strokeWidth="2" stroke="#ea580c" />
+          <circle cx="44" cy="83" r="2" fill="#fed7aa" stroke="none" />
+          <line x1="55" y1="140" x2="50" y2="146" strokeWidth="2" stroke="#ea580c" />
+          <circle cx="49" cy="147" r="2" fill="#fed7aa" stroke="none" />
+
+          {/* Lower primary dendrite */}
+          <path d="M165,225 Q 125,255 85,285" strokeWidth="5.5" />
+          <path d="M85,285 Q 65,305 40,320" strokeWidth="3" />
+          <path d="M85,285 Q 70,265 45,250" strokeWidth="2.8" />
+          <path d="M125,255 Q 105,290 80,315" strokeWidth="2.8" />
+
+          {/* Dendritic spines on lower branch */}
+          <line x1="80" y1="290" x2="75" y2="296" strokeWidth="2" stroke="#ea580c" />
+          <circle cx="74" cy="297" r="2" fill="#fed7aa" stroke="none" />
+          <line x1="55" y1="260" x2="49" y2="263" strokeWidth="2" stroke="#ea580c" />
+          <circle cx="48" cy="264" r="2" fill="#fed7aa" stroke="none" />
+        </g>
+        <text x="65" y="55" fill="#f97316" fontSize="11" fontWeight="bold" fontFamily="-apple-system, sans-serif">
+          Dendrites &amp; Spines
+        </text>
+        <text x="65" y="70" fill="#a8a29e" fontSize="9" fontFamily="monospace">
+          Receptive Field (Input)
+        </text>
+
+        {/* Soma (Cell Body) */}
+        <g transform="translate(190, 205)" filter="url(#bioDropShadow)">
+          {/* Organic Perikaryon / Soma Body */}
+          <path
+            d="M-30,-25 Q -10,-45 20,-30 Q 50,-15 55,10 Q 50,40 20,45 Q -15,48 -35,25 Q -50,0 -30,-25 Z"
+            fill="url(#bioSomaGrad)"
+            stroke="#ea580c"
+            strokeWidth="2"
+          />
+
+          {/* Nissl Granules (Rough ER clusters for protein synthesis) */}
+          <circle cx="-15" cy="-12" r="2.2" fill="#fecdd3" opacity="0.8" />
+          <circle cx="-5" cy="-22" r="2" fill="#fecdd3" opacity="0.8" />
+          <circle cx="22" cy="-10" r="2.2" fill="#fecdd3" opacity="0.8" />
+          <circle cx="-18" cy="18" r="2.2" fill="#fecdd3" opacity="0.8" />
+          <circle cx="5" cy="28" r="2" fill="#fecdd3" opacity="0.8" />
+          <circle cx="28" cy="20" r="2" fill="#fecdd3" opacity="0.8" />
+
+          {/* Nucleus */}
+          <circle cx="2" cy="5" r="18" fill="#1e293b" stroke="#38bdf8" strokeWidth="1.8" />
+          {/* Nucleolus */}
+          <circle cx="0" cy="3" r="6" fill="#93c5fd" />
+          <circle cx="-2" cy="1" r="2" fill="#ffffff" opacity="0.7" />
+
+          <text x="2" y="-38" fill="#faf9f5" fontSize="11" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            Soma (Cell Body)
+          </text>
+          <text x="2" y="52" fill="#fdba74" fontSize="9" textAnchor="middle" fontFamily="monospace">
+            Nucleus &amp; Nissl Substance
+          </text>
+        </g>
+
+        {/* Axon Hillock (Trigger Zone / Summation Point) */}
+        <g transform="translate(245, 205)">
+          <path d="M-5,-10 L30,-4 L30,4 L-5,10 Z" fill="#c2410c" stroke="#ea580c" strokeWidth="1.5" />
+          <text x="14" y="-18" fill="#fbbf24" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            Axon Hillock
+          </text>
+          <text x="14" y="-6" fill="#fde68a" fontSize="8" textAnchor="middle" fontFamily="monospace">
+            Vth = -55 mV
+          </text>
+        </g>
+
+        {/* Central Axon Fiber Cylinder */}
+        <rect x="275" y="201" width="350" height="8" rx="3" fill="#fed7aa" stroke="#f97316" strokeWidth="1" />
+
+        {/* Myelin Sheaths (Schwann Cells / Oligodendrocytes) */}
+        {/* Segment 1 */}
+        <g transform="translate(285, 187)" filter="url(#bioDropShadow)">
+          <rect x="0" y="0" width="70" height="36" rx="8" fill="url(#bioMyelinGrad)" stroke="#38bdf8" strokeWidth="1.6" />
+          <ellipse cx="35" cy="8" rx="10" ry="4" fill="#0369a1" stroke="#7dd3fc" strokeWidth="1" />
+          <text x="35" y="26" fill="#f0f9ff" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            MYELIN #1
+          </text>
+        </g>
+
+        {/* Segment 2 */}
+        <g transform="translate(375, 187)" filter="url(#bioDropShadow)">
+          <rect x="0" y="0" width="70" height="36" rx="8" fill="url(#bioMyelinGrad)" stroke="#38bdf8" strokeWidth="1.6" />
+          <ellipse cx="35" cy="8" rx="10" ry="4" fill="#0369a1" stroke="#7dd3fc" strokeWidth="1" />
+          <text x="35" y="26" fill="#f0f9ff" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            MYELIN #2
+          </text>
+        </g>
+
+        {/* Segment 3 */}
+        <g transform="translate(465, 187)" filter="url(#bioDropShadow)">
+          <rect x="0" y="0" width="70" height="36" rx="8" fill="url(#bioMyelinGrad)" stroke="#38bdf8" strokeWidth="1.6" />
+          <ellipse cx="35" cy="8" rx="10" ry="4" fill="#0369a1" stroke="#7dd3fc" strokeWidth="1" />
+          <text x="35" y="26" fill="#f0f9ff" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            MYELIN #3
+          </text>
+        </g>
+
+        {/* Segment 4 */}
+        <g transform="translate(555, 187)" filter="url(#bioDropShadow)">
+          <rect x="0" y="0" width="65" height="36" rx="8" fill="url(#bioMyelinGrad)" stroke="#38bdf8" strokeWidth="1.6" />
+          <ellipse cx="32" cy="8" rx="10" ry="4" fill="#0369a1" stroke="#7dd3fc" strokeWidth="1" />
+          <text x="32" y="26" fill="#f0f9ff" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            MYELIN #4
+          </text>
+        </g>
+
+        {/* Nodes of Ranvier (Exposed Gaps with Na+ Influx) */}
+        {/* Node 1 */}
+        <g transform="translate(365, 205)">
+          <text x="0" y="32" fill="#facc15" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            Node #1
+          </text>
+          <text x="0" y="44" fill="#fef08a" fontSize="7.5" textAnchor="middle" fontFamily="sans-serif">
+            Na⁺ Influx
+          </text>
+          <path d="M0,8 L0,18" stroke="#facc15" strokeWidth="1.5" />
+        </g>
+
+        {/* Node 2 */}
+        <g transform="translate(455, 205)">
+          <text x="0" y="32" fill="#facc15" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            Node #2
+          </text>
+          <text x="0" y="44" fill="#fef08a" fontSize="7.5" textAnchor="middle" fontFamily="sans-serif">
+            Na⁺ Influx
+          </text>
+          <path d="M0,8 L0,18" stroke="#facc15" strokeWidth="1.5" />
+        </g>
+
+        {/* Node 3 */}
+        <g transform="translate(545, 205)">
+          <text x="0" y="32" fill="#facc15" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
+            Node #3
+          </text>
+          <text x="0" y="44" fill="#fef08a" fontSize="7.5" textAnchor="middle" fontFamily="sans-serif">
+            Na⁺ Influx
+          </text>
+          <path d="M0,8 L0,18" stroke="#facc15" strokeWidth="1.5" />
+        </g>
+
+        {/* Saltatory Conduction Leaping Arcs (Action Potential Jumping from Node to Node) */}
+        <g fill="none" stroke="#fde047" strokeWidth="2" strokeDasharray="4 2">
+          {/* Leap 1: Hillock to Node 1 */}
+          <path d="M275,183 Q 320,155 365,183" />
+          {/* Leap 2: Node 1 to Node 2 */}
+          <path d="M365,183 Q 410,155 455,183" />
+          {/* Leap 3: Node 2 to Node 3 */}
+          <path d="M455,183 Q 500,155 545,183" />
+          {/* Leap 4: Node 3 to Terminal */}
+          <path d="M545,183 Q 585,155 625,183" />
+        </g>
+        {/* Animated Traveling Action Potential Pulse */}
+        <circle cx="275" cy="183" r="4.5" fill="#fef08a" filter="url(#bioDropShadow)">
+          <animate attributeName="cx" values="275;365;455;545;625" dur="1.8s" repeatCount="indefinite" />
+        </circle>
+        <text x="455" y="152" fill="#fde047" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="-apple-system, sans-serif">
+          ⚡ Saltatory Conduction (Up to 120 m/s)
+        </text>
+
+        {/* Axon Terminal & Synaptic Boutons */}
+        <g stroke="#34d399" strokeLinecap="round" fill="none">
+          <path d="M620,205 Q 645,180 670,160" strokeWidth="3" />
+          <path d="M620,205 Q 650,205 680,205" strokeWidth="3.5" />
+          <path d="M620,205 Q 645,230 670,250" strokeWidth="3" />
+        </g>
+        {/* Synaptic Bouton Bulbs */}
+        <circle cx="672" cy="158" r="6" fill="#065f46" stroke="#34d399" strokeWidth="1.8" />
+        <circle cx="682" cy="205" r="7" fill="#065f46" stroke="#34d399" strokeWidth="2" />
+        <circle cx="672" cy="252" r="6" fill="#065f46" stroke="#34d399" strokeWidth="1.8" />
+
+        {/* Detail Callout of Synaptic Cleft at (682, 205) */}
+        <g transform="translate(620, 265)">
+          <rect x="0" y="0" width="125" height="52" rx="6" fill="#0f172a" stroke="#34d399" strokeWidth="1.2" />
+          <text x="62" y="15" fill="#34d399" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            Synaptic Cleft (20nm)
+          </text>
+          <text x="62" y="28" fill="#e2e8f0" fontSize="8" textAnchor="middle" fontFamily="monospace">
+            Vesicular Exocytosis
+          </text>
+          <text x="62" y="42" fill="#94a3b8" fontSize="8" textAnchor="middle" fontFamily="sans-serif">
+            ACh / Glutamate Release
+          </text>
+        </g>
+
+        {/* Global Propagation Arrow Across Bottom */}
+        <g transform="translate(140, 345)">
+          <rect x="0" y="0" width="480" height="20" rx="4" fill="#1b1a18" stroke="rgba(255,255,255,0.08)" />
+          <path d="M20,10 L460,10" stroke="#f97316" strokeWidth="2" strokeDasharray="6 4" />
+          <polygon points="460,6 468,10 460,14" fill="#f97316" />
+          <text x="240" y="14" fill="#faf9f5" fontSize="9.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
+            Orthodromic Propagation: Dendrite ➔ Soma ➔ Axon Hillock ➔ Nodes of Ranvier ➔ Synapse
+          </text>
+        </g>
+      </svg>
+    );
+  };
+
   // Render High-Precision Microcontroller / SoC System Architecture SVG
   const renderArchitectureSvg = () => {
     return (
@@ -764,6 +1112,8 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
               ? 'ATOMIC MODEL'
               : normalizedType === 'molecule'
               ? 'MOLECULAR STRUCTURE'
+              : normalizedType === 'biological-neuron'
+              ? 'NEUROBIOLOGY SCHEMATIC'
               : normalizedType === 'neural-net'
               ? 'NEURAL ARCHITECTURE'
               : normalizedType === 'architecture'
@@ -776,6 +1126,8 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
                 ? `Bohr Model: ${currentAtom.name} (${currentAtom.symbol}, Z=${currentAtom.z})`
                 : normalizedType === 'molecule'
                 ? `Molecular Geometry: ${moleculePreset.toUpperCase()}`
+                : normalizedType === 'biological-neuron'
+                ? 'Biological Multipolar Neuron & Glial Architecture'
                 : normalizedType === 'neural-net'
                 ? 'Deep Neural Network Topology'
                 : normalizedType === 'architecture'
@@ -786,6 +1138,17 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
 
         {/* Action Controls */}
         <div className="universal-diagram-actions">
+          {normalizedType === 'atom' && (
+            <button
+              type="button"
+              className={`universal-diagram-btn ${is3DMode ? 'universal-diagram-btn--active' : ''}`}
+              onClick={() => setIs3DMode((m) => !m)}
+              title={is3DMode ? 'Switch to 2D Bohr Vector Model' : 'Switch to Interactive 3D WebGL Orbitals'}
+            >
+              {is3DMode ? '🪐 3D Orbitals' : '📐 2D Bohr'}
+            </button>
+          )}
+
           {normalizedType === 'atom' && (
             <button
               type="button"
@@ -909,19 +1272,106 @@ export const UniversalDiagramCard: React.FC<UniversalDiagramProps> = ({
         </div>
       )}
 
+      {/* Row 2: Cellular Component Badges for Biological Neuroanatomy */}
+      {normalizedType === 'biological-neuron' && (
+        <div className="universal-diagram-presets-bar">
+          <span className="universal-diagram-presets-label">Cellular Architecture:</span>
+          <span className="universal-diagram-preset-pill universal-diagram-preset-pill--active">
+            Dendrites &amp; Spines (Receptive Field)
+          </span>
+          <span className="universal-diagram-preset-pill">
+            Soma &amp; Nucleus (Metabolism)
+          </span>
+          <span className="universal-diagram-preset-pill">
+            Axon Hillock (Trigger Zone / Vth -55mV)
+          </span>
+          <span className="universal-diagram-preset-pill">
+            Myelin Sheaths &amp; Nodes of Ranvier
+          </span>
+          <span className="universal-diagram-preset-pill">
+            Synaptic Boutons (Exocytosis)
+          </span>
+          <span className="universal-diagram-preset-pill">
+            Astrocyte Glia (BBB Coupling)
+          </span>
+        </div>
+      )}
+
       {/* Visual Canvas Stage (Scalable Transform) */}
       <div className="universal-diagram-viewport" ref={svgContainerRef}>
-        <div
-          className="universal-diagram-svg-wrap"
-          style={{ transform: `scale(${zoomLevel})` }}
-        >
-          {normalizedType === 'atom' && renderAtomSvg()}
-          {normalizedType === 'molecule' && renderMoleculeSvg()}
-          {normalizedType === 'neural-net' && renderNeuralNetSvg()}
-          {normalizedType === 'architecture' && renderArchitectureSvg()}
-          {normalizedType === 'custom-svg' && renderCustomSvg()}
-        </div>
+        {normalizedType === 'atom' && is3DMode ? (
+          <AtomViewer3D
+            atom={currentAtom}
+            animate={animate}
+            showLabels={showLabels}
+          />
+        ) : (
+          <div
+            className="universal-diagram-svg-wrap"
+            style={{ transform: `scale(${zoomLevel})` }}
+          >
+            {normalizedType === 'atom' && renderAtomSvg()}
+            {normalizedType === 'molecule' && renderMoleculeSvg()}
+            {normalizedType === 'biological-neuron' && renderBiologicalNeuronSvg()}
+            {normalizedType === 'neural-net' && renderNeuralNetSvg()}
+            {normalizedType === 'architecture' && renderArchitectureSvg()}
+            {normalizedType === 'custom-svg' && renderCustomSvg()}
+          </div>
+        )}
       </div>
+
+      {/* Editorial Scientific Data Cards for Biological Neuroanatomy */}
+      {normalizedType === 'biological-neuron' && (
+        <div className="universal-diagram-editorial-panel">
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Membrane Electrophysiology</span>
+            <span className="universal-diagram-col-headline" style={{ color: '#38bdf8' }}>
+              Resting Potential: -70 mV
+            </span>
+            <div className="universal-diagram-col-metric">
+              Threshold: -55 mV (Voltage-Gated Na⁺ Activation)
+            </div>
+            <div className="universal-diagram-col-metric">
+              Action Potential Peak: +30 mV (Rapid Depolarization)
+            </div>
+            <div className="universal-diagram-col-metric">
+              Ion Gradient: Na⁺/K⁺-ATPase (3 Na⁺ out / 2 K⁺ in)
+            </div>
+          </div>
+
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Axonal Conduction Dynamics</span>
+            <span className="universal-diagram-col-headline" style={{ color: '#fbbf24' }}>
+              Saltatory Conduction (~120 m/s)
+            </span>
+            <div className="universal-diagram-col-metric">
+              Myelin Sheath: Schwann cells (PNS) / Oligodendrocytes (CNS)
+            </div>
+            <div className="universal-diagram-col-metric">
+              Nodes of Ranvier: Clustered Nav1.6 channels (~12,000/µm²)
+            </div>
+            <div className="universal-diagram-col-metric">
+              Transmission: High-speed electrotonic leap between nodes
+            </div>
+          </div>
+
+          <div className="universal-diagram-card-column">
+            <span className="universal-diagram-col-title">Glial Architecture &amp; Synapse</span>
+            <span className="universal-diagram-col-headline" style={{ color: '#c084fc' }}>
+              Astrocytes &amp; Glial Ratio (~1:1)
+            </span>
+            <div className="universal-diagram-col-metric">
+              Astrocytes: K⁺ buffering, glutamate uptake, blood-brain barrier
+            </div>
+            <div className="universal-diagram-col-metric">
+              Synaptic Cleft: 20–40 nm gap, exocytotic vesicle release
+            </div>
+            <div className="universal-diagram-col-metric">
+              Neurotransmitters: Glutamate (excitatory), GABA (inhibitory)
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Editorial Scientific Data Cards for Microcontroller Architecture */}
       {normalizedType === 'architecture' && (

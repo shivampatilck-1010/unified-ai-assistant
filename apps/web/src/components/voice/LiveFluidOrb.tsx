@@ -89,9 +89,10 @@ export const LiveFluidOrb: React.FC<LiveFluidOrbProps> = ({
     const render = () => {
       if (!isMounted) return;
 
-      // Smooth volume interpolation
+      // Responsive dynamic volume interpolation: Fast attack for instant organic spiking, smooth release
       const targetVol = Math.max(0, Math.min(1, volume));
-      smoothVolRef.current += (targetVol - smoothVolRef.current) * 0.22;
+      const attackSpeed = targetVol > smoothVolRef.current ? 0.65 : 0.16;
+      smoothVolRef.current += (targetVol - smoothVolRef.current) * attackSpeed;
       const v = smoothVolRef.current;
 
       // Animation speed scaling based on voice state
@@ -169,9 +170,12 @@ export const LiveFluidOrb: React.FC<LiveFluidOrbProps> = ({
         for (let i = 0; i <= steps; i++) {
           const theta = (i / steps) * Math.PI * 2;
 
-          // 3D Harmonic Toroidal parametric math (exact shape from reference design)
+          // 3D Harmonic Toroidal parametric math with expressive high-frequency audio spiking
           const harmonicMod = 0.32 * Math.sin(cfg.harmonic * theta + t * 2.2 + idx);
-          const audioSpike = v * 0.45 * Math.sin(theta * 6 + t * 4);
+          const audioSpike = v * (
+            0.65 * Math.sin(theta * 8 + t * 5 + idx) +
+            0.35 * Math.cos(theta * 14 - t * 3)
+          );
           const r = baseRadius * (0.85 + harmonicMod + audioSpike);
 
           // 3D coordinates on rotating torus

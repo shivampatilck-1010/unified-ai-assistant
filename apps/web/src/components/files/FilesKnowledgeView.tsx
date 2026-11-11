@@ -45,6 +45,8 @@ export const FilesKnowledgeView: React.FC = () => {
   // Preview Modal state
   const [inspectingFile, setInspectingFile] = useState<FileDetailResponse | null>(null);
   const [isInspectingLoading, setIsInspectingLoading] = useState(false);
+  const [chunkFilterQuery, setChunkFilterQuery] = useState('');
+  const [copiedChunkId, setCopiedChunkId] = useState<string | null>(null);
 
   // Ask Documents Q&A state
   const [question, setQuestion] = useState('');
@@ -137,6 +139,7 @@ export const FilesKnowledgeView: React.FC = () => {
   // Inspect Chunks
   const handleInspect = async (fileId: string) => {
     setIsInspectingLoading(true);
+    setChunkFilterQuery('');
     try {
       const detail = await fetchFileDetail(fileId);
       setInspectingFile(detail);
@@ -145,6 +148,12 @@ export const FilesKnowledgeView: React.FC = () => {
     } finally {
       setIsInspectingLoading(false);
     }
+  };
+
+  // Direct 1-Click Ask Document
+  const handleAskDocument = (fileId: string) => {
+    setSelectedFileIds([fileId]);
+    setActiveTab('ask');
   };
 
   // Reprocess
@@ -357,6 +366,13 @@ export const FilesKnowledgeView: React.FC = () => {
 
                   <div className="fk-file-actions">
                     <button
+                      className="fk-btn fk-btn--primary"
+                      onClick={() => handleAskDocument(f.id)}
+                      title={`Ask questions directly grounded in ${f.filename}`}
+                    >
+                      Ask Document
+                    </button>
+                    <button
                       className="fk-btn"
                       onClick={() => handleInspect(f.id)}
                       disabled={isInspectingLoading}
@@ -509,24 +525,60 @@ export const FilesKnowledgeView: React.FC = () => {
             </div>
 
             <div className="fk-modal__body">
+              {inspectingFile.preview_chunks.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <input
+                    type="text"
+                    className="fk-search-input"
+                    placeholder="Search in chunks..."
+                    value={chunkFilterQuery}
+                    onChange={(e) => setChunkFilterQuery(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+
               {inspectingFile.preview_chunks.length === 0 ? (
                 <p style={{ color: '#888' }}>No chunks available for this file.</p>
               ) : (
-                inspectingFile.preview_chunks.map((chk) => (
-                  <div key={chk.id} className="fk-chunk-card">
-                    <div className="fk-chunk-meta">
-                      <span>
-                        Chunk #{chk.chunk_index + 1}
-                        {chk.page_number ? ` • Page ${chk.page_number}` : ''}
-                        {chk.section_title ? ` • ${chk.section_title}` : ''}
-                      </span>
-                      <span>{chk.token_count} tokens</span>
-                    </div>
-                    <div className="fk-chunk-content">
-                      {chk.content}
-                    </div>
-                  </div>
-                ))
+                inspectingFile.preview_chunks
+                  .filter((chk) =>
+                    !chunkFilterQuery ||
+                    chk.content.toLowerCase().includes(chunkFilterQuery.toLowerCase()) ||
+                    (chk.section_title && chk.section_title.toLowerCase().includes(chunkFilterQuery.toLowerCase()))
+                  )
+                  .map((chk) => {
+                    const wordCount = chk.content.trim().split(/\s+/).filter(Boolean).length;
+                    return (
+                      <div key={chk.id} className="fk-chunk-card">
+                        <div className="fk-chunk-meta">
+                          <span>
+                            Chunk #{chk.chunk_index + 1}
+                            {chk.page_number ? ` • Page ${chk.page_number}` : ''}
+                            {chk.section_title ? ` • ${chk.section_title}` : ''}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{chk.token_count} tokens • {wordCount} words</span>
+                            <button
+                              type="button"
+                              className="fk-btn"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              onClick={() => {
+                                void navigator.clipboard.writeText(chk.content);
+                                setCopiedChunkId(chk.id);
+                                setTimeout(() => setCopiedChunkId(null), 2000);
+                              }}
+                            >
+                              {copiedChunkId === chk.id ? '✓ Copied' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="fk-chunk-content">
+                          {chk.content}
+                        </div>
+                      </div>
+                    );
+                  })
               )}
             </div>
           </div>

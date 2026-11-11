@@ -14,7 +14,6 @@ import { InteractiveCalendarEventCard } from '../calendar/InteractiveCalendarEve
 import type { ExplanationBranch } from './explanationBranches';
 import { highlightCode } from '../../utils/syntaxHighlighter';
 import { replaceEmojisWithCustom } from '../common/CustomEmoji';
-import { BmwChassisVisualizer3D } from '../vibe';
 import { InteractiveModel3D } from './InteractiveModel3D';
 import { parseInteractiveModel } from './interactiveModelSchema';
 import './MarkdownContent.css';
@@ -40,6 +39,7 @@ mermaid.initialize({
 interface MarkdownContentProps {
   content: string;
   isError?: boolean;
+  isStreaming?: boolean;
   onSelectChoice?: (choice: string) => void;
 }
 
@@ -408,7 +408,7 @@ const AutoRouteBanner: React.FC<AutoRouteBannerProps> = ({ rawText }) => {
   );
 };
 
-export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ content, isError, onSelectChoice }) => {
+export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ content, isError, isStreaming, onSelectChoice }) => {
   // Clean raw quota errors
   const cleanContent = React.useMemo(() => {
     if (!content) return '';
@@ -540,13 +540,39 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       if (parsed.ok) {
         return <InteractiveModel3D model={parsed.model} />;
       }
+      if (isStreaming) {
+        return (
+          <div
+            className="code-block-container"
+            style={{
+              padding: '24px 20px',
+              textAlign: 'center',
+              background: '#161513',
+              border: '1px solid rgba(217, 119, 87, 0.35)',
+              borderRadius: '12px',
+            }}
+          >
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', color: '#f3f4f6', fontWeight: 600 }}>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#d97757', animation: 'pulse 1.5s infinite' }} />
+              <span>Building Interactive 3D Model…</span>
+            </div>
+            <p style={{ margin: '8px 0 0', color: '#9ca3af', fontSize: '12px' }}>
+              Streaming spatial coordinates, geometry, and cross-section telemetry…
+            </p>
+          </div>
+        );
+      }
       return (
         <div className="code-block-container" role="alert">
           <div className="code-block-header">
             <span className="code-block-lang">3D model could not be rendered</span>
           </div>
-          <p style={{ padding: '0 14px', color: '#ffc3aa', fontSize: '13px' }}>{parsed.error}</p>
-          <pre className="code-block-pre"><code>{code}</code></pre>
+          <p style={{ padding: '0 14px', color: '#ffc3aa', fontSize: '13px' }}>
+            The model output is malformed ({parsed.error}). Regenerate the response or ask for a simpler model.
+          </p>
+          <pre className="code-block-pre" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            <code>{code}</code>
+          </pre>
         </div>
       );
     }
@@ -859,7 +885,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
 
       let diagType: string = lowerLang;
       let diagTitle: string | undefined = undefined;
-      let diagElement: string = 'Carbon';
+      let diagElement: string = 'Argon';
 
       const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);
       if (typeMatch) diagType = typeMatch[1].toLowerCase();
@@ -867,27 +893,44 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
       const titleMatch = code.match(/title:\s*([^\n]+)/i);
       if (titleMatch) diagTitle = titleMatch[1].replace(/^["']|["']$/g, '').trim();
 
-      const elemMatch = code.match(/element:\s*([a-zA-Z0-9_-]+)/i);
-      if (elemMatch) diagElement = elemMatch[1].trim();
+      const elemMatch = code.match(/element:\s*["']?([a-zA-Z0-9_-]+)["']?/i);
+      if (elemMatch) {
+        diagElement = elemMatch[1].trim();
+      } else {
+        const knownElements = [
+          'argon', 'hydrogen', 'helium', 'lithium', 'beryllium', 'boron',
+          'carbon', 'nitrogen', 'oxygen', 'fluorine', 'neon', 'sodium',
+          'magnesium', 'aluminum', 'silicon', 'phosphorus', 'sulfur',
+          'chlorine', 'potassium', 'calcium', 'iron', 'copper', 'zinc',
+          'krypton', 'silver', 'gold'
+        ];
+        const searchScope = `${diagTitle || ''} ${code}`.toLowerCase();
+        for (const el of knownElements) {
+          const reg = new RegExp(`\\b${el}\\b`, 'i');
+          if (reg.test(searchScope)) {
+            diagElement = el.charAt(0).toUpperCase() + el.slice(1);
+            break;
+          }
+        }
+      }
+
+      if (/3d|orbital/i.test(code) || /3d|orbital/i.test(diagTitle || '') || lowerLang.includes('3d')) {
+        if (diagType === 'atom') {
+          diagType = 'atom-3d';
+        }
+      }
 
       if (/esp32|pro_cpu|app_cpu|xtensa|microcontroller|ulp\s*coprocessor|system\s*memory|soc/i.test(code)) {
         diagType = 'architecture';
       }
 
-      // 3D Mechanical Digital Twin: Auto-upgrade automotive/BMW chassis & powertrain schematics to interactive 3D WebGL!
-      if (
-        /bmw|longitudinal.*chassis|powertrain.*skeleton|transmission.*zf|b58.*engine|rwd.*chassis|50:50.*mass/i.test(code) ||
-        /bmw|chassis.*skeleton|longitudinal.*powertrain/i.test(diagTitle || '') ||
-        lowerLang === 'bmw-chassis' ||
-        lowerLang === 'bmw' ||
-        lowerLang === 'powertrain-3d' ||
-        lowerLang === 'chassis-3d'
-      ) {
-        return (
-          <BmwChassisVisualizer3D
-            title={diagTitle || "BMW Longitudinal Chassis & Powertrain Architecture (CLAR)"}
-          />
-        );
+      // Biological Neuroanatomy Disambiguation (Biological Neurons vs Machine Learning ANNs)
+      const isBioNeuronContext =
+        /neuron|biological|nervous|glial|glia|soma|axon|dendrite|myelin|ranvier|synapse|schwann|astrocyte|neurotransmitter|saltatory|action\s*potential|membrane\s*potential/i.test(`${diagType} ${diagTitle || ''} ${code}`) &&
+        !/deep\s*learning|perceptron|artificial|mlp|backprop|cnn|rnn|layer\s*weights/i.test(`${diagType} ${diagTitle || ''} ${code}`);
+
+      if (isBioNeuronContext) {
+        diagType = 'biological-neuron';
       }
 
       // Direct seamless routing for SVG schematics & illustrations: render borderless EmbeddedFigure!
@@ -912,20 +955,6 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = React.memo(({ con
           title={diagTitle}
           code={code}
           element={diagElement}
-        />
-      );
-    }
-
-    if (
-      lowerLang === 'bmw-chassis' ||
-      lowerLang === 'bmw' ||
-      lowerLang === 'powertrain' ||
-      lowerLang === 'chassis-3d' ||
-      lowerLang === 'powertrain-3d'
-    ) {
-      return (
-        <BmwChassisVisualizer3D
-          title="BMW Longitudinal Chassis & Powertrain Architecture (CLAR)"
         />
       );
     }

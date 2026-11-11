@@ -47,6 +47,15 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
+  // Detected User Timezone
+  const userTimeZone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch {
+      return 'UTC';
+    }
+  }, []);
+
   // Editable Event State
   const [title, setTitle] = useState(event.title || 'Chemistry Exam');
   const [date, setDate] = useState(
@@ -168,9 +177,10 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
       dates: dates,
       details: `${notes}\n\nPrepared on Unified AI Assistant: https://unified-ai-assistant.cortexbuild1.workers.dev`,
       location: location || 'Exam Center / Campus',
+      ctz: userTimeZone,
     });
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
-  }, [title, date, startTime, endTime, notes, location]);
+  }, [title, date, startTime, endTime, notes, location, userTimeZone]);
 
   // Dynamic Outlook Calendar Link
   const outlookCalendarUrl = useMemo(() => {
@@ -290,6 +300,9 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
             <span className="sched-live-dot" />
             {isSavedToUnified ? 'Saved to Calendar' : 'Draft'}
           </span>
+          <span className="sched-tz-badge" title={`Detected local timezone: ${userTimeZone}`}>
+            {userTimeZone.split('/').pop()?.replace(/_/g, ' ') || userTimeZone}
+          </span>
         </div>
 
         <button
@@ -326,6 +339,12 @@ export const InteractiveCalendarEventCard: React.FC<InteractiveCalendarEventCard
               onChange={(e) => {
                 setTitle(e.target.value);
                 setIsSavedToUnified(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handleSaveToUnifiedCalendar();
+                }
               }}
               placeholder="e.g. Chemistry Exam, Math Midterm"
             />

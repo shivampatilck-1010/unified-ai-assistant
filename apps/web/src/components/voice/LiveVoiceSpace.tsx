@@ -405,24 +405,20 @@ export const LiveVoiceSpace: React.FC<LiveVoiceSpaceProps> = ({
     rec.onresult = (event: any) => {
       // If AI is currently speaking:
       if (isSpeakingRef.current) {
-        // Voice Barge-In: Check if user spoke an intentional voice interruption command!
+        // Universal Voice Barge-In: Any clear user speech immediately halts assistant speech synthesis
         let bargeInText = '';
+        let hasFinal = false;
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           bargeInText += event.results[i][0].transcript + ' ';
+          if (event.results[i].isFinal) hasFinal = true;
         }
-        const lower = bargeInText.toLowerCase().trim();
-        if (
-          lower.includes('stop') ||
-          lower.includes('wait') ||
-          lower.includes('hold on') ||
-          lower.includes('shut up') ||
-          lower.includes('pause') ||
-          lower.includes('cancel') ||
-          lower.includes('quiet')
-        ) {
+        const cleanBarge = deduplicateSpeech(bargeInText);
+        if (cleanBarge.length > 1) {
           handleInterruptVoice();
+          finalTranscriptRef.current = hasFinal ? cleanBarge + ' ' : '';
+          setTranscript(cleanBarge);
+          setVoiceState('listening');
         }
-        // Suppress laptop speaker acoustic echo loop
         return;
       }
 

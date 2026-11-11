@@ -100,8 +100,21 @@ export const InteractiveSimulationCard: React.FC<InteractiveSimulationCardProps>
   // Determine actual simulation type
   const resolvedType = React.useMemo(() => {
     if (activeSimOverride) return activeSimOverride;
-    // If explicitly provided a specific type (other than generic custom-html), use it
-    if (type && type !== 'custom-html') return type;
+    // Prioritize AI-generated custom simulations (HTML/Canvas/SVG scripts) over predefined templates
+    const hasCustomExecutable =
+      code.includes('<canvas') ||
+      code.includes('<script') ||
+      code.includes('requestAnimationFrame') ||
+      code.includes('<!DOCTYPE') ||
+      code.includes('<html') ||
+      type === 'custom-html';
+
+    if (hasCustomExecutable) {
+      return 'custom-html';
+    }
+
+    // If explicitly provided a specific type, use it
+    if (type) return type;
 
     const lowerCode = code.toLowerCase().trim();
     const typeMatch = code.match(/type:\s*([a-zA-Z0-9_-]+)/i);

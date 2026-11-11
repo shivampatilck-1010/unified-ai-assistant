@@ -564,6 +564,7 @@ export function ChatView({
                         )}
                         <MarkdownContent
                           content={cleanContent}
+                          isStreaming={Boolean(msg.isStreaming)}
                           onSelectChoice={(choice) => onSend(choice, currentModel?.provider, selectedModelId)}
                         />
                         {(cleanContent.includes('Anthropic API Key Required') ||

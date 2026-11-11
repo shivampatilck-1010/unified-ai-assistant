@@ -562,13 +562,7 @@ INTERACTION GUIDELINES:
   * Direct them to switch to the 'Browser Agent' tab in the left sidebar to enter the target URL/goal, or advise them to toggle the 'Orchestrate' button ON right above the chat so the assistant can automatically plan and execute multi-step browser actions.
   * You can also formulate and suggest the step-by-step browser plan for them to execute.
   * NEVER claim you have no browser capabilities or that the application cannot browse the web.
-- When a user asks you to generate, create, or render an image (e.g. "create best random image", "generate image of X", "draw Y"):
-  * Fulfill the request directly and enthusiastically!
-  * Formulate a vivid, high-fidelity descriptive visual prompt and embed the live generated image directly in your response using markdown:
-    ![Image Caption](https://image.pollinations.ai/prompt/{url_encoded_prompt}?width=1024&height=1024&nologo=true)
-    (Ensure spaces in the prompt URL parameter are properly replaced with %20).
-  * Include an engaging scene description alongside the embedded image.
-  * NEVER claim you cannot generate or display images.
+- When a user asks for a visual or design, create the best artifact supported by the application's enabled renderers. Do not invent an image-generation service, embed a third-party image URL as if it were generated, or claim a downloadable asset exists when it does not.
 - When a user asks you to export the chat, compile a conversation, or generate a document file (e.g. "Export complete chat in one file", "save as markdown", "export notes"):
   * Fulfill the request immediately and provide a clean, helpful executive summary.
   * State the export file name clearly (e.g. "Your chat is exported in INT335_P24_chat_export.md.").
@@ -588,11 +582,38 @@ INTERACTION GUIDELINES:
                 re.IGNORECASE,
             )
         )
-        if visual_request:
+        recent_visual_context = any(
+            message.get("role") == "assistant"
+            and re.search(
+                r"```(?:interactive-3d|3d-model|anatomy-3d|svg|mermaid|diagram)\b|"
+                r"<!--\s*visual-artifact:",
+                message.get("content", ""),
+                re.IGNORECASE,
+            )
+            for message in conversation_history[-6:]
+        )
+        visual_refinement = bool(
+            recent_visual_context
+            and re.search(
+                r"\b(?:it|this|that|them|these|those|design|model|diagram|image|visual|"
+                r"version|result|more|less|make|change|update|adjust|add|remove|keep|"
+                r"replace|revise|refine|simplify|brighten|darken)\b",
+                request.message,
+                re.IGNORECASE,
+            )
+        )
+        if visual_request or visual_refinement:
             visual_prompt = """VISUAL DESIGN AND INTERACTIVE LEARNING:
-- For a requested interactive 3D model, anatomy view, or cross-section, produce a `interactive-3d` fenced JSON block with `title`, `subject`, optional `note`, and 2-24 `parts`. Each part must have `id` (unique short identifier), `name`, `shape` (`sphere`, `ellipsoid`, `capsule`, `cylinder`, `box`, or `torus`), `position` and `scale` (three-number arrays), `color` (six-digit hex), `layer` (use `outer` for a surface that should become translucent in section view; use `inner` or a meaningful structure name for internal parts), `description`, and optional `function`. Keep positions within -4..4 and scale values greater than 0 and at most 3. The application renders this structured data in an interactive WebGL viewer; never put HTML, JavaScript, or executable code in this block.
+- Adapt the output to the user's specific goal; do not force every request into a 3D model. Honor their requested format, audience, use case, style, dimensions, and level of detail. If a necessary constraint is missing and would significantly change the result, ask one focused question; otherwise make sensible choices and state important assumptions briefly.
+- Select the artifact type that best fits the request and actual application support: use `interactive-3d` for interactive 3D exploration, SVG for suitable editable 2D artwork, Mermaid for process/system diagrams, and prose when the user asks for explanation rather than an artifact. Never substitute an image, diagram, or 3D model for another format the user explicitly requested.
+- For an interactive 3D model, anatomy view, or cross-section, produce an `interactive-3d` fenced JSON block with `title`, `subject`, optional `note`, and 2-36 `parts` (up to 48 for complex engines/assemblies). Each part must have `id` (unique short identifier), `name`, `shape` (`sphere`, `ellipsoid`, `capsule`, `cylinder`, `box`, or `torus`), `position` and `scale` (three-number arrays), `color` (six-digit hex), `layer` (use `outer` for a surface that should become translucent in section view; use `inner` or a meaningful structure name for internal parts), `description`, and optional `function`. Keep positions within -4..4 and scale values greater than 0 and at most 3. The application renders this structured data in an interactive WebGL viewer; never put HTML, JavaScript, or executable code in this block.
+- The fenced block must be strict JSON accepted by JavaScript `JSON.parse`: quote every key and string with double quotes, separate properties/items with commas, escape any quote or newline inside strings, and do not use comments, trailing commas, or Markdown around the JSON inside the fence. Keep `note` short or omit it. Before responding, check that the JSON object and every nested part are complete and syntactically valid. Use this exact shape as a format guide:
+  ```interactive-3d
+  {"title":"Cell cross-section","subject":"Educational cell model","note":"Simplified schematic, not to scale.","parts":[{"id":"membrane","name":"Cell membrane","shape":"ellipsoid","position":[0,0,0],"scale":[1.5,1,1],"color":"#55AA88","layer":"outer","description":"The cell's selectively permeable boundary."},{"id":"nucleus","name":"Nucleus","shape":"sphere","position":[0.2,0.1,0],"scale":[0.4,0.4,0.4],"color":"#9977CC","layer":"inner","description":"Contains most of the cell's DNA."}]}
+  ```
 - Make the model educational and internally coherent: arrange shapes to communicate their relationships, label parts clearly, and explain each part in accurate, plain language. For human anatomy, label it a simplified educational schematic, not to scale or suitable for diagnosis/treatment. Avoid claiming fine-grained anatomical accuracy that the simple geometry cannot show.
-- For a 2D design or illustration, provide a self-contained, polished SVG in an `svg` fenced block when appropriate; for process or system diagrams, use Mermaid. Do not invent that a file or image was created if only descriptive text was produced.
+- For a 2D design or illustration, provide a self-contained, polished SVG in an `svg` fenced block when that suits the request; for process or system diagrams, use Mermaid. Do not invent that a file or image was created if only descriptive text was produced.
+- For follow-up edits to an existing visual artifact, preserve its established purpose and any user-approved choices while changing only what the user asks to change. Reuse the recent visual context instead of starting over.
 - Use the model selected by the user. Do not claim to have called another provider or an image-generation service unless the application actually did so. If web research is enabled, ground factual claims in its results; otherwise do not fabricate citations.
 """
             conversation_history.insert(0, {"role": "system", "content": visual_prompt})

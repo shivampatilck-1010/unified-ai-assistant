@@ -42,7 +42,12 @@ export type EmojiName =
   | 'key'
   | 'package'
   | 'tag'
-  | 'gem';
+  | 'gem'
+  | 'atom'
+  | 'microscope'
+  | 'dna'
+  | 'terminal'
+  | 'clipboard';
 
 interface CustomEmojiProps {
   name: EmojiName;
@@ -422,6 +427,54 @@ export const CustomEmoji: React.FC<CustomEmojiProps> = ({
           </svg>
         );
 
+      case 'atom':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="2.5" fill="#38bdf8" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" stroke="#38bdf8" strokeWidth="1.5" transform="rotate(30 12 12)" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" stroke="#818cf8" strokeWidth="1.5" transform="rotate(-30 12 12)" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" stroke="#06b6d4" strokeWidth="1.5" transform="rotate(90 12 12)" />
+          </svg>
+        );
+
+      case 'microscope':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 18h8M10 22h8M14 18v4" />
+            <circle cx="9" cy="9" r="3" fill="rgba(6, 182, 212, 0.2)" />
+            <path d="M12 9a4 4 0 0 1-4 4H7" />
+            <path d="M9 3l4 4-2 2-4-4 2-2z" fill="#06b6d4" fillOpacity="0.3" />
+            <path d="M14 8l1.5-1.5" />
+          </svg>
+        );
+
+      case 'dna':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#ec4899" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 15c6.667-6 13.333 0 20-6" />
+            <path d="M2 9c6.667 6 13.333 0 20 6" stroke="#38bdf8" />
+            <path d="M7 11.5v1M12 10.5v3M17 11.5v1" stroke="#f472b6" strokeWidth="1.5" />
+          </svg>
+        );
+
+      case 'terminal':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="4" width="20" height="16" rx="3" fill="#181920" stroke="#38bdf8" strokeWidth="1.6" />
+            <polyline points="6 9 10 12 6 15" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <line x1="13" y1="15" x2="18" y2="15" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        );
+
+      case 'clipboard':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+            <rect x="8" y="2" width="8" height="4" rx="1" fill="#27272a" stroke="#38bdf8" strokeWidth="1.5" />
+            <path d="M9 12l2 2 4-4" stroke="#10b981" strokeWidth="1.8" />
+          </svg>
+        );
+
       case 'chat':
       default:
         return (
@@ -463,6 +516,9 @@ export const EMOJI_MAP: Record<string, EmojiName> = {
   '🍏': 'apple',
   '💻': 'laptop',
   '📱': 'laptop',
+  '🖥️': 'terminal',
+  '🖥': 'terminal',
+  '⌨️': 'terminal',
   '🤖': 'robot',
   '🧠': 'brain',
 
@@ -485,7 +541,10 @@ export const EMOJI_MAP: Record<string, EmojiName> = {
   '🧪': 'flask',
   '⚗️': 'flask',
   '⚗': 'flask',
-  '🔬': 'flask',
+  '🔬': 'microscope',
+  '⚛️': 'atom',
+  '⚛': 'atom',
+  '🧬': 'dna',
   '📚': 'books',
   '📖': 'books',
   '🎓': 'grad-cap',
@@ -517,7 +576,7 @@ export const EMOJI_MAP: Record<string, EmojiName> = {
   '📂': 'folder',
   '📝': 'memo',
   '📄': 'memo',
-  '📋': 'memo',
+  '📋': 'clipboard',
   '🔒': 'lock',
   '🔑': 'key',
   '📦': 'package',
